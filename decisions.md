@@ -124,3 +124,56 @@ repertoire; additive, v1/v2 preserved — verified live at version 3 with all 9 
 games, analyses, SRS cards, and the repertoire behind on wipe — a privacy defect. Fixed to iterate
 `db.objectStoreNames` (covers future stores automatically) plus clear the separate tablebase cache DB.
 Regression-guarded by a test that seeds a v2 and a v3 store and asserts every store is empty after wipe.
+
+## ADR-0014 — Loop closure: opponent steers the OPENING toward the weakness (not strength)
+**Date:** 2026-05-31 · **Status:** accepted
+
+The payoff of the whole architecture. On a new game, `Play.svelte` reads the weakness profile from
+analysed games and `selectOpening('b', weakest, pick)` weights the bot's opening ~3:1 toward an
+opening tagged with the player's weakest dimension, keeping variety (AP-CHESS-22: bias, don't
+obsess). The book feeds the bot's moves while the game stays on the line; once the player deviates
+the engine takes over at the calibrated ~55% Elo, so the flow band is preserved. We steer the
+opening, NOT the engine's strength or a forced move-by-move structure — real and testable without
+overclaiming. Verified: steer hit-rate ~0.5 with variety; book replies correct for both colours.
+
+## ADR-0015 — NL explanations: rule-based templates, fact-derived only (Q-J)
+**Date:** 2026-05-31 · **Status:** accepted
+
+`explain.ts` builds {headline, reasons, better} entirely from facts already on PlyAnalysis (severity,
+winProbLoss, motif+confidence, phase, mate, bestUci). No LLM (AP-CHESS-19): a specific tactic is
+named only when a motif detector fired with high confidence; otherwise it explicitly says it can't
+name a pattern; a forced mate is mentioned only when the engine reported one; "Better was <SAN>"
+only when a best move exists. Keeps the app faithful and fully local. (Fixed uciToSan to only pass a
+promotion field when the UCI carries one — chess.js 1.4.0 rejects it on non-promoting moves.)
+
+## ADR-0016 — Woodpecker: fixed-set speed drilling, complements FSRS
+**Date:** 2026-05-31 · **Status:** accepted
+
+A fixed, ordered puzzle set repeated as timed cycles until automatic — distinct goal from FSRS
+Review (retention across an expanding pool). Pure cycle logic (immutable), persisted in IndexedDB
+v4 `woodpeckerSets`; `improvement()` reports faster-and-≥-accurate vs the previous cycle. Schema
+migrated v3→v4 additively; the db migration test was also de-duplicated (stale repeated assertion +
+stray brace) and bumped to v4.
+
+## ADR-0017 — Guess-the-Move: built-in master games, exact-match scoring
+**Date:** 2026-05-31 · **Status:** accepted
+
+Active recall on famous games (Opera, Immortal, Evergreen). PGNs are asserted legal + finished by
+the test suite so a typo can't ship. A guess is credited only on an exact match with the played
+move (honest scoring — no partial credit we didn't compute); wrong guesses don't advance; Reveal
+shows without crediting. No DB writes.
+
+## ADR-0018 — Calculation/vision drills: pure deterministic primitives
+**Date:** 2026-05-31 · **Status:** accepted
+
+Square-colour and knight-distance (BFS shortest path) drills, no board. `vision.ts` is pure and
+deterministic (no Math.random in the core — the UI seeds prompts), so it's fully unit-tested
+(knight a1→h8 = 6 moves, path legality, square colours). Completes Phase 4.
+
+## ADR-0019 — Maia stays OUT of v1 (consequence of Q-A=b + Q-B=a)
+**Date:** 2026-05-31 · **Status:** accepted
+
+Q-A=b (local-only, no distribution) ⇒ no backend in scope; Q-B=a deferred Maia to a backend that
+doesn't exist. So Maia is not built. The adaptive Stockfish opponent + the loop-closure opening
+steering (ADR-0014) cover the "instructive adversary" goal client-side. Revisit only if a backend
+is ever adopted (which also reopens the licensing posture — hosting triggers GPL/AGPL).

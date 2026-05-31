@@ -60,7 +60,7 @@ npm run build        # production build
 `npm install` runs `scripts/copy-engine.mjs`, which copies **only** the lite single-thread
 build (~7 MB) out of the `stockfish` package (which unpacks to ~251 MB of all variants) into
 `public/stockfish/`. The lite single-thread build needs **no** COOP/COEP headers, so it works
-on any static host. Multi-thread (faster, needs those headers, AGPL) is a Phase 2 opt-in.
+on any static host. Multi-thread (faster, needs those headers, AGPL) remains an unused opt-in.
 
 ### Puzzles
 
@@ -77,9 +77,9 @@ This writes `public/puzzles/puzzles.json` (preferred over the seed set when pres
 ## Privacy
 
 Everything stays on your device. Games, puzzle history, and your player model live in your
-browser's IndexedDB. Nothing is sent anywhere by default. (The Phase 3 endgame trainer will be
-the only feature that makes a network call — the Lichess Syzygy tablebase API — and only with
-your consent.)
+browser's IndexedDB. Nothing is sent anywhere by default. The **only** feature that makes a network
+call is the endgame trainer's Syzygy tablebase lookup (Lichess API) — off by default, enabled only
+with your explicit consent in Settings, and cached so each position is fetched at most once.
 
 ## Licensing
 
