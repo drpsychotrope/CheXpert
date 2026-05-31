@@ -28,6 +28,30 @@ export function parseBestmove(line: string): string | null {
   return m[1] === '(none)' ? null : m[1];
 }
 
+export interface MultiPvInfo extends ScoreInfo {
+  /** 1-based MultiPV line index (defaults to 1 if the engine omits it). */
+  multipv: number;
+  /** First move of the principal variation in UCI form, if present. */
+  pvMove?: string;
+}
+
+/**
+ * Parse an `info` line for MultiPV analysis: like parseInfo but also captures the
+ * `multipv` index and the first `pv` move. Separate from parseInfo so the move
+ * loop's exact-shape tests stay valid.
+ */
+export function parseMultiPv(line: string): MultiPvInfo | null {
+  const base = parseInfo(line);
+  if (!base) return null;
+  const mpv = line.match(/\bmultipv (\d+)/);
+  const pv = line.match(/\bpv (\S+)/);
+  return {
+    ...base,
+    multipv: mpv ? Number(mpv[1]) : 1,
+    pvMove: pv ? pv[1] : undefined,
+  };
+}
+
 /**
  * Convert an engine score (from the mover's POV) to a White-POV centipawn value,
  * clamping mate scores to a large finite number so downstream math is stable.

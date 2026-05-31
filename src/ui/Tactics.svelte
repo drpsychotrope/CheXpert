@@ -16,19 +16,36 @@
   let feedbackKind = $state<'good' | 'bad' | ''>('');
   let solvedThisSession = $state(0);
   let attemptedThisSession = $state(0);
+  let mode = $state<'mixed' | 'personal' | 'themed'>('mixed');
   const seen = new Set<string>();
 
   const model = $derived(app.model);
+  // Theme filter handed over by the dashboard's "Drill" buttons (loop closure).
+  const drillThemes = $derived(app.tacticsFilterThemes);
 
   function loadNext() {
     if (!model) return;
     feedback = '';
     feedbackKind = '';
-    const p = app.puzzles.next({
-      rating: model.puzzleRating.rating,
-      window: 250,
-      exclude: seen,
-    });
+
+    // Selection priority closes the loop: a dashboard drill filter wins; else
+    // prefer the player's own personal puzzles (from their real mistakes); else
+    // fall back to the curated set in the player's rating zone.
+    let p =
+      drillThemes && drillThemes.length
+        ? app.puzzles.next({ rating: model.puzzleRating.rating, window: 400, exclude: seen, themes: drillThemes })
+        : null;
+    if (p) mode = 'themed';
+
+    if (!p) {
+      p = app.puzzles.next({ rating: model.puzzleRating.rating, window: 600, exclude: seen, source: 'personal' });
+      if (p) mode = 'personal';
+    }
+    if (!p) {
+      p = app.puzzles.next({ rating: model.puzzleRating.rating, window: 250, exclude: seen });
+      if (p) mode = 'mixed';
+    }
+
     if (!p) {
       feedback = 'No more puzzles available in your range.';
       return;
@@ -39,6 +56,13 @@
     display = new ChessGame(p.fen);
     fen = display.fen;
     lastMove = null;
+  }
+
+  function clearDrill() {
+    app.tacticsFilterThemes = null;
+    seen.clear();
+    trainer = null;
+    loadNext();
   }
 
   function sideToMove(): 'white' | 'black' {
@@ -134,6 +158,14 @@
       · session {solvedThisSession}/{attemptedThisSession}
     </p>
   {/if}
+  {#if drillThemes && drillThemes.length}
+    <p class="feedback">
+      Drilling your weakness: {drillThemes.slice(0, 3).join(', ')}
+      <button class="link" onclick={clearDrill}>clear</button>
+    </p>
+  {:else if mode === 'personal'}
+    <p class="muted" style="font-size:0.85rem">★ From your own games</p>
+  {/if}
 
   <div class="board-wrap">
     <Board
@@ -155,6 +187,13 @@
     <button onclick={loadNext}>Next puzzle →</button>
   </div>
   {#if puzzle}
-    <p class="muted" style="font-size:0.8rem">Themes: {puzzle.themes.join(', ') || '—'}</p>
+    <p class="muted" style="font-size:0.8rem">
+      Themes: {puzzle.themes.join(', ') || '—'}
+      {#if puzzle.source === 'personal'} · ★ from your game{/if}
+    </p>
   {/if}
 </section>
+
+<style>
+  button.link { background: none; border: none; color: var(--accent); padding: 0 0 0 0.4rem; text-decoration: underline; cursor: pointer; }
+</style>

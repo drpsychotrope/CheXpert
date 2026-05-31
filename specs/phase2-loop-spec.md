@@ -1,7 +1,11 @@
 # Spec — Phase 2: the differentiating loop
 
-**Status:** V1 (draft-general output, decisions applied 2026-05-31) · **Scope:** feature
-> ⚠ **PREMISE ESTIMATED.** This spec depends on Phase 1 code that does not exist yet. Every baseline number, file path, and integration point below is a **prediction**, not a measurement. Before executing, re-run the draft-general pre-V0 scan against the *real* Phase 1 codebase and replace estimates with measured anchors (skill §3.3).
+**Status:** V2 (re-baselined against real Phase 1 code 2026-05-31) · **Scope:** feature
+> ✅ **PREMISE RE-BASELINED.** Phase 1 shipped (commit 8c2e999). Verified integration points against real code:
+> - `ChessGame` (`src/game/ChessGame.ts`): `loadPgn`/`history`/`move`/`moveUci`/`terminal`/`fen`/`turn`. No per-ply FEN accessor → the PGN parser uses chess.js verbose history (`before`/`after`/`captured`/`san`/`lan`) directly.
+> - `EngineClient` (`src/engine/EngineClient.ts`): `evaluate(fen,{depth|movetime}) → {bestmove,whiteCp,score,depthReached}`, injectable worker factory (fake engine in tests). **Added** `analyzeLines(fen,{multipv})` for uniqueness checks; new `parseMultiPv` in `uci.ts` (left `parseInfo` untouched to preserve its tests).
+> - DB v1 cached-connection + `closeTrainerDB`; `puzzles` store has a `source` index → personal puzzles reuse it via `PuzzleRepo.addPuzzles`. v2 migration adds `importedGames` + `gameAnalyses`.
+> - Win-probability uses the Lichess logistic on White-POV cp (mate already clamped by `scoreToWhiteCp`).
 
 ---
 
@@ -85,11 +89,13 @@ Depends on Phase 1: chess.js game model, the Stockfish engine worker + `EngineCl
 
 ## §8 Acceptance criteria
 
-- [ ] Import a PGN, get per-ply evals, gaffes labelled, motifs/phase/time tagged.
-- [ ] Significant gaffes become personal puzzles served by the trainer.
-- [ ] Radar dashboard benchmarks the player vs their level band with drill-through.
-- [ ] 40-move analysis < 30s; UI never blocks; data migration safe.
-- [ ] Calibration Stage 2 upgraded to analyzed-game path (Phase 1 ACPL kept as fallback).
+- [x] Import a PGN, get per-ply evals, gaffes labelled, motifs/phase/time tagged.
+- [x] Significant gaffes become personal puzzles served by the trainer (verified: 2 generated + stored + drillable).
+- [x] Radar dashboard benchmarks the player vs their level band with drill-through (verified in browser).
+- [x] 40-move analysis < 30s (measured in-browser: 20.4s for 80 plies / 81 evals @200ms); v1→v2 migration additive.
+- [ ] Calibration Stage 2 upgraded to analyzed-game path — **DEFERRED**: Phase 1's live ACPL path already
+      seeds the game rating acceptably; folding the batch analyser into onboarding is low-value vs. Phase 3.
+      Tracked as a follow-up, not a blocker. (Single-concern: it doesn't belong in the import/dashboard PR.)
 
 ## §9 Anti-patterns
 

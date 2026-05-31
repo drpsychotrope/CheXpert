@@ -6,6 +6,8 @@
   import Tactics from './Tactics.svelte';
   import Onboarding from './Onboarding.svelte';
   import Settings from './Settings.svelte';
+  import Import from './Import.svelte';
+  import Dashboard from './Dashboard.svelte';
 
   let booted = $state(false);
 
@@ -24,6 +26,8 @@
     <button onclick={() => app.go('home')}>Home</button>
     <button onclick={() => app.go('play')}>Play</button>
     <button onclick={() => app.go('tactics')}>Tactics</button>
+    <button onclick={() => app.go('import')}>Analyse</button>
+    <button onclick={() => app.go('dashboard')}>Dashboard</button>
     <button onclick={() => app.go('settings')}>Settings</button>
   {/if}
 </header>
@@ -37,6 +41,10 @@
     <Play />
   {:else if app.view === 'tactics'}
     <Tactics />
+  {:else if app.view === 'import'}
+    <Import />
+  {:else if app.view === 'dashboard'}
+    <Dashboard />
   {:else if app.view === 'settings'}
     <Settings />
   {:else}

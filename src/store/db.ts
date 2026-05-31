@@ -1,12 +1,14 @@
 // IndexedDB persistence via idb (spec AP-CHESS-3: never localStorage for volume).
 //
-// Schema v1 (Phase 1). The upgrade() switch is written as a fallthrough ladder so
-// Phase 2 (v2: importedGames, per-ply evals) and Phase 3 (v3: srsCards, repertoire)
-// can append cases without rewriting v1. Migrations must never drop existing data.
+// Schema v2. The upgrade() switch is a fallthrough ladder so each phase appends
+// cases without rewriting earlier ones. Migrations must never drop existing data.
+//   v1 (Phase 1): games, puzzleAttempts, puzzles, playerModel, settings
+//   v2 (Phase 2): importedGames, gameAnalyses
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Rating } from '../rating/glicko2';
 import type { Puzzle } from '../trainer/puzzle';
+import type { GameAnalysis } from '../analysis/types';
 
 export interface GameRecord {
   id: string;
@@ -50,16 +52,28 @@ export interface SettingsRecord {
   boardOrientation: 'white' | 'black';
 }
 
+/** A PGN brought in for analysis (Phase 2). Raw source + which side the user was. */
+export interface ImportedGameRecord {
+  id: string;
+  pgn: string;
+  playerColor: 'w' | 'b';
+  headers: Record<string, string>;
+  importedAt: number;
+  analyzed: boolean;
+}
+
 interface TrainerDB extends DBSchema {
   games: { key: string; value: GameRecord; indexes: { playedAt: number } };
   puzzleAttempts: { key: string; value: PuzzleAttemptRecord; indexes: { puzzleId: string; playedAt: number } };
   puzzles: { key: string; value: Puzzle; indexes: { rating: number; source: string } };
   playerModel: { key: string; value: PlayerModel };
   settings: { key: string; value: SettingsRecord };
+  importedGames: { key: string; value: ImportedGameRecord; indexes: { importedAt: number } };
+  gameAnalyses: { key: string; value: GameAnalysis; indexes: { analyzedAt: number } };
 }
 
 export const DB_NAME = 'chess-trainer';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 // Cached single connection. Opening a fresh connection per call leaks handles
 // and, critically, blocks deleteDatabase (which matters for clean test resets).
@@ -98,7 +112,13 @@ function createDB(): Promise<IDBPDatabase<TrainerDB>> {
         db.createObjectStore('playerModel', { keyPath: 'id' });
         db.createObjectStore('settings', { keyPath: 'id' });
       }
-      // Phase 2 will add: if (oldVersion < 2) { importedGames, plyEvals ... }
+      // v2 — Phase 2 stores. Additive only; v1 data is preserved.
+      if (oldVersion < 2) {
+        const ig = db.createObjectStore('importedGames', { keyPath: 'id' });
+        ig.createIndex('importedAt', 'importedAt');
+        const ga = db.createObjectStore('gameAnalyses', { keyPath: 'gameId' });
+        ga.createIndex('analyzedAt', 'analyzedAt');
+      }
       // Phase 3 will add: if (oldVersion < 3) { srsCards, repertoire ... }
     },
   });

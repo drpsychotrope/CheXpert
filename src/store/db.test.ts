@@ -12,11 +12,11 @@ import { resetDb } from '../test/resetDb';
 describe('IndexedDB store', () => {
   beforeEach(resetDb);
 
-  it('creates all v1 stores at the declared version', async () => {
+  it('creates all stores at the declared (v2) version', async () => {
     const db = await openTrainerDB();
     expect(db.version).toBe(DB_VERSION);
     expect([...db.objectStoreNames].sort()).toEqual(
-      ['games', 'playerModel', 'puzzleAttempts', 'puzzles', 'settings'].sort(),
+      ['gameAnalyses', 'games', 'importedGames', 'playerModel', 'puzzleAttempts', 'puzzles', 'settings'].sort(),
     );
   });
 
@@ -66,5 +66,34 @@ describe('IndexedDB store', () => {
     await clearAllData();
     expect(await db.count('games')).toBe(0);
     expect(await db.count('playerModel')).toBe(0);
+  });
+
+  it('migrates v1 → v2 without dropping existing data (G3)', async () => {
+    // Build a real v1 database by hand, seed a row, close it, then open at the
+    // current version and confirm the old row survived + new stores exist.
+    const { openDB } = await import('idb');
+    const v1 = await openDB('chess-trainer', 1, {
+      upgrade(db) {
+        const games = db.createObjectStore('games', { keyPath: 'id' });
+        games.createIndex('playedAt', 'playedAt');
+        const pa = db.createObjectStore('puzzleAttempts', { keyPath: 'id' });
+        pa.createIndex('puzzleId', 'puzzleId');
+        pa.createIndex('playedAt', 'playedAt');
+        const puz = db.createObjectStore('puzzles', { keyPath: 'id' });
+        puz.createIndex('rating', 'rating');
+        puz.createIndex('source', 'source');
+        db.createObjectStore('playerModel', { keyPath: 'id' });
+        db.createObjectStore('settings', { keyPath: 'id' });
+      },
+    });
+    await v1.put('games', { id: 'old', pgn: '1. e4', result: 'win', botElo: 1500, playedAt: 1, coached: false });
+    v1.close();
+
+    // Now the app opens at v2 via the real upgrade ladder.
+    const v2 = await openTrainerDB();
+    expect(v2.version).toBe(2);
+    expect(await v2.get('games', 'old')).toBeTruthy(); // data preserved
+    expect(v2.objectStoreNames.contains('importedGames')).toBe(true);
+    expect(v2.objectStoreNames.contains('gameAnalyses')).toBe(true);
   });
 });

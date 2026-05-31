@@ -8,7 +8,7 @@
 //  - A single long-lived worker is reused across moves (cheap), respawned only
 //    to interrupt.
 
-import { parseBestmove, parseInfo, scoreToWhiteCp, type ScoreInfo } from './uci';
+import { parseBestmove, parseInfo, parseMultiPv, scoreToWhiteCp, type ScoreInfo } from './uci';
 import { ENGINE_WORKER_URL } from './stockfish.worker';
 
 export interface GoOptions {
@@ -26,6 +26,15 @@ export interface EvalResult {
   /** Raw last score from the mover POV. */
   score: ScoreInfo;
   depthReached: number;
+}
+
+export interface LineResult {
+  /** UCI move that starts this line, or null. */
+  uci: string | null;
+  /** White-POV centipawns (mate clamped large). */
+  whiteCp: number;
+  /** Mate distance from the mover POV, if a forced mate. */
+  mate?: number;
 }
 
 type Listener = (line: string) => void;
@@ -109,6 +118,48 @@ export class EngineClient {
     );
 
     return { bestmove, whiteCp: scoreToWhiteCp(lastScore, whiteToMove), score: lastScore, depthReached };
+  }
+
+  /**
+   * Analyse a position with MultiPV, returning the top `multipv` lines sorted
+   * best-first (White-POV). Used by the puzzle generator's uniqueness check
+   * (AP-CHESS-10): a position only becomes a puzzle if line 1 clearly beats line 2.
+   * Resets MultiPV back to 1 afterwards.
+   */
+  async analyzeLines(fen: string, opts: GoOptions & { multipv: number }): Promise<LineResult[]> {
+    await this.init();
+    const whiteToMove = fen.split(' ')[1] !== 'b';
+    const best = new Map<number, { score: ScoreInfo; uci: string | null }>();
+
+    this.send(`setoption name MultiPV value ${opts.multipv}`);
+    await this.waitFor(
+      () => {
+        this.send(`position fen ${fen}`);
+        if (opts.depth != null) this.send(`go depth ${opts.depth}`);
+        else this.send(`go movetime ${opts.movetime ?? 500}`);
+      },
+      (line) => {
+        const info = parseMultiPv(line);
+        if (info && (info.cp !== undefined || info.mate !== undefined)) {
+          best.set(info.multipv, { score: info, uci: info.pvMove ?? null });
+        }
+        return line.startsWith('bestmove');
+      },
+      30000,
+      'bestmove (multipv)',
+    );
+    this.send('setoption name MultiPV value 1');
+
+    const lines: LineResult[] = [...best.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([, v]) => ({
+        uci: v.uci,
+        whiteCp: scoreToWhiteCp(v.score, whiteToMove),
+        mate: v.score.mate,
+      }));
+    // Sort best-first from the mover's POV: White wants high whiteCp, Black low.
+    lines.sort((a, b) => (whiteToMove ? b.whiteCp - a.whiteCp : a.whiteCp - b.whiteCp));
+    return lines;
   }
 
   /** Hard interrupt: kill the worker and respawn (lite single-thread cannot soft-stop). */

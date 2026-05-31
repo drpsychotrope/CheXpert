@@ -1,0 +1,169 @@
+<script lang="ts">
+  import { app } from '../state/app.svelte';
+  import { parsePgn, inferPlayerColor } from '../analysis/pgn';
+  import { runAnalysis } from '../analysis/runAnalysis';
+  import type { GameAnalysis } from '../analysis/types';
+
+  let pgn = $state('');
+  let playerName = $state('');
+  let colorChoice = $state<'auto' | 'w' | 'b'>('auto');
+  let status = $state<'idle' | 'analyzing' | 'done' | 'error'>('idle');
+  let progress = $state(0);
+  let total = $state(0);
+  let error = $state('');
+  let result = $state<GameAnalysis | null>(null);
+  let puzzlesMade = $state(0);
+  let elapsedMs = $state(0);
+
+  const model = $derived(app.model);
+
+  const SAMPLE =
+    '[Event "Casual"]\n[White "You"]\n[Black "Opponent"]\n[TimeControl "300+3"]\n\n' +
+    '1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5 Nxd5 6. Nxf7 Kxf7 ' +
+    '7. Qf3+ Ke6 8. Nc3 Ncb4 9. a3 *';
+
+  async function analyze() {
+    error = '';
+    result = null;
+    puzzlesMade = 0;
+    status = 'analyzing';
+    progress = 0;
+
+    try {
+      const parsed = parsePgn(pgn); // throws on malformed
+      total = parsed.plies.length + 1;
+      const color =
+        colorChoice === 'auto' ? inferPlayerColor(parsed.headers, playerName || 'You') : colorChoice;
+
+      const baseRating = model ? Math.round(model.puzzleRating.rating) : 1200;
+      const gameId = `import:${parsed.headers.White ?? '?'}-${parsed.headers.Black ?? '?'}-${parsed.plies.length}`;
+      const now = Date.now();
+      const t0 = performance.now();
+
+      // Persist the imported game record first.
+      const { openTrainerDB } = await import('../store/db');
+      const db = await openTrainerDB();
+      await db.put('importedGames', {
+        id: gameId,
+        pgn,
+        playerColor: color,
+        headers: parsed.headers,
+        importedAt: now,
+        analyzed: false,
+      });
+
+      const res = await runAnalysis(app.engine, app.puzzles, {
+        gameId,
+        pgn,
+        playerColor: color,
+        source: 'imported',
+        baseRating,
+        now,
+        movetimeMs: 200,
+        onProgress: (d, t) => {
+          progress = d;
+          total = t;
+        },
+      });
+
+      await db.put('importedGames', {
+        id: gameId,
+        pgn,
+        playerColor: color,
+        headers: parsed.headers,
+        importedAt: now,
+        analyzed: true,
+      });
+
+      elapsedMs = Math.round(performance.now() - t0);
+      result = res.analysis;
+      puzzlesMade = res.puzzles.length;
+      status = 'done';
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+      status = 'error';
+    }
+  }
+</script>
+
+<section class="col" style="max-width:680px;margin:0 auto">
+  <h2>Analyse a game</h2>
+  <p class="muted">
+    Paste a PGN. We run the engine locally over every move, flag your inaccuracies / mistakes /
+    blunders, tag the missed idea, and turn your real mistakes into personalised puzzles. Nothing
+    leaves your device.
+  </p>
+
+  <textarea
+    bind:value={pgn}
+    rows="8"
+    placeholder="Paste PGN here…"
+    style="width:100%;font-family:monospace;font-size:0.85rem"
+  ></textarea>
+
+  <div class="row">
+    <label style="flex:1">
+      Your name in the PGN (optional)
+      <input bind:value={playerName} placeholder="e.g. You" />
+    </label>
+    <label>
+      You played
+      <select bind:value={colorChoice}>
+        <option value="auto">Auto-detect</option>
+        <option value="w">White</option>
+        <option value="b">Black</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="row">
+    <button onclick={analyze} disabled={status === 'analyzing' || pgn.trim().length === 0}>
+      {status === 'analyzing' ? 'Analysing…' : 'Analyse'}
+    </button>
+    <button class="ghost" onclick={() => (pgn = SAMPLE)} disabled={status === 'analyzing'}>
+      Load sample
+    </button>
+  </div>
+
+  {#if status === 'analyzing'}
+    <div class="panel">
+      <p>Analysing position {progress} / {total}…</p>
+      <div class="bar"><div class="bar-fill" style="width:{total ? (progress / total) * 100 : 0}%"></div></div>
+    </div>
+  {/if}
+
+  {#if status === 'error'}
+    <p class="feedback bad">Could not analyse: {error}</p>
+  {/if}
+
+  {#if status === 'done' && result}
+    <div class="panel col">
+      <h3>Result</h3>
+      <p class="muted">Analysed in {(elapsedMs / 1000).toFixed(1)}s ({result.movetimeMs}ms/ply)</p>
+      <div class="row" style="gap:1.5rem">
+        <div><b style="font-size:1.5rem">{result.acpl}</b><br /><span class="muted">your ACPL</span></div>
+        <div><b style="font-size:1.5rem;color:var(--bad)">{result.blunders}</b><br /><span class="muted">blunders</span></div>
+        <div><b style="font-size:1.5rem">{result.mistakes}</b><br /><span class="muted">mistakes</span></div>
+        <div><b style="font-size:1.5rem">{result.inaccuracies}</b><br /><span class="muted">inaccuracies</span></div>
+      </div>
+      {#if puzzlesMade > 0}
+        <p class="feedback good">
+          Created {puzzlesMade} personalised {puzzlesMade === 1 ? 'puzzle' : 'puzzles'} from your
+          mistakes — find them in <button class="link" onclick={() => app.go('tactics')}>Tactics</button>.
+        </p>
+      {:else}
+        <p class="muted">No clear-cut, unique-solution mistakes found to turn into puzzles.</p>
+      {/if}
+      <div class="row">
+        <button onclick={() => app.go('dashboard')}>See your weakness dashboard →</button>
+      </div>
+    </div>
+  {/if}
+</section>
+
+<style>
+  .bar { height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin-top: 0.5rem; }
+  .bar-fill { height: 100%; background: var(--accent); transition: width 0.1s linear; }
+  button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  button.link { background: none; border: none; color: var(--accent); padding: 0; text-decoration: underline; cursor: pointer; }
+</style>

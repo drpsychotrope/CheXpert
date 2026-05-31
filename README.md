@@ -7,7 +7,15 @@ improvement loop instead:
 > play → auto-analysis → weakness diagnosis → personalised puzzles → spaced repetition →
 > an opponent that probes your gaps → play
 
-**This repo is Phase 1 (the MVP backbone).** See `specs/` for the full four-phase plan.
+**This repo has Phases 1–2.** See `specs/` for the full four-phase plan.
+
+## The differentiating loop (Phase 2)
+
+Import a PGN → the engine reviews every move locally (~20s for a 40-move game) → your mistakes are
+classified by win-probability loss and tagged with the missed motif → the worst, *uniquely
+punishable* ones become personalised puzzles served in Tactics → a weakness radar benchmarks you per
+dimension (tactics / opening / endgame / time / resilience) with one-click drill-through to the
+matching puzzles. Your losses train you. Everything stays local.
 
 ## What works now (Phase 1)
 

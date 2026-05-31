@@ -51,3 +51,39 @@ On first run (re-runnable from Settings):
 
 Both ratings are seeded and kept separate (puzzle rating correlates weakly with playing strength).
 Phase 2 will upgrade Stage 2 to a fully analyzed calibration game. User requirement, 2026-05-31.
+
+## ADR-0006 — Phase 2 batch analysis: single-pass, fixed movetime (Q-C=a)
+**Date:** 2026-05-31 · **Status:** accepted
+
+Each game position is evaluated exactly once: eval-after-ply-i == eval-before-ply-(i+1), so N
+plies need N+1 evals. Default 200ms/ply on the lite single-thread engine in the existing Worker.
+Verified in-browser: an 80-ply (40-move) game = 81 evals in **20.4s < 30s gate** (G2), ~252ms/position.
+The evaluator is an
+injectable interface (`PositionEvaluator`) so analysis logic is engine-free in tests. Multi-thread
+remains a future opt-in only if the <30s gate ever fails on slower hardware.
+
+## ADR-0007 — Motif tagging: small high-confidence detector + honest fallback (Q-F context)
+**Date:** 2026-05-31 · **Status:** accepted
+
+Tagging engine lines to the 64-theme Lichess taxonomy is the hardest, most error-prone part of the
+diagnosis (AP-CHESS-9). We detect ONLY a small set we can do reliably — mate / mateInN / backRank,
+hanging piece, fork/knightFork — and otherwise FALL BACK to a `{phase}Mistake` tag with
+`confidence:'low'` (surfaced in the UI as a "?"). We do NOT fabricate pin/skewer/discovered-attack
+from scratch; a wrong specific tag is worse than an honest generic one. Taxonomy extends in later
+passes, never by guessing.
+
+## ADR-0008 — Gaffe metric: win-probability delta (Q-F=a)
+**Date:** 2026-05-31 · **Status:** accepted
+
+Moves are classified by win-probability points lost (Lichess logistic on White-POV cp, k=0.00368208),
+not raw centipawns: inaccuracy ≥5%, mistake ≥10%, blunder ≥20%. A centipawn-loss figure is still
+stored for ACPL display. Rationale: a 200cp swing means very different things at ±50 vs ±900.
+
+## ADR-0009 — Weakness dimensions + benchmarks are directional (AP-CHESS-13)
+**Date:** 2026-05-31 · **Status:** accepted
+
+Radar = tactics, openingAccuracy, endgameConversion, timeManagement, resilience. "Resilience" =
+recovery rate after falling clearly behind (mover-POV ≤ −200 later returning to ≥ −100), per the
+arbitrage. ACPL benchmarks come from rough community anchors, presented as "where to focus", never
+as a precise grade. Schema migrated to IndexedDB v2 (importedGames, gameAnalyses; additive, v1 data
+preserved).

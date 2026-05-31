@@ -6,13 +6,15 @@ import { PuzzleRepo } from '../trainer/PuzzleRepo';
 import { loadPlayerModel, savePlayerModel, loadSettings, saveSettings } from '../store/playerModel';
 import type { PlayerModel, SettingsRecord } from '../store/db';
 
-export type View = 'home' | 'onboarding' | 'play' | 'tactics' | 'settings';
+export type View = 'home' | 'onboarding' | 'play' | 'tactics' | 'import' | 'dashboard' | 'settings';
 
 class AppState {
   view = $state<View>('home');
   ready = $state(false);
   model = $state<PlayerModel | null>(null);
   settings = $state<SettingsRecord | null>(null);
+  /** Set by the dashboard "Drill" buttons; consumed by the tactics trainer. */
+  tacticsFilterThemes = $state<string[] | null>(null);
 
   readonly engine = new EngineClient();
   readonly puzzles = new PuzzleRepo();
