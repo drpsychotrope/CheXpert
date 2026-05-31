@@ -11,6 +11,7 @@
   import Review from './Review.svelte';
   import Endgames from './Endgames.svelte';
   import Repertoire from './Repertoire.svelte';
+  import Woodpecker from './Woodpecker.svelte';
 
   let booted = $state(false);
 
@@ -30,6 +31,7 @@
     <button onclick={() => app.go('play')}>Play</button>
     <button onclick={() => app.go('tactics')}>Tactics</button>
     <button onclick={() => app.go('review')}>Review</button>
+    <button onclick={() => app.go('woodpecker')}>Woodpecker</button>
     <button onclick={() => app.go('import')}>Analyse</button>
     <button onclick={() => app.go('dashboard')}>Dashboard</button>
     <button onclick={() => app.go('endgames')}>Endgames</button>
@@ -57,6 +59,8 @@
     <Endgames />
   {:else if app.view === 'repertoire'}
     <Repertoire />
+  {:else if app.view === 'woodpecker'}
+    <Woodpecker />
   {:else if app.view === 'settings'}
     <Settings />
   {:else}

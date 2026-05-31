@@ -16,6 +16,7 @@ export type View =
   | 'review'
   | 'endgames'
   | 'repertoire'
+  | 'woodpecker'
   | 'settings';
 
 class AppState {

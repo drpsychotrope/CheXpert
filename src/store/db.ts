@@ -1,9 +1,11 @@
 // IndexedDB persistence via idb (spec AP-CHESS-3: never localStorage for volume).
 //
-// Schema v2. The upgrade() switch is a fallthrough ladder so each phase appends
+// Schema v4. The upgrade() switch is a fallthrough ladder so each phase appends
 // cases without rewriting earlier ones. Migrations must never drop existing data.
 //   v1 (Phase 1): games, puzzleAttempts, puzzles, playerModel, settings
 //   v2 (Phase 2): importedGames, gameAnalyses
+//   v3 (Phase 3): srsCards, repertoire
+//   v4 (Phase 4): woodpeckerSets
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Rating } from '../rating/glicko2';
@@ -11,6 +13,7 @@ import type { Puzzle } from '../trainer/puzzle';
 import type { GameAnalysis } from '../analysis/types';
 import type { SrsCardRecord } from '../srs/types';
 import type { RepertoireLine } from '../repertoire/types';
+import type { WoodpeckerSet } from '../woodpecker/types';
 
 export interface GameRecord {
   id: string;
@@ -74,10 +77,11 @@ interface TrainerDB extends DBSchema {
   gameAnalyses: { key: string; value: GameAnalysis; indexes: { analyzedAt: number } };
   srsCards: { key: string; value: SrsCardRecord; indexes: { due: number; kind: string } };
   repertoire: { key: string; value: RepertoireLine; indexes: { color: string } };
+  woodpeckerSets: { key: string; value: WoodpeckerSet; indexes: { createdAt: number } };
 }
 
 export const DB_NAME = 'chess-trainer';
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 // Cached single connection. Opening a fresh connection per call leaks handles
 // and, critically, blocks deleteDatabase (which matters for clean test resets).
@@ -130,6 +134,11 @@ function createDB(): Promise<IDBPDatabase<TrainerDB>> {
         srs.createIndex('kind', 'kind');
         const rep = db.createObjectStore('repertoire', { keyPath: 'id' });
         rep.createIndex('color', 'color');
+      }
+      // v4 — Phase 4 (Woodpecker). Additive only; prior data preserved.
+      if (oldVersion < 4) {
+        const wp = db.createObjectStore('woodpeckerSets', { keyPath: 'id' });
+        wp.createIndex('createdAt', 'createdAt');
       }
     },
   });

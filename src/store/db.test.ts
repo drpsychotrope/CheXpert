@@ -12,10 +12,10 @@ import { resetDb } from '../test/resetDb';
 describe('IndexedDB store', () => {
   beforeEach(resetDb);
 
-  it('creates all stores at the declared (v3) version', async () => {
+  it('creates all stores at the declared (v4) version', async () => {
     const db = await openTrainerDB();
     expect(db.version).toBe(DB_VERSION);
-    expect(DB_VERSION).toBe(3);
+    expect(DB_VERSION).toBe(4);
     expect([...db.objectStoreNames].sort()).toEqual(
       [
         'gameAnalyses',
@@ -27,6 +27,7 @@ describe('IndexedDB store', () => {
         'repertoire',
         'settings',
         'srsCards',
+        'woodpeckerSets',
       ].sort(),
     );
   });
@@ -87,7 +88,7 @@ describe('IndexedDB store', () => {
     }
   });
 
-  it('migrates v1 → v3 without dropping existing data (G3)', async () => {
+  it('migrates v1 → v4 without dropping existing data (G3)', async () => {
     // Build a real v1 database by hand, seed a row, close it, then open at the
     // current version and confirm the old row survived + new stores exist.
     const { openDB } = await import('idb');
