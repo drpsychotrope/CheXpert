@@ -14,3 +14,4 @@ coverage/
 # ETL output — regenerated from the Lichess CC0 DB by `npm run etl:puzzles`. The seed set is committed; the big subset is not.
 /public/puzzles/puzzles.json
 /lichess_db_puzzle.csv
+_*.txt
