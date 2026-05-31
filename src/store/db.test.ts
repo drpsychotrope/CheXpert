@@ -109,13 +109,14 @@ describe('IndexedDB store', () => {
     await v1.put('games', { id: 'old', pgn: '1. e4', result: 'win', botElo: 1500, playedAt: 1, coached: false });
     v1.close();
 
-    // Now the app opens at v3 via the real upgrade ladder (v1→v2→v3).
+    // Now the app opens at v4 via the real upgrade ladder (v1→v2→v3→v4).
     const upgraded = await openTrainerDB();
-    expect(upgraded.version).toBe(3);
+    expect(upgraded.version).toBe(4);
     expect(await upgraded.get('games', 'old')).toBeTruthy(); // v1 data preserved
     expect(upgraded.objectStoreNames.contains('importedGames')).toBe(true); // v2
     expect(upgraded.objectStoreNames.contains('gameAnalyses')).toBe(true); // v2
     expect(upgraded.objectStoreNames.contains('srsCards')).toBe(true); // v3
     expect(upgraded.objectStoreNames.contains('repertoire')).toBe(true); // v3
+    expect(upgraded.objectStoreNames.contains('woodpeckerSets')).toBe(true); // v4
   });
 });

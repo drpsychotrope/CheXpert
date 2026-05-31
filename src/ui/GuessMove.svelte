@@ -1,6 +1,5 @@
 <script lang="ts">
   import Board from './Board.svelte';
-  import { app } from '../state/app.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { MASTER_GAMES, type MasterGame } from '../guess/games';
   import { GuessGame } from '../guess/guess';
