@@ -39,9 +39,9 @@ describe('explainPly — rule-based, fact-derived only (Q-J / AP-CHESS-19)', () 
   });
 
   it('suggests a concrete better move in SAN', () => {
-    // bestUci d1h5 = Qh5 from the standard test FEN.
-    const e = explainPly(ply({ bestUci: 'd1h5' }));
-    expect(e.better).toMatch(/Better was Qh5/);
+    // f3g5 = Ng5, a legal move in the fixture FEN (an Italian after 3.Bc4).
+    const e = explainPly(ply({ bestUci: 'f3g5' }));
+    expect(e.better).toBe('Better was Ng5.');
   });
 
   it('affirms good/best moves without inventing criticism', () => {
