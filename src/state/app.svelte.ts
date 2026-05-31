@@ -17,6 +17,7 @@ export type View =
   | 'endgames'
   | 'repertoire'
   | 'woodpecker'
+  | 'guess'
   | 'settings';
 
 class AppState {
