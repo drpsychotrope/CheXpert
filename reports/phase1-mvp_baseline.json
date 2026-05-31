@@ -1,0 +1,30 @@
+{
+  "pr_name": "phase1-mvp",
+  "scan_timestamp": "2026-05-31",
+  "repo_state": {
+    "tracked_files": [".claude/settings.local.json"],
+    "is_git_repo": false,
+    "lines_of_code": 0
+  },
+  "toolchain": {
+    "status": "VERIFIED",
+    "node": "v20.20.2 (>= 18 OK)",
+    "npm": "10.8.2",
+    "git": "2.54.0.windows.1 (repo not yet initialized — see Q-G)"
+  },
+  "dependencies_verified": [
+    { "name": "chess.js",            "version": "1.4.0",  "license": "BSD-2-Clause",        "role": "rules / move gen / FEN / PGN (headless)", "ships_types": true },
+    { "name": "chessground",         "version": "9.2.1",  "license": "GPL-3.0-or-later",    "role": "board UI + native SVG arrows/circles", "note": "copyleft driver — see Q-A" },
+    { "name": "stockfish",           "version": "18.0.7", "license": "GPL-3.0",             "role": "analysis + strong opponent (WASM)", "note": "npm package unpacks to ~251MB (all builds) — extract ONLY the lite single-thread WASM asset; copyleft driver" },
+    { "name": "ts-fsrs",             "version": "5.4.1",  "license": "MIT",                 "role": "FSRS spaced repetition (Phase 3)" },
+    { "name": "idb",                 "version": "8.0.3",  "license": "ISC",                 "role": "IndexedDB promise wrapper" },
+    { "name": "vite",                "version": "8.0.14", "license": "MIT",                 "role": "build/dev server (COOP/COEP headers when needed)" }
+  ],
+  "dependencies_noted_not_chosen": [
+    { "name": "chessops",            "version": "0.15.0", "license": "GPL-3.0-or-later",    "note": "alt to chess.js, but GPL — chess.js BSD-2 is the lighter-license choice" },
+    { "name": "stockfish.wasm",      "version": "0.10.0", "license": "GPL-3.0",             "note": "older standalone wasm port" },
+    { "name": "lila-stockfish-web",  "version": "0.0.11", "license": "AGPL-3.0-or-later",   "note": "lichess modern multi-thread sf web build — AGPL is stricter (network copyleft); only relevant if Q-C picks multi-thread" }
+  ],
+  "scan_status": "ok",
+  "note_3_3": "Greenfield: there is no existing code to measure. All size/latency TARGETS in the specs are EXECUTION-TIME GATES, not measured anchors — re-measure against real Phase 1 code (skill 3.3). Dependency versions/licenses above ARE empirically verified (npm view, 2026-05-31)."
+}

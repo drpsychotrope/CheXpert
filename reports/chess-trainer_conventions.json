@@ -1,0 +1,15 @@
+{
+  "scan_timestamp": "2026-05-31",
+  "project_conventions_doc": "none in-project (D:/Download/Chess has no CLAUDE.md / CONTRIBUTING / README)",
+  "global_conventions": "~/.claude/CLAUDE.md — defines graphify skill, user email, current date. No code/style conventions.",
+  "implication": "The specs must ESTABLISH conventions rather than inherit them. Baked into the V0 templates:",
+  "established_conventions": [
+    "Language: TypeScript, strict mode.",
+    "Tests: Vitest (unit + worker integration).",
+    "License: GPL-3.0 (forced by chessground + Stockfish) — pending Q-A.",
+    "Decision log: append-only decisions.md as ADR entries; never amend prior entries; cross-link supersedence.",
+    "Phase ordering: code first, docs last (skill 3.2).",
+    "Privacy: all telemetry + player model local by default; nothing leaves the device without explicit consent."
+  ],
+  "scan_status": "ok"
+}

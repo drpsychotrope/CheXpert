@@ -1,0 +1,139 @@
+/* chessground layout (pure positioning, no external image refs). */
+@import 'chessground/assets/chessground.base.css';
+
+:root {
+  --bg: #1f1f23;
+  --panel: #2b2b31;
+  --panel-2: #34343c;
+  --text: #ececf0;
+  --muted: #9a9aa6;
+  --border: #3d3d46;
+  --accent: #5b8def;
+  --good: #6fbf73;
+  --bad: #e2686d;
+  --light-sq: #f0d9b5;
+  --dark-sq: #b58863;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+
+button {
+  font: inherit;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+button:hover { filter: brightness(1.08); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.app-main { flex: 1; padding: 1.5rem 1rem 3rem; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.topbar .brand { font-weight: 700; }
+.topbar .spacer { flex: 1; }
+.topbar button { background: transparent; color: var(--muted); padding: 0.4rem 0.7rem; }
+.topbar button:hover { color: var(--text); }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+}
+
+/* ---- Board theme (asset-free) ------------------------------------------- */
+/* The board container becomes a size container so pieces can size in cqmin. */
+.board-wrap { container-type: size; }
+
+/* Checkerboard via two offset 45deg gradients — no image needed. */
+.cg-board {
+  background-color: var(--light-sq);
+  background-image:
+    linear-gradient(45deg, var(--dark-sq) 25%, transparent 25%, transparent 75%, var(--dark-sq) 75%),
+    linear-gradient(45deg, var(--dark-sq) 25%, transparent 25%, transparent 75%, var(--dark-sq) 75%);
+  background-size: 25% 25%;
+  background-position: 0 0, 12.5% 12.5%;
+}
+
+/* Pieces rendered as Unicode glyphs (filled set for both colors), with stroke
+   for white/black contrast. Recognizable and fully offline. */
+.cg-board piece {
+  background: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cg-board piece::before {
+  font-size: 11cqmin;
+  line-height: 1;
+  font-family: 'Segoe UI Symbol', 'Noto Sans Symbols 2', 'DejaVu Sans', sans-serif;
+}
+.cg-board piece.white::before { color: #f7f7f7; -webkit-text-stroke: 1.4px #2a2a2a; text-shadow: 0 1px 1px rgba(0,0,0,0.35); }
+.cg-board piece.black::before { color: #2b2b2b; -webkit-text-stroke: 1.4px #050505; text-shadow: 0 1px 1px rgba(255,255,255,0.18); }
+
+.cg-board piece.king::before { content: '\265A'; }
+.cg-board piece.queen::before { content: '\265B'; }
+.cg-board piece.rook::before { content: '\265C'; }
+.cg-board piece.bishop::before { content: '\265D'; }
+.cg-board piece.knight::before { content: '\265E'; }
+.cg-board piece.pawn::before { content: '\265F'; }
+
+.cg-board piece.ghost { opacity: 0.3; }
+
+/* Coordinates rendered by chessground. */
+.cg-wrap coords {
+  position: absolute;
+  display: flex;
+  pointer-events: none;
+  opacity: 0.7;
+  font-size: 9px;
+  font-weight: 600;
+}
+.cg-wrap coords.ranks { flex-flow: column-reverse; top: 0; right: 2px; height: 100%; }
+.cg-wrap coords.ranks.black { flex-flow: column; }
+.cg-wrap coords.files { bottom: 1px; left: 4px; width: 100%; flex-flow: row; }
+.cg-wrap coords.files.black { flex-flow: row-reverse; }
+.cg-wrap coords coord { flex: 1 1 auto; }
+.cg-wrap coords.ranks coord { transform: translateY(-50%); }
+
+/* ---- Misc UI ----------------------------------------------------------- */
+.feedback { font-weight: 600; min-height: 1.5em; }
+.feedback.good { color: var(--good); }
+.feedback.bad { color: var(--bad); }
+.muted { color: var(--muted); }
+.row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+.col { display: flex; flex-direction: column; gap: 0.75rem; }
+.center { align-items: center; justify-content: center; text-align: center; }
+label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.9rem; }
+select, input {
+  font: inherit; padding: 0.5rem; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+}

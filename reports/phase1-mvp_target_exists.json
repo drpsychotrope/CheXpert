@@ -1,0 +1,10 @@
+{
+  "pr_name": "phase1-mvp",
+  "scope": "feature (greenfield application)",
+  "scan_timestamp": "2026-05-31",
+  "target_file": null,
+  "target_symbol": null,
+  "verdict": "GREENFIELD — no existing target. Directory D:/Download/Chess is empty except .claude/. Not a git repository.",
+  "implication": "Section 2.1 (target existence) and 2.2 (code baseline) are moot: the baseline is an empty repo. The existence/baseline burden moves to the Phase 1 pre-flight gates, which must verify toolchain + dependency install at execution time.",
+  "scan_status": "ok"
+}

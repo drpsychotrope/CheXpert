@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "note": "Small VERIFIED fallback set (solver always to move; moves[0] is the solver's move). The real curated subset (~50-100k) is produced by scripts/build-puzzle-subset.mjs from the Lichess CC0 puzzle DB and written to public/puzzles/puzzles.json, which the app prefers when present.",
+  "license": "These hand-authored seed positions are CC0. The Lichess puzzle database is CC0.",
+  "puzzles": [
+    {
+      "id": "seed-0001",
+      "fen": "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1",
+      "moves": ["a1a8"],
+      "rating": 700,
+      "ratingDeviation": 80,
+      "themes": ["mate", "mateIn1", "backRankMate"],
+      "source": "curated"
+    },
+    {
+      "id": "seed-0002",
+      "fen": "7k/R7/8/8/8/8/8/1R5K w - - 0 1",
+      "moves": ["b1b8"],
+      "rating": 750,
+      "ratingDeviation": 80,
+      "themes": ["mate", "mateIn1", "rookEndgame"],
+      "source": "curated"
+    },
+    {
+      "id": "seed-0003",
+      "fen": "6k1/R7/6Q1/8/8/8/8/6K1 w - - 0 1",
+      "moves": ["g6g7"],
+      "rating": 650,
+      "ratingDeviation": 80,
+      "themes": ["mate", "mateIn1"],
+      "source": "curated"
+    },
+    {
+      "id": "seed-0004",
+      "fen": "7k/8/3q4/6N1/8/8/8/6K1 w - - 0 1",
+      "moves": ["g5f7", "h8g8", "f7d6"],
+      "rating": 1100,
+      "ratingDeviation": 90,
+      "themes": ["fork", "knightFork", "advantage"],
+      "source": "curated"
+    },
+    {
+      "id": "seed-0005",
+      "fen": "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1",
+      "moves": ["a1a8"],
+      "rating": 720,
+      "ratingDeviation": 80,
+      "themes": ["mate", "mateIn1", "backRankMate"],
+      "source": "curated"
+    }
+  ]
+}

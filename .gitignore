@@ -1,0 +1,16 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+.DS_Store
+*.log
+npm-debug.log*
+.vite/
+coverage/
+# large engine source package (we vendor only the needed asset into public/)
+/scripts/.cache/
+# vendored Stockfish asset — regenerated from node_modules by `npm run copy:engine` (postinstall). Keeps the ~7MB wasm out of git.
+/public/stockfish/
+# ETL output — regenerated from the Lichess CC0 DB by `npm run etl:puzzles`. The seed set is committed; the big subset is not.
+/public/puzzles/puzzles.json
+/lichess_db_puzzle.csv

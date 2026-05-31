@@ -1,0 +1,23 @@
+{
+  "pr_name": "phase1-mvp",
+  "scan_timestamp": "2026-05-31",
+  "scan_status": "ok",
+  "method": "npm view (registry reachable, exit 0). Output was buffered/delayed in-session but landed complete; values verified.",
+  "verified": {
+    "chess.js": "1.4.0 / BSD-2-Clause",
+    "chessground": "9.2.1 / GPL-3.0-or-later",
+    "stockfish": "18.0.7 / GPL-3.0 (unpackedSize 251051807 bytes ~= 251MB)",
+    "ts-fsrs": "5.4.1 / MIT",
+    "idb": "8.0.3 / ISC",
+    "vite": "8.0.14 / MIT",
+    "chessops": "0.15.0 / GPL-3.0-or-later (not chosen)",
+    "stockfish.wasm": "0.10.0 / GPL-3.0 (not chosen)",
+    "lila-stockfish-web": "0.0.11 / AGPL-3.0-or-later (not chosen unless multi-thread)"
+  },
+  "findings": [
+    "The npm 'stockfish' package is ~251MB unpacked because it bundles every build (full NNUE, single, lite, etc.). Phase 1 must copy ONLY the lite single-thread WASM+JS asset into public/stockfish and load that — never depend on the whole package at runtime. Verify the exact lite asset filename + size at pre-flight G3.",
+    "Licensing posture confirmed forced: chessground (GPL-3.0) + stockfish (GPL-3.0). If Q-C ever selects lila-stockfish-web (multi-thread), the license escalates to AGPL-3.0 (network copyleft). See Q-A.",
+    "chess.js (BSD-2) is the lighter-license rules engine vs chessops (GPL); keep chess.js per the brief."
+  ],
+  "action": "Pre-flight G2 = 'npm install pinned deps succeeds'; G3 = 'lite single-thread WASM asset (extracted from the stockfish package) loads in a Worker and answers uci/isready with NO COOP/COEP headers'."
+}

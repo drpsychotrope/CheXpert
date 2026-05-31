@@ -1,0 +1,10 @@
+{
+  "decision": "skip_cycle_3",
+  "date": "2026-05-31",
+  "rule": "skip_cycle_3 = (cycle_2_critical_count == 0) AND (cycle_2_polish_count <= 8)",
+  "cycle_2_critical_count": 0,
+  "cycle_2_polish_count": 5,
+  "result": true,
+  "rationale": "Cycle 2 surfaced zero critical defects and only 5 post-merge-able polish items. Per skill §4.3, cycle 3 is decreasing-returns territory here. Residual items are empirical tuning (subset size, sigmoid constant, FSRS params) better resolved at execution than by more drafting. Shipping V1.",
+  "override_flag": "pass --force-cycle-3 to disable this skip"
+}

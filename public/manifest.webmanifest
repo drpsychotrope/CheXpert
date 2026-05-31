@@ -1,0 +1,13 @@
+{
+  "name": "Chess Trainer",
+  "short_name": "ChessTrainer",
+  "description": "A chess trainer whose only job is to make you stronger.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#2b2b2b",
+  "theme_color": "#2b2b2b",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

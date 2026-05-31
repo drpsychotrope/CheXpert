@@ -1,0 +1,8 @@
+{
+  "pr_name": "phase1-mvp",
+  "scan_timestamp": "2026-05-31",
+  "is_git_repo": false,
+  "tracker": "none",
+  "verdict": "N/A — greenfield, no version control, no PRs/issues. No parallel-work collision possible.",
+  "scan_status": "ok"
+}

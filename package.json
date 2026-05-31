@@ -1,0 +1,35 @@
+{
+  "name": "chess-trainer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Client-side chess progression trainer — adaptive opponent + tactical trainer + closed improvement loop.",
+  "scripts": {
+    "dev": "vite",
+    "build": "svelte-check --tsconfig ./tsconfig.json && vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "copy:engine": "node scripts/copy-engine.mjs",
+    "postinstall": "node scripts/copy-engine.mjs || echo \"[postinstall] engine copy skipped (stockfish dev dep not installed yet)\"",
+    "etl:puzzles": "node scripts/build-puzzle-subset.mjs"
+  },
+  "dependencies": {
+    "chess.js": "1.4.0",
+    "chessground": "9.2.1",
+    "idb": "8.0.3"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@tsconfig/svelte": "^5.0.4",
+    "fake-indexeddb": "^6.0.0",
+    "jsdom": "^25.0.1",
+    "stockfish": "^18.0.7",
+    "svelte": "^5.19.0",
+    "svelte-check": "^4.1.4",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
+  }
+}
