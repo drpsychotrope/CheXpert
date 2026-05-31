@@ -34,6 +34,7 @@
     <button onclick={() => app.go('endgames')}>Endgame trainer</button>
     <button onclick={() => app.go('repertoire')}>Opening repertoire</button>
     <button onclick={() => app.go('guess')}>Guess the move</button>
+    <button onclick={() => app.go('vision')}>Calculation & vision</button>
     <button class="ghost" onclick={() => app.go('onboarding')}>Re-run skill evaluation</button>
     <button class="ghost" onclick={() => app.go('settings')}>Settings</button>
   </div>

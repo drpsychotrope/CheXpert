@@ -18,6 +18,7 @@ export type View =
   | 'repertoire'
   | 'woodpecker'
   | 'guess'
+  | 'vision'
   | 'settings';
 
 class AppState {

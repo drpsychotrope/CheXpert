@@ -13,6 +13,7 @@
   import Repertoire from './Repertoire.svelte';
   import Woodpecker from './Woodpecker.svelte';
   import GuessMove from './GuessMove.svelte';
+  import Vision from './Vision.svelte';
 
   let booted = $state(false);
 
@@ -38,6 +39,7 @@
     <button onclick={() => app.go('endgames')}>Endgames</button>
     <button onclick={() => app.go('repertoire')}>Repertoire</button>
     <button onclick={() => app.go('guess')}>Guess</button>
+    <button onclick={() => app.go('vision')}>Vision</button>
     <button onclick={() => app.go('settings')}>Settings</button>
   {/if}
 </header>
@@ -65,6 +67,8 @@
     <Woodpecker />
   {:else if app.view === 'guess'}
     <GuessMove />
+  {:else if app.view === 'vision'}
+    <Vision />
   {:else if app.view === 'settings'}
     <Settings />
   {:else}
