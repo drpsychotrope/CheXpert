@@ -1,6 +1,9 @@
 <script lang="ts">
   // chessground wrapper. Owns the Chessground instance; reacts to prop changes.
   import { onMount, onDestroy } from 'svelte';
+  // chessground's package.json `exports` maps "." → "./dist/chessground.js", so the
+  // bare specifier is correct. (An earlier "failed to resolve" was a stale Vite
+  // dep-cache artifact, cleared with `rm -rf node_modules/.vite`.)
   import { Chessground } from 'chessground';
   import type { Api } from 'chessground/api';
   import type { Config } from 'chessground/config';
@@ -73,15 +76,20 @@
   });
 </script>
 
-<div class="board-wrap">
+<div class="board-frame">
   <div class="cg-board-host" bind:this={el}></div>
 </div>
 
 <style>
-  .board-wrap {
-    width: min(80vw, 70vh, 560px);
-    aspect-ratio: 1 / 1;
+  /* Fixed square frame. Use min() of viewport width/height so it always has a
+     real, non-zero size regardless of the flex parent (the earlier bug: a
+     percentage/70vh height collapsed inside a centered column → 0-size board). */
+  .board-frame {
+    width: min(86vw, 70vh, 560px);
+    height: min(86vw, 70vh, 560px);
+    flex: 0 0 auto;
   }
+  /* chessground replaces this element's contents and adds the .cg-wrap class. */
   .cg-board-host {
     width: 100%;
     height: 100%;

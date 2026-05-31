@@ -70,11 +70,20 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 /* ---- Board theme (asset-free) ------------------------------------------- */
-/* The board container becomes a size container so pieces can size in cqmin. */
-.board-wrap { container-type: size; }
+/* chessground renders custom ELEMENTS: <cg-board>, <piece>, <square>, <coords>.
+   These rules MUST target those tags (not a .cg-board class). The mount element
+   gets the .cg-wrap class from chessground and is the size container so pieces
+   can size in cqmin. */
+.cg-wrap {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: block;
+  container-type: size;
+}
 
 /* Checkerboard via two offset 45deg gradients — no image needed. */
-.cg-board {
+cg-board {
   background-color: var(--light-sq);
   background-image:
     linear-gradient(45deg, var(--dark-sq) 25%, transparent 25%, transparent 75%, var(--dark-sq) 75%),
@@ -85,28 +94,28 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Pieces rendered as Unicode glyphs (filled set for both colors), with stroke
    for white/black contrast. Recognizable and fully offline. */
-.cg-board piece {
+cg-board piece {
   background: none !important;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.cg-board piece::before {
+cg-board piece::before {
   font-size: 11cqmin;
   line-height: 1;
   font-family: 'Segoe UI Symbol', 'Noto Sans Symbols 2', 'DejaVu Sans', sans-serif;
 }
-.cg-board piece.white::before { color: #f7f7f7; -webkit-text-stroke: 1.4px #2a2a2a; text-shadow: 0 1px 1px rgba(0,0,0,0.35); }
-.cg-board piece.black::before { color: #2b2b2b; -webkit-text-stroke: 1.4px #050505; text-shadow: 0 1px 1px rgba(255,255,255,0.18); }
+cg-board piece.white::before { color: #f7f7f7; -webkit-text-stroke: 1.4px #2a2a2a; text-shadow: 0 1px 1px rgba(0,0,0,0.35); }
+cg-board piece.black::before { color: #2b2b2b; -webkit-text-stroke: 1.4px #050505; text-shadow: 0 1px 1px rgba(255,255,255,0.18); }
 
-.cg-board piece.king::before { content: '\265A'; }
-.cg-board piece.queen::before { content: '\265B'; }
-.cg-board piece.rook::before { content: '\265C'; }
-.cg-board piece.bishop::before { content: '\265D'; }
-.cg-board piece.knight::before { content: '\265E'; }
-.cg-board piece.pawn::before { content: '\265F'; }
+cg-board piece.king::before { content: '\265A'; }
+cg-board piece.queen::before { content: '\265B'; }
+cg-board piece.rook::before { content: '\265C'; }
+cg-board piece.bishop::before { content: '\265D'; }
+cg-board piece.knight::before { content: '\265E'; }
+cg-board piece.pawn::before { content: '\265F'; }
 
-.cg-board piece.ghost { opacity: 0.3; }
+cg-board piece.ghost { opacity: 0.3; }
 
 /* Coordinates rendered by chessground. */
 .cg-wrap coords {
