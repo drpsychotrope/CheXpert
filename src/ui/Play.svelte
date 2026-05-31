@@ -5,6 +5,9 @@
   import { AdaptiveOpponent, initOpponentState, type GameOutcome } from '../engine/AdaptiveOpponent';
   import { updateRating } from '../rating/glicko2';
   import { openTrainerDB, type GameRecord } from '../store/db';
+  import { loadAllAnalyses } from '../analysis/runAnalysis';
+  import { buildWeaknessProfile, type Dimension } from '../analysis/weakness';
+  import { selectOpening, nextBookMove, steeringNote, type OpeningEntry } from '../opening/openingBook';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   let game = $state(new ChessGame());
@@ -13,8 +16,13 @@
   let status = $state<'idle' | 'playing' | 'thinking' | 'over'>('idle');
   let result = $state('');
   let thinking = $state(false);
+  let steerNote = $state('');
   let opponent: AdaptiveOpponent | null = null;
   const playerColor: 'white' | 'black' = 'white';
+
+  // Loop closure: the bot (Black here) opens toward the player's weakest area.
+  let opening: OpeningEntry | null = null;
+  let playedUci: string[] = [];
 
   const model = $derived(app.model);
   const coached = $derived(app.settings?.coachedMode ?? false);
@@ -25,6 +33,19 @@
     game = new ChessGame();
     fen = game.fen;
     lastMove = null;
+    playedUci = [];
+
+    // Read the weakness profile (from analysed games) and steer the opening.
+    let weakest: Dimension | null = null;
+    try {
+      const analyses = await loadAllAnalyses();
+      if (analyses.length) weakest = buildWeaknessProfile(analyses, model.gameRating.rating).weakest;
+    } catch {
+      /* no analyses yet → neutral variety */
+    }
+    opening = selectOpening('b', weakest, Math.random());
+    steerNote = steeringNote(opening, weakest);
+
     const state = initOpponentState(model.opponentTargetElo);
     opponent = new AdaptiveOpponent(app.engine, state);
     status = 'thinking';
@@ -43,8 +64,10 @@
 
   async function onMove(from: string, to: string) {
     if (status !== 'playing' || turnColor() !== playerColor) return;
+    const uci = from + to + (game.isPromotion(from, to) ? 'q' : '');
     const san = game.move(from, to, 'q');
     if (!san) return;
+    playedUci.push(uci);
     fen = game.fen;
     lastMove = [from, to];
 
@@ -59,9 +82,13 @@
     status = 'thinking';
     thinking = true;
     try {
-      const uci = await opponent.pickMove(game.fen, 500);
+      // Loop closure: play the steering opening's book move if still on the line;
+      // otherwise the engine takes over at the calibrated ~55% Elo (band intact).
+      let uci = opening ? nextBookMove(opening, playedUci) : null;
+      if (!uci) uci = await opponent.pickMove(game.fen, 500);
       if (uci) {
         game.moveUci(uci);
+        playedUci.push(uci);
         fen = game.fen;
         lastMove = [uci.slice(0, 2), uci.slice(2, 4)];
       }
@@ -175,6 +202,10 @@
     {#if thinking}Bot is thinking…{:else}{result}{/if}
   </p>
 
+  {#if steerNote && status !== 'idle'}
+    <p class="muted" style="font-size:0.82rem">{steerNote}</p>
+  {/if}
+
   <div class="row center">
     {#if status === 'idle' || status === 'over'}
       <button onclick={newGame}>New game</button>
@@ -183,7 +214,7 @@
     {/if}
   </div>
   <p class="muted" style="font-size:0.8rem; max-width:420px">
-    Tip: play slowly and think. After Phase 2 you'll be able to import these games for analysis and
-    auto-generated puzzles from your mistakes.
+    Tip: play slowly and think, then import the game in <b>Analyse</b> to turn your mistakes into puzzles —
+    the bot will then steer future openings toward whatever you're weakest at.
   </p>
 </section>

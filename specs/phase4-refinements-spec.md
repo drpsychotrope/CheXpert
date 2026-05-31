@@ -1,7 +1,7 @@
 # Spec — Phase 4: refinements + loop closure
 
-**Status:** V1 (draft-general output) · **Scope:** feature (bundle of refinements)
-> ⚠ **PREMISE ESTIMATED.** Depends on Phases 1–3. Re-baseline before executing. Also note: this phase is itself a **bundle** — at execution time, split it into one spec per feature (single-concern, skill §3.4). It is presented together here only because you asked for the full 4-phase series up front.
+**Status:** V2 (re-baselined against real code 2026-05-31) · **Scope:** feature bundle → **shipped as one commit per feature** (skill §3.4).
+> ✅ **RE-BASELINED.** Verified hooks: `AdaptiveOpponent.pickMove`/`recordGame` (pure, extendable), `WeaknessProfile.weakest: Dimension` (steering signal), `PlyAnalysis` (motif/severity/phase/winProbLoss/bestWhiteCp/mate → NL + guess-the-move). Maia **OUT** (Q-A=b local-only ⇒ no backend ⇒ ADR-0003/0012). Commits, in value order: (1) loop-closure opening steering, (2) NL analysis, (3) Woodpecker, (4) guess-the-move, (5) calc/vision drills.
 
 ---
 
