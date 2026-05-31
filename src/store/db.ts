@@ -9,6 +9,8 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Rating } from '../rating/glicko2';
 import type { Puzzle } from '../trainer/puzzle';
 import type { GameAnalysis } from '../analysis/types';
+import type { SrsCardRecord } from '../srs/types';
+import type { RepertoireLine } from '../repertoire/types';
 
 export interface GameRecord {
   id: string;
@@ -70,10 +72,12 @@ interface TrainerDB extends DBSchema {
   settings: { key: string; value: SettingsRecord };
   importedGames: { key: string; value: ImportedGameRecord; indexes: { importedAt: number } };
   gameAnalyses: { key: string; value: GameAnalysis; indexes: { analyzedAt: number } };
+  srsCards: { key: string; value: SrsCardRecord; indexes: { due: number; kind: string } };
+  repertoire: { key: string; value: RepertoireLine; indexes: { color: string } };
 }
 
 export const DB_NAME = 'chess-trainer';
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 // Cached single connection. Opening a fresh connection per call leaks handles
 // and, critically, blocks deleteDatabase (which matters for clean test resets).
@@ -119,7 +123,14 @@ function createDB(): Promise<IDBPDatabase<TrainerDB>> {
         const ga = db.createObjectStore('gameAnalyses', { keyPath: 'gameId' });
         ga.createIndex('analyzedAt', 'analyzedAt');
       }
-      // Phase 3 will add: if (oldVersion < 3) { srsCards, repertoire ... }
+      // v3 — Phase 3 stores. Additive only; v1/v2 data is preserved.
+      if (oldVersion < 3) {
+        const srs = db.createObjectStore('srsCards', { keyPath: 'id' });
+        srs.createIndex('due', 'due'); // epoch ms — query the due queue cheaply
+        srs.createIndex('kind', 'kind');
+        const rep = db.createObjectStore('repertoire', { keyPath: 'id' });
+        rep.createIndex('color', 'color');
+      }
     },
   });
 }

@@ -5,6 +5,8 @@
   import { TacticalTrainer, gradeAttempt } from '../trainer/TacticalTrainer';
   import type { Puzzle } from '../trainer/puzzle';
   import { openTrainerDB } from '../store/db';
+  import { reviewItem } from '../srs/SrsStore';
+  import { resultToGrade } from '../srs/fsrs';
 
   let trainer = $state<TacticalTrainer | null>(null);
   let puzzle = $state<Puzzle | null>(null);
@@ -117,12 +119,13 @@
     }
 
     const now = Date.now();
+    const ms = trainer.elapsedMs(now);
     const db = await openTrainerDB();
     await db.put('puzzleAttempts', {
       id: `${puzzle.id}:${now}`,
       puzzleId: puzzle.id,
       solved,
-      ms: trainer.elapsedMs(now),
+      ms,
       themes: puzzle.themes,
       ratingBefore: graded.player.rating,
       ratingAfter: model.puzzleRating.rating,
@@ -131,6 +134,8 @@
     });
     // Persist the updated puzzle rating into the puzzle row too (it drifts down).
     await db.put('puzzles', { ...puzzle, rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) });
+    // Schedule this puzzle for spaced repetition (FSRS) so it resurfaces in Review.
+    await reviewItem('puzzle', puzzle.id, resultToGrade(solved, ms), now);
     await app.persistModel(now);
   }
 

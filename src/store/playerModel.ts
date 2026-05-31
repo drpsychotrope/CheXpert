@@ -49,13 +49,13 @@ export async function saveSettings(s: SettingsRecord): Promise<void> {
   await db.put('settings', s);
 }
 
-/** Privacy / data-control: wipe everything local (spec §4.10 Settings). */
+/** Privacy / data-control: wipe everything local (spec §4.10 Settings).
+ * Iterates every object store (so stores added in later phases are covered
+ * automatically) and also clears the separate Syzygy tablebase cache DB. */
 export async function clearAllData(): Promise<void> {
   const db = await openTrainerDB();
-  await Promise.all([
-    db.clear('games'),
-    db.clear('puzzleAttempts'),
-    db.clear('playerModel'),
-    db.clear('settings'),
-  ]);
+  await Promise.all([...db.objectStoreNames].map((name) => db.clear(name)));
+  // The tablebase cache lives in its own IndexedDB (endgame/tablebaseCache.ts).
+  const { tbCacheClear } = await import('../endgame/tablebaseCache');
+  await tbCacheClear();
 }

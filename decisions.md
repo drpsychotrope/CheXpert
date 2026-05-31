@@ -87,3 +87,40 @@ recovery rate after falling clearly behind (mover-POV ≤ −200 later returning
 arbitrage. ACPL benchmarks come from rough community anchors, presented as "where to focus", never
 as a precise grade. Schema migrated to IndexedDB v2 (importedGames, gameAnalyses; additive, v1 data
 preserved).
+
+## ADR-0010 — Retention: FSRS via ts-fsrs; one card per trainable item (Q-I=a)
+**Date:** 2026-05-31 · **Status:** accepted
+
+ts-fsrs 5.4.1 (MIT). One SRS card per item, id `${kind}:${refId}` (kinds: puzzle, repertoire). Cards
+persist as epoch-ms records (not Date objects) for deterministic storage/tests; conversion at the
+boundary in `srs/fsrs.ts`. Grade mapping (Q-I=a): fail→Again, fast clean (≤8s)→Easy, slow (≥25s)→Hard,
+else→Good. Cards are created the first time an item is attempted (Tactics + Review both call
+`reviewItem`), so the due queue self-populates from normal play. Active recall preserved (AP-CHESS-15):
+the player plays the move before any grading. Verified in-browser: schedule→due-queue→review round-trip.
+
+## ADR-0011 — Repertoire: chess.js-validated lines, drilled as FSRS cards
+**Date:** 2026-05-31 · **Status:** accepted
+
+A repertoire line is a chess.js-validated SAN/UCI sequence stored in the `repertoire` store. `RepertoireDrill`
+auto-plays the opponent's moves and requires the player to play their own (active recall); the whole-line
+result (mistake-free?) + time maps to an FSRS grade on a `repertoire:` card. (Lichess `chess-openings`
+CC0 naming integration deferred — lines are user-named for now; the `opening` field is reserved.)
+
+## ADR-0012 — Endgames: Syzygy via Lichess API, consent-gated + cache-first (Q-H=a, Q-A=b)
+**Date:** 2026-05-31 · **Status:** accepted
+
+Perfect endgame feedback (WDL/DTZ, ≤7 pieces) from `tablebase.lichess.ovh` — the ONE network egress in
+the app. Gated on explicit `settings.allowNetwork` consent with a clear dialog (AP-CHESS-17, Q-A=b);
+off by default, drills still work engine-only. Every result cached in a dedicated IndexedDB
+(`chess-trainer-tbcache`) so each position is fetched at most once (AP-CHESS-14) — verified: 2 probes,
+1 fetch. A cached result is served even with consent off (no network needed). The HTTP client is
+dependency-injected so tests never touch the network. Schema migrated to IndexedDB v3 (srsCards,
+repertoire; additive, v1/v2 preserved — verified live at version 3 with all 9 stores).
+
+## ADR-0013 — "Delete all my data" must wipe every store (privacy correctness)
+**Date:** 2026-05-31 · **Status:** accepted
+
+`clearAllData()` originally enumerated 5 stores by name; adding Phase 2/3 stores silently left imported
+games, analyses, SRS cards, and the repertoire behind on wipe — a privacy defect. Fixed to iterate
+`db.objectStoreNames` (covers future stores automatically) plus clear the separate tablebase cache DB.
+Regression-guarded by a test that seeds a v2 and a v3 store and asserts every store is empty after wipe.

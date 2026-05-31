@@ -71,6 +71,11 @@ export class PuzzleRepo {
     this.cache.push(...puzzles);
   }
 
+  /** Look up a puzzle by id from the in-memory cache (used by the SRS review queue). */
+  byId(id: string): Puzzle | null {
+    return this.cache.find((p) => p.id === id) ?? null;
+  }
+
   /**
    * Pick the next puzzle nearest the requested rating, honoring theme/phase/source
    * filters and exclusions. Pure selection over the in-memory cache.

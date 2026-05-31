@@ -27,8 +27,11 @@
   <div class="actions">
     <button onclick={() => app.go('play')}>Play the adaptive bot</button>
     <button onclick={() => app.go('tactics')}>Train tactics</button>
+    <button onclick={() => app.go('review')}>Review (spaced repetition)</button>
     <button onclick={() => app.go('import')}>Analyse a game</button>
     <button onclick={() => app.go('dashboard')}>Weakness dashboard</button>
+    <button onclick={() => app.go('endgames')}>Endgame trainer</button>
+    <button onclick={() => app.go('repertoire')}>Opening repertoire</button>
     <button class="ghost" onclick={() => app.go('onboarding')}>Re-run skill evaluation</button>
     <button class="ghost" onclick={() => app.go('settings')}>Settings</button>
   </div>

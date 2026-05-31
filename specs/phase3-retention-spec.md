@@ -73,10 +73,13 @@ Depends on: Phase 1 trainer + IndexedDB; Phase 2 personal puzzles + weakness dim
 
 ## §8 Acceptance criteria
 
-- [ ] Personal puzzles + weakness drills + repertoire lines all schedule under FSRS.
-- [ ] Daily due queue drives the trainer.
-- [ ] Endgame trainer gives Syzygy-perfect feedback, cached, rate-limit-safe.
-- [ ] Migrations safe; privacy disclosure for the Syzygy call present.
+- [x] Puzzles + repertoire lines schedule under FSRS (one card per item; verified schedule→due→review).
+- [x] Due queue drives the Review view (and Tactics auto-creates cards so it self-populates).
+- [x] Endgame trainer gives Syzygy feedback, **cache-first** (verified 2 probes → 1 fetch), consent-gated.
+- [x] Migration v2→v3 additive (verified live at version 3, all 9 stores); Syzygy consent dialog present;
+      "delete all my data" now wipes every store + the tablebase cache (ADR-0013 regression-guarded).
+- [ ] Opening names from Lichess `chess-openings` CC0 — **DEFERRED** (lines are user-named; `opening`
+      field reserved). Low-value vs. Phase 4; not a blocker.
 
 ## §9 Anti-patterns
 

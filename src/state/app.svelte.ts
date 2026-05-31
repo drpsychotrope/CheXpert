@@ -6,7 +6,17 @@ import { PuzzleRepo } from '../trainer/PuzzleRepo';
 import { loadPlayerModel, savePlayerModel, loadSettings, saveSettings } from '../store/playerModel';
 import type { PlayerModel, SettingsRecord } from '../store/db';
 
-export type View = 'home' | 'onboarding' | 'play' | 'tactics' | 'import' | 'dashboard' | 'settings';
+export type View =
+  | 'home'
+  | 'onboarding'
+  | 'play'
+  | 'tactics'
+  | 'import'
+  | 'dashboard'
+  | 'review'
+  | 'endgames'
+  | 'repertoire'
+  | 'settings';
 
 class AppState {
   view = $state<View>('home');

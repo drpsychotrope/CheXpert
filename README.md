@@ -7,7 +7,16 @@ improvement loop instead:
 > play → auto-analysis → weakness diagnosis → personalised puzzles → spaced repetition →
 > an opponent that probes your gaps → play
 
-**This repo has Phases 1–2.** See `specs/` for the full four-phase plan.
+**This repo has Phases 1–3.** See `specs/` for the full four-phase plan.
+
+## Retention + endgames (Phase 3)
+
+- **Review** — every puzzle you attempt becomes an FSRS spaced-repetition card; the Review view
+  resurfaces your weakest patterns right before you'd forget them.
+- **Endgame trainer** — play fundamental endgames (K+Q vs K, K+R vs K, K+P opposition, Lucena,
+  Philidor) against the engine, with perfect feedback from the Lichess **Syzygy** tablebase
+  (≤7 pieces). The one network feature — off by default, consent-gated, cache-first.
+- **Opening repertoire** — build lines (validated by chess.js), drill them under FSRS until automatic.
 
 ## The differentiating loop (Phase 2)
 
