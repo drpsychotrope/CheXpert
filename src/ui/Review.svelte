@@ -18,6 +18,8 @@
   let display = $state(new ChessGame());
   let fen = $state(START_FEN);
   let lastMove = $state<[string, string] | null>(null);
+  // Solver's side, fixed for the whole puzzle (board must not flip mid-solve).
+  let orientation = $state<'white' | 'black'>('white');
   let feedback = $state('');
   let feedbackKind = $state<'good' | 'bad' | ''>('');
   let reviewed = $state(0);
@@ -52,6 +54,7 @@
         display = new ChessGame(p.fen);
         fen = display.fen;
         lastMove = null;
+        orientation = display.turn === 'w' ? 'white' : 'black'; // fixed for the puzzle
         startedAt = Date.now();
         return;
       }
@@ -145,7 +148,7 @@
     <div class="board-wrap">
       <Board
         {fen}
-        orientation={sideToMove()}
+        {orientation}
         turnColor={sideToMove()}
         movableColor={trainer.state.status === 'solving' ? sideToMove() : undefined}
         dests={trainer.state.status === 'solving' ? display.dests() : new Map()}

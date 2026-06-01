@@ -19,6 +19,7 @@
   let trainer = $state<TacticalTrainer | null>(null);
   let display = $state(new ChessGame());
   let fen = $state(START_FEN);
+  let orientation = $state<'white' | 'black'>('white'); // fixed per puzzle
   let feedback = $state('');
   let feedbackKind = $state<'good' | 'bad' | ''>('');
   let puzzleStartedAt = 0;
@@ -74,6 +75,7 @@
     trainer = new TacticalTrainer(p, Date.now());
     display = new ChessGame(p.fen);
     fen = display.fen;
+    orientation = display.turn === 'w' ? 'white' : 'black'; // fixed for the puzzle
     feedback = '';
     feedbackKind = '';
     puzzleStartedAt = Date.now();
@@ -209,7 +211,7 @@
       <div class="board-wrap">
         <Board
           {fen}
-          orientation={side()}
+          {orientation}
           turnColor={side()}
           movableColor={trainer?.state.status === 'solving' ? side() : undefined}
           dests={trainer?.state.status === 'solving' ? display.dests() : new Map()}

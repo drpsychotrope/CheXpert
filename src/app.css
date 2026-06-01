@@ -123,23 +123,16 @@ cg-board piece.pawn::before { content: '\265F'; }
 
 cg-board piece.ghost { opacity: 0.3; }
 
-/* Coordinates rendered by chessground. Black + fully opaque for legibility
-   against the light/dark board squares. */
+/* Coordinate labels: ONLY restyle for legibility (black, opaque, bold). Do NOT
+   override position / flex-flow — chessground's own base CSS already places them
+   correctly per orientation; duplicating it here caused conflicts. */
 .cg-wrap coords {
-  position: absolute;
-  display: flex;
-  pointer-events: none;
   opacity: 1;
   color: #111;
   font-size: 10px;
   font-weight: 700;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.6);
 }
-.cg-wrap coords.ranks { flex-flow: column-reverse; top: 0; right: 2px; height: 100%; }
-.cg-wrap coords.ranks.black { flex-flow: column; }
-.cg-wrap coords.files { bottom: 1px; left: 4px; width: 100%; flex-flow: row; }
-.cg-wrap coords.files.black { flex-flow: row-reverse; }
-.cg-wrap coords coord { flex: 1 1 auto; }
-.cg-wrap coords.ranks coord { transform: translateY(-50%); }
 
 /* ---- Misc UI ----------------------------------------------------------- */
 .feedback { font-weight: 600; min-height: 1.5em; }

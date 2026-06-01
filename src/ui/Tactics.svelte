@@ -14,6 +14,9 @@
   let display = $state(new ChessGame());
   let fen = $state(START_FEN);
   let lastMove = $state<[string, string] | null>(null);
+  // The solver's side, fixed for the whole puzzle (the side to move in the start
+  // FEN). The board must NOT flip when the opponent's auto-reply changes turn.
+  let orientation = $state<'white' | 'black'>('white');
   let feedback = $state('');
   let feedbackKind = $state<'good' | 'bad' | ''>('');
   let solvedThisSession = $state(0);
@@ -58,6 +61,8 @@
     display = new ChessGame(p.fen);
     fen = display.fen;
     lastMove = null;
+    // Orient the board to the solver's side, fixed for the whole puzzle.
+    orientation = display.turn === 'w' ? 'white' : 'black';
   }
 
   function clearDrill() {
@@ -78,12 +83,13 @@
     const result = trainer.playUserMove(uci);
 
     if (result === 'wrong') {
-      feedback = 'Not the move — this one is failed. Try the next.';
+      feedback = 'Not the move — Retry the position, or move on.';
       feedbackKind = 'bad';
       await finish(false);
-      // Reflect the attempted (wrong) move briefly is skipped; reset to puzzle pos.
+      // Reset the board to the puzzle's start so Retry is one click away.
       display = new ChessGame(puzzle.fen);
       fen = display.fen;
+      lastMove = null;
       return;
     }
 
@@ -153,6 +159,20 @@
       }
     }
   }
+
+  /** Re-attempt the SAME puzzle from the start (after a miss). Already graded, so
+   * this does not re-score — it's pure practice of the position. */
+  function retry() {
+    if (!puzzle) return;
+    trainer = new TacticalTrainer(puzzle, Date.now());
+    display = new ChessGame(puzzle.fen);
+    fen = display.fen;
+    lastMove = null;
+    feedback = 'Retry — find the move.';
+    feedbackKind = '';
+  }
+
+  const canRetry = $derived(trainer?.state.status === 'failed');
 </script>
 
 <section class="col center">
@@ -175,7 +195,7 @@
   <div class="board-wrap">
     <Board
       {fen}
-      orientation={sideToMove()}
+      {orientation}
       turnColor={sideToMove()}
       movableColor={trainer?.state.status === 'solving' ? sideToMove() : undefined}
       dests={trainer?.state.status === 'solving' ? display.dests() : new Map()}
@@ -188,7 +208,11 @@
   <p class="feedback {feedbackKind}">{feedback}</p>
 
   <div class="row center">
-    <button onclick={hint} disabled={trainer?.state.status !== 'solving'}>Hint</button>
+    {#if canRetry}
+      <button onclick={retry}>↻ Retry</button>
+    {:else}
+      <button onclick={hint} disabled={trainer?.state.status !== 'solving'}>Hint</button>
+    {/if}
     <button onclick={loadNext}>Next puzzle →</button>
   </div>
   {#if puzzle}

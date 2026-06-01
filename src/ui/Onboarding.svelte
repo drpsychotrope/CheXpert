@@ -25,6 +25,7 @@
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   let display = $state(new ChessGame());
   let fen = $state(START_FEN);
+  let ladderOrientation = $state<'white' | 'black'>('white'); // fixed per ladder puzzle
   let ladderFeedback = $state('');
   let ladderProgress = $state(0);
 
@@ -65,6 +66,7 @@
     trainer = t;
     display = new ChessGame(t.getFen());
     fen = display.fen;
+    ladderOrientation = display.turn === 'w' ? 'white' : 'black'; // fixed per puzzle
     ladderFeedback = '';
     ladderProgress = ladder.count;
   }
@@ -225,7 +227,7 @@
     <div class="board-wrap">
       <Board
         {fen}
-        orientation={display.turn === 'w' ? 'white' : 'black'}
+        orientation={ladderOrientation}
         turnColor={display.turn === 'w' ? 'white' : 'black'}
         movableColor={display.turn === 'w' ? 'white' : 'black'}
         dests={display.dests()}
