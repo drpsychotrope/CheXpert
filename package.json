@@ -14,6 +14,7 @@
     "copy:engine": "node scripts/copy-engine.mjs",
     "postinstall": "node scripts/copy-engine.mjs || echo \"[postinstall] engine copy skipped (stockfish dev dep not installed yet)\"",
     "etl:puzzles": "node scripts/build-puzzle-subset.mjs",
+    "etl:eco": "node scripts/build-eco.mjs",
     "launch": "node launcher/server.cjs",
     "build:exe": "npm run build && node scripts/build-exe.mjs"
   },

@@ -21,7 +21,7 @@ by GPL-3.0. See `README.md` → Licensing.
 ## Data (all CC0 — public domain)
 
 - **Lichess puzzle database** — https://database.lichess.org/#puzzles
-- **Lichess `chess-openings`** — https://github.com/lichess-org/chess-openings (planned, Phase 3)
+- **Lichess `chess-openings`** — https://github.com/lichess-org/chess-openings (ECO naming; seed in `public/openings/eco.json`, full set via `npm run etl:eco`)
 - **Syzygy tablebases via the Lichess API** — https://tablebase.lichess.ovh (planned, Phase 3)
 
 The hand-authored seed puzzles in `public/puzzles/seed-puzzles.json` are released CC0.

@@ -280,3 +280,15 @@ honesty per ADR-0007), ranks "leaks" by impact (count × avg win-prob loss), kee
 (vision warm-up, then worst-impact leaks mapped to Tactics/Endgames/Repertoire/Comeback). New
 `Insights.svelte` view (leaks with one-click Drill, plan, per-dim trend sparkline); reachable from a nav
 button + a Dashboard link. No engine, no schema. AP-CHESS-48…50.
+
+## ADR-0028 — Openings: ECO naming + repertoire-gap + explorer (batch 2, spec B)
+**Date:** 2026-06-01 · **Status:** accepted
+
+`eco.ts` names a game's opening by **longest-prefix** match over a bundled CC0 table and reports the
+**first out-of-book ply**. A curated **seed** `public/openings/eco.json` (~40 common lines) ships;
+`scripts/build-eco.mjs` (`npm run etl:eco`) regenerates the full ~3500-line set from the Lichess
+chess-openings TSVs (seed→ETL pattern, like the puzzle DB). `AnalysisResult` shows the opening name +
+where you left book, with **"Add this line to repertoire"** (builds a line from the in-book SAN prefix
+via the existing `buildLine`/`saveLine`). A minimal `Explorer.svelte` names typed lines + shows book
+continuations (no frequency stats — follow-up). Static data, no schema, no engine. Transposition naming
+is move-order-based (documented limitation). AP-CHESS-51…53.

@@ -21,6 +21,7 @@ export type View =
   | 'vision'
   | 'comeback'
   | 'insights'
+  | 'explorer'
   | 'settings';
 
 class AppState {

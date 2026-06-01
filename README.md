@@ -61,6 +61,9 @@ Everything runs in the browser. Nothing leaves your device by default.
 - **Insights** — your recurring **leaks** (mistakes clustered across all games, ranked by impact, with
   example positions), a deterministic **study plan** for a chosen daily time budget, and a **progress**
   trend per dimension over time. Recomputed locally from your analyses; no grade, just where to focus.
+- **Openings** — every analysed game is named (ECO) and flagged with where you **left book**; one click
+  adds that line to your repertoire. A local **explorer** names typed lines. Seed openings ship; the
+  full CC0 set is one `npm run etl:eco` away.
 - **Analysis explained** — plain-language *why this was a mistake + what was better*, rule-based and
   derived only from the engine's own evaluation. No LLM; when it can't name a specific tactical
   pattern, it says so rather than guess.

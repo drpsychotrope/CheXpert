@@ -2,11 +2,14 @@
   // Shared analysis result panel — used by Import (pasted PGN) AND Play's one-click
   // "Analyse this game" (ADR-0022). Stat row + win% curve + critical moments + a
   // read-only board for the selected moment + the explained-mistakes list.
+  import { onMount } from 'svelte';
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
   import EvalGraph from './EvalGraph.svelte';
   import { explainPly } from '../analysis/explain';
   import { criticalMoments } from '../analysis/criticalMoments';
+  import { describeOpening, type OpeningName } from '../opening/eco';
+  import { buildLine, saveLine } from '../repertoire/repertoire';
   import type { GameAnalysis } from '../analysis/types';
 
   interface Props {
@@ -27,6 +30,22 @@
       .filter((p) => p.color === analysis.playerColor && (p.severity === 'mistake' || p.severity === 'blunder'))
       .map((p) => ({ ply: p, ex: explainPly(p) })),
   );
+
+  // Opening naming + repertoire-gap (ADR-0028).
+  let opening = $state<OpeningName | null>(null);
+  let repAdded = $state(false);
+  onMount(async () => {
+    opening = await describeOpening(analysis.plies.map((p) => p.uci));
+  });
+  async function addToRepertoire() {
+    if (!opening) return;
+    const sanPrefix = analysis.plies.slice(0, opening.plyInBook).map((p) => p.san);
+    const res = buildLine(`rep:${analysis.gameId}`, opening.name, analysis.playerColor, sanPrefix, Date.now(), opening.name);
+    if (res.ok && res.line) {
+      await saveLine(res.line);
+      repAdded = true;
+    }
+  }
 </script>
 
 <div class="row" style="gap:1.5rem">
@@ -35,6 +54,17 @@
   <div><b style="font-size:1.5rem">{analysis.mistakes}</b><br /><span class="muted">mistakes</span></div>
   <div><b style="font-size:1.5rem">{analysis.inaccuracies}</b><br /><span class="muted">inaccuracies</span></div>
 </div>
+
+{#if opening}
+  <p class="muted" style="font-size:0.85rem">
+    Opening: <b>{opening.name}</b> ({opening.eco}) · left book at move {Math.floor(opening.plyInBook / 2) + 1}.
+    {#if repAdded}
+      <span style="color:var(--good)">✓ added to repertoire</span>
+    {:else}
+      <button class="link" onclick={addToRepertoire}>Add this line to repertoire</button>
+    {/if}
+  </p>
+{/if}
 
 <EvalGraph {analysis} selected={selectedPly} onSelect={(i) => (selectedPly = i)} />
 

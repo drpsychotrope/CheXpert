@@ -16,6 +16,7 @@
   import Vision from './Vision.svelte';
   import Comeback from './Comeback.svelte';
   import Insights from './Insights.svelte';
+  import Explorer from './Explorer.svelte';
 
   let booted = $state(false);
 
@@ -41,6 +42,7 @@
     <button onclick={() => app.go('insights')}>Insights</button>
     <button onclick={() => app.go('endgames')}>Endgames</button>
     <button onclick={() => app.go('repertoire')}>Repertoire</button>
+    <button onclick={() => app.go('explorer')}>Explorer</button>
     <button onclick={() => app.go('guess')}>Guess</button>
     <button onclick={() => app.go('vision')}>Vision</button>
     <button onclick={() => app.go('settings')}>Settings</button>
@@ -76,6 +78,8 @@
     <Comeback />
   {:else if app.view === 'insights'}
     <Insights />
+  {:else if app.view === 'explorer'}
+    <Explorer />
   {:else if app.view === 'settings'}
     <Settings />
   {:else}
