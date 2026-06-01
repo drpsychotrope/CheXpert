@@ -82,14 +82,20 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   container-type: size;
 }
 
-/* Checkerboard via two offset 45deg gradients — no image needed. */
+/* Checkerboard via a conic-gradient tile — axis-aligned squares, no image.
+   Each 25%×25% tile is split into 4 quadrants: 2 dark + 2 light on the diagonal,
+   which tiles into a proper 8×8 board. (The old 45deg linear-gradient produced
+   diagonal stripes, not squares.) */
 cg-board {
   background-color: var(--light-sq);
   background-image:
-    linear-gradient(45deg, var(--dark-sq) 25%, transparent 25%, transparent 75%, var(--dark-sq) 75%),
-    linear-gradient(45deg, var(--dark-sq) 25%, transparent 25%, transparent 75%, var(--dark-sq) 75%);
+    conic-gradient(
+      var(--dark-sq) 90deg,
+      var(--light-sq) 90deg 180deg,
+      var(--dark-sq) 180deg 270deg,
+      var(--light-sq) 270deg
+    );
   background-size: 25% 25%;
-  background-position: 0 0, 12.5% 12.5%;
 }
 
 /* Pieces rendered as Unicode glyphs (filled set for both colors), with stroke
