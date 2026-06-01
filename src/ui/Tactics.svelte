@@ -167,20 +167,25 @@
 
     const now = Date.now();
     const ms = trainer.elapsedMs(now);
+    // IndexedDB cannot structured-clone a Svelte 5 $state proxy ("could not be cloned"),
+    // and `puzzle` is $state — its proxied arrays (themes/moves/meta) make these db.put()s
+    // throw, silently aborting finish() so NOTHING persists (no attempt, no SRS card → empty
+    // Review, no "misses"). Snapshot to a plain, cloneable object first (cf. woodpecker.saveSet).
+    const p = $state.snapshot(puzzle);
     const db = await openTrainerDB();
     await db.put('puzzleAttempts', {
-      id: `${puzzle.id}:${now}`,
-      puzzleId: puzzle.id,
+      id: `${p.id}:${now}`,
+      puzzleId: p.id,
       solved,
       ms,
-      themes: puzzle.themes,
+      themes: p.themes,
       ratingBefore: graded.player.rating,
       ratingAfter: model.puzzleRating.rating,
       playedAt: now,
-      source: puzzle.source,
+      source: p.source,
     });
     // Persist the updated puzzle rating into the puzzle row too (it drifts down).
-    await db.put('puzzles', { ...puzzle, rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) });
+    await db.put('puzzles', { ...p, rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) });
     // Schedule this puzzle for spaced repetition (FSRS) so it resurfaces in Review.
     await reviewItem('puzzle', puzzle.id, resultToGrade(solved, ms), now);
     await app.persistModel(now);

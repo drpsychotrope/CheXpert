@@ -117,7 +117,8 @@
       model.puzzleRating = graded.player;
       if (!solved) for (const t of puzzle.themes) model.weaknessCounters[t] = (model.weaknessCounters[t] ?? 0) + 1;
       const db = await openTrainerDB();
-      await db.put('puzzles', { ...puzzle, rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) });
+      // Snapshot the $state puzzle — a proxy can't be structured-cloned by IndexedDB.
+      await db.put('puzzles', { ...$state.snapshot(puzzle), rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) });
       await app.persistModel(Date.now());
     }
     reviewed += 1;
