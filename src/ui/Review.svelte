@@ -132,13 +132,13 @@
     }
   }
 
-  /** Build a fixed "Your misses" Woodpecker set from your most-failed personal puzzles. */
+  /** Build a fixed "Your misses" Woodpecker set from the puzzles you fail most (any source). */
   async function buildMissesSet() {
     const db = await openTrainerDB();
-    const attempts = (await db.getAll('puzzleAttempts')) as Array<{ puzzleId: string; solved: boolean; source: string }>;
+    const attempts = (await db.getAll('puzzleAttempts')) as Array<{ puzzleId: string; solved: boolean }>;
     const ids = buildLapseSet(attempts, 12);
     if (!ids.length) {
-      missesMsg = 'No failed personal puzzles yet — solve some first.';
+      missesMsg = 'No failed puzzles yet — miss a few in Tactics first.';
       return;
     }
     await saveSet(createSet('wp:lapses', 'Your misses', ids, Date.now()));

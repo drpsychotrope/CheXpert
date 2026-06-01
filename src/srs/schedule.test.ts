@@ -20,16 +20,17 @@ describe('interleave', () => {
 });
 
 describe('buildLapseSet', () => {
-  it('ranks the most-failed personal puzzles, capped at k, excluding curated/solved', () => {
+  it('ranks the most-failed puzzles (any source), capped at k, excluding solved', () => {
     const attempts = [
       { puzzleId: 'p1', solved: false, source: 'personal' },
       { puzzleId: 'p1', solved: false, source: 'personal' },
-      { puzzleId: 'p2', solved: false, source: 'personal' },
-      { puzzleId: 'p3', solved: true, source: 'personal' }, // never failed
-      { puzzleId: 'c1', solved: false, source: 'curated' }, // not personal
+      { puzzleId: 'c1', solved: false, source: 'curated' }, // failed curated — counts too
+      { puzzleId: 'p3', solved: true, source: 'personal' }, // never failed — excluded
     ];
-    expect(buildLapseSet(attempts, 2)).toEqual(['p1', 'p2']);
-    expect(buildLapseSet(attempts, 5)).not.toContain('c1');
-    expect(buildLapseSet(attempts, 5)).not.toContain('p3');
+    const ids = buildLapseSet(attempts, 5);
+    expect(ids[0]).toBe('p1'); // most-failed first
+    expect(ids).toContain('c1'); // a failed CURATED puzzle is a "miss" too
+    expect(ids).not.toContain('p3'); // solved excluded
+    expect(buildLapseSet(attempts, 1)).toEqual(['p1']); // capped
   });
 });

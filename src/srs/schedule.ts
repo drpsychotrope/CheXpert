@@ -20,14 +20,12 @@ export function interleave<T>(items: T[], themeOf: (t: T) => string): T[] {
 export interface AttemptLike {
   puzzleId: string;
   solved: boolean;
-  source: string;
 }
 
-/** The `k` personal puzzles you fail most, ranked by failure count (for a "your misses" set). */
+/** The `k` puzzles you fail most (any source), ranked by failure count (a "your misses" set). */
 export function buildLapseSet(attempts: AttemptLike[], k: number): string[] {
   const fails = new Map<string, number>();
   for (const a of attempts) {
-    if (a.source !== 'personal') continue;
     if (a.solved) continue;
     fails.set(a.puzzleId, (fails.get(a.puzzleId) ?? 0) + 1);
   }
