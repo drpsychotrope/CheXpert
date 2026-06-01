@@ -97,9 +97,10 @@
     thinking = true;
     try {
       // Loop closure: play the steering opening's book move if still on the line;
-      // otherwise the engine takes over at the calibrated ~55% Elo (band intact).
+      // otherwise the engine takes over at the calibrated ~55% Elo, playing a HUMAN-LIKE
+      // move (top moves sampled by eval/temperature) rather than always the best.
       let uci = opening ? nextBookMove(opening, playedUci) : null;
-      if (!uci) uci = await opponent.pickMove(game.fen, 500);
+      if (!uci) uci = await opponent.pickHumanMove(game.fen);
       if (uci) {
         game.moveUci(uci);
         playedUci.push(uci);

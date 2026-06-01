@@ -39,7 +39,9 @@ Everything runs in the browser. Nothing leaves your device by default.
   strength. Skippable, re-runnable from Settings.
 - **Adaptive opponent** — Stockfish via `UCI_LimitStrength` + `UCI_Elo`, nudged ±50–100 Elo per
   game toward a ~55% player win-rate band (your zone of proximal development). Instructive, not just
-  hard — strength is set honestly, never via random blunder injection.
+  hard. Plays **human-like**: among the engine's top moves it samples one weighted by evaluation
+  (temperature set by its Elo) — varied, plausible moves rather than always the best — but **never a
+  catastrophic blunder** (nothing more than ~1.5 pawns below best). No random blunder injection.
 - **Coached mode** — optional engine check that warns before an obvious blunder while you play.
 - **One-click review** — after a game, *Analyse this game* runs the full local analysis (puzzles +
   weakness dashboard) with no PGN to copy or paste.

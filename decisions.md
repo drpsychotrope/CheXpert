@@ -357,3 +357,16 @@ resurfaces in ~10 min, then graduates normally on the next review. Verified: a f
 due in < 1 day (was ~10). Also: Review's empty state now shows **N scheduled · next due in Y**
 (`allCards` + `intervalLabel`) so it's never a mysterious blank. Plus a usability fix: **Tactics shows
 the Retry button at all times** (reset the current puzzle), not only after a miss.
+
+## ADR-0034 — Human-like opponent via MultiPV temperature sampling (Maia-spike alternative)
+**Date:** 2026-06-01 · **Status:** accepted
+
+The Maia-WASM spike (`reports/maia-wasm-spike.md`) deferred a neural human model (high effort/bloat).
+Cheaper path adopted: `humanMove.ts` `sampleHumanMove` samples among the engine's top moves
+(`analyzeLines` multipv 4) weighted by eval with a softmax **temperature** set by the bot's target Elo
+(`temperatureForElo`: lower Elo → hotter → more variety), **excluding any move > 150 cp below best** (no
+catastrophic blunders). `AdaptiveOpponent.pickHumanMove` wires it (falls back to best move if MultiPV
+unavailable); `Play` uses it for the bot's non-book moves. Pure core unit-tested (rand injected); no ML,
+no new dependency, reuses the engine. Result: varied, plausible, beatable opponent moves instead of
+always-best. (Comeback/Sparring still use `pickMove`; can opt into `pickHumanMove` later.) ADR-0019 (no
+Maia) stands.

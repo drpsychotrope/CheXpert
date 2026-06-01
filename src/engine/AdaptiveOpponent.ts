@@ -6,6 +6,7 @@
 // so the opponent stays in the player's zone of proximal development.
 
 import type { EngineClient } from './EngineClient';
+import { sampleHumanMove, temperatureForElo } from './humanMove';
 
 export const ELO_MIN = 1320;
 export const ELO_MAX = 3190;
@@ -74,6 +75,31 @@ export class AdaptiveOpponent {
   async pickMove(fen: string, movetime = 500): Promise<string | null> {
     const res = await this.engine.evaluate(fen, { movetime });
     return res.bestmove;
+  }
+
+  /**
+   * Human-like move: sample among the engine's top moves weighted by eval, with a
+   * temperature set by the target Elo (lower Elo → more variety). Never a catastrophic
+   * blunder (moves > maxGapCp below best are excluded). Falls back to the best move if
+   * MultiPV is unavailable. The Maia-spike's cheap alternative — varied, beatable play.
+   */
+  async pickHumanMove(fen: string, movetime = 300): Promise<string | null> {
+    let lines;
+    try {
+      lines = await this.engine.analyzeLines(fen, { multipv: 4, movetime });
+    } catch {
+      return this.pickMove(fen, movetime);
+    }
+    if (!lines.length || !lines[0].uci) return this.pickMove(fen, movetime);
+    const whiteToMove = fen.split(' ')[1] !== 'b';
+    const moves = lines
+      .filter((l) => l.uci)
+      .map((l) => ({ uci: l.uci as string, cp: whiteToMove ? l.whiteCp : -l.whiteCp }));
+    return sampleHumanMove(moves, {
+      temperature: temperatureForElo(this.state.targetElo),
+      maxGapCp: 150,
+      rand: Math.random(),
+    });
   }
 
   /** Record the finished game and re-apply the adjusted strength. */
