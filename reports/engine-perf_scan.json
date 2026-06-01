@@ -1,0 +1,21 @@
+{
+  "pr_name": "engine-perf",
+  "scope": "feature (perf + licensing decision)",
+  "captured_at": "2026-06-01",
+  "bundles": ["#9 multi-thread Stockfish via the launcher (COOP/COEP)"],
+  "target_exists": {
+    "launcher/server.cjs": "static server, NO COOP/COEP headers today (line 69 writeHead) — add them",
+    "scripts/copy-engine.mjs": "copies LITE single-thread only; has isMulti() detector already — also copy MT build",
+    "src/engine/stockfish.worker.ts": "ENGINE_WORKER_URL — must select MT vs lite at runtime",
+    "src/engine/EngineClient.ts": "loads ENGINE_WORKER_URL; setOption(Threads) for MT",
+    "vite.config": "dev server headers (COOP/COEP) for MT in dev",
+    "decisions.md ADR-0004": "hybrid engine; states MT build = AGPL-3.0"
+  },
+  "licensing_flag": "MT build (lila-stockfish-web / threaded) is AGPL-3.0 vs lite GPL-3.0. ADR-0002 = local/no-distribution. Adopting MT escalates obligations IF distributed/hosted. CRITICAL decision, not a code defect.",
+  "perf": "MT ~Nx faster analysis where crossOriginIsolated; lite fallback otherwise",
+  "schema_change": "none",
+  "git_remotes": [],
+  "tests_baseline": 162,
+  "ap_chess_alloc": "65-67",
+  "adr_alloc": "ADR-0032 (supersedes/extends ADR-0004)"
+}

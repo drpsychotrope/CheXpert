@@ -63,6 +63,10 @@
 
     <Radar dimensions={profile.dimensions} />
 
+    <div class="row">
+      <button onclick={() => app.go('insights')}>Insights: top leaks + study plan + progress →</button>
+    </div>
+
     <div class="col">
       {#each profile.dimensions as d}
         <div class="dim-row panel">

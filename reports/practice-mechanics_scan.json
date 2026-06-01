@@ -1,0 +1,22 @@
+{
+  "pr_name": "practice-mechanics",
+  "scope": "feature (bundled — recommend split 3a/3b/3c)",
+  "captured_at": "2026-06-01",
+  "bundles": ["#4 deep calculation trainer", "#5 board-vision micro-drills", "#6 interleaved scheduler + auto-Woodpecker"],
+  "target_exists": {
+    "src/engine/EngineClient.ts": "analyzeLines(fen,{multipv,movetime}) -> PV lines; evaluate(fen,{depth}) — calc grading",
+    "src/vision/vision.ts": "pure square-colour + knight-distance primitives (extend with checks/captures/hanging)",
+    "src/ui/Vision.svelte": "vision drills view (add tabs)",
+    "src/srs/SrsStore.ts": "dueCards(now,kind,limit) ordered by due — interleave ordering",
+    "src/woodpecker/woodpecker.ts": "createSet(id,name,puzzleIds,now) — auto-set from lapsed puzzles",
+    "src/srs/fsrs.ts": "gradeCard/isDue; lapse = a card that failed (Again)",
+    "src/calc/": "NEW calculation trainer module + view"
+  },
+  "engine_use": "calc trainer reuses analyzeLines (PV) — no new engine build",
+  "schema_change": "none (woodpeckerSets store exists; srsCards exists)",
+  "git_remotes": [],
+  "collision": "disjoint domains; app.svelte.ts View union touched (additive)",
+  "tests_baseline": 162,
+  "ap_chess_alloc": "54-58",
+  "adr_alloc": "ADR-0029 (or 0029/0030/0031 if split)"
+}

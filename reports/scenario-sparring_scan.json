@@ -1,0 +1,21 @@
+{
+  "pr_name": "scenario-sparring",
+  "scope": "feature",
+  "captured_at": "2026-06-01",
+  "bundles": ["#7 scenario sparring"],
+  "target_exists": {
+    "src/ui/Play.svelte": "vs-engine loop (Board + onMove + AdaptiveOpponent) to reuse",
+    "src/ui/Comeback.svelte": "play-from-FEN-vs-adaptive pattern (ADR-0025) to mirror",
+    "src/engine/AdaptiveOpponent.ts": "pickMove(fen) at ZPD Elo",
+    "src/analysis/fingerprint.ts": "(spec A) weakness positions — optional source",
+    "src/analysis/scenarios.ts": "NEW: scenario catalogue + position sourcing",
+    "src/ui/Sparring.svelte": "NEW view"
+  },
+  "engine_use": "AdaptiveOpponent at model.opponentTargetElo — no new engine",
+  "schema_change": "none (scenarios derive from analyses + a static imbalance library)",
+  "depends_on": "spec A (fingerprint) for 'your leaks' source — standalone via imbalance library if A absent",
+  "git_remotes": [],
+  "tests_baseline": 162,
+  "ap_chess_alloc": "59-61",
+  "adr_alloc": "ADR-0030"
+}

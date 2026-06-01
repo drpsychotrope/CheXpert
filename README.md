@@ -58,6 +58,9 @@ Everything runs in the browser. Nothing leaves your device by default.
   conversion · time management · resilience), benchmarked against your level band. **Every** dimension
   is one-click drillable to the right training: tactics → Tactics, opening → Repertoire, endgame →
   Endgames, time → timed Tactics, resilience → comeback drills.
+- **Insights** — your recurring **leaks** (mistakes clustered across all games, ranked by impact, with
+  example positions), a deterministic **study plan** for a chosen daily time budget, and a **progress**
+  trend per dimension over time. Recomputed locally from your analyses; no grade, just where to focus.
 - **Analysis explained** — plain-language *why this was a mistake + what was better*, rule-based and
   derived only from the engine's own evaluation. No LLM; when it can't name a specific tactical
   pattern, it says so rather than guess.

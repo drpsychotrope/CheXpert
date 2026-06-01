@@ -1,0 +1,23 @@
+{
+  "pr_name": "analysis-board",
+  "scope": "feature",
+  "captured_at": "2026-06-01",
+  "bundles": ["#8 interactive MultiPV analysis board + positional explanations"],
+  "target_exists": {
+    "src/engine/EngineClient.ts": "analyzeLines(fen,{multipv,movetime}) -> ranked PV lines (interactive eval)",
+    "src/ui/Board.svelte": "interactive board (movable) to drive exploration",
+    "src/game/ChessGame.ts": "move/undo/fen/dests/history for the variation walker",
+    "src/analysis/explain.ts": "rule-based explanations (extend with positional reasons)",
+    "src/analysis/winProb.ts": "winPct for eval display",
+    "src/analysis/positional.ts": "NEW: FEN-derived positional features",
+    "src/ui/AnalysisBoard.svelte": "NEW interactive analysis view"
+  },
+  "engine_use": "analyzeLines on demand (MultiPV) — no new engine; runs in existing worker",
+  "no_llm": true,
+  "schema_change": "none",
+  "git_remotes": [],
+  "collision": "extends explain.ts (additive); reuses Board/winProb",
+  "tests_baseline": 162,
+  "ap_chess_alloc": "62-64",
+  "adr_alloc": "ADR-0031"
+}

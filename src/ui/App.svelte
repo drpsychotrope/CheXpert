@@ -15,6 +15,7 @@
   import GuessMove from './GuessMove.svelte';
   import Vision from './Vision.svelte';
   import Comeback from './Comeback.svelte';
+  import Insights from './Insights.svelte';
 
   let booted = $state(false);
 
@@ -37,6 +38,7 @@
     <button onclick={() => app.go('woodpecker')}>Woodpecker</button>
     <button onclick={() => app.go('import')}>Analyse</button>
     <button onclick={() => app.go('dashboard')}>Dashboard</button>
+    <button onclick={() => app.go('insights')}>Insights</button>
     <button onclick={() => app.go('endgames')}>Endgames</button>
     <button onclick={() => app.go('repertoire')}>Repertoire</button>
     <button onclick={() => app.go('guess')}>Guess</button>
@@ -72,6 +74,8 @@
     <Vision />
   {:else if app.view === 'comeback'}
     <Comeback />
+  {:else if app.view === 'insights'}
+    <Insights />
   {:else if app.view === 'settings'}
     <Settings />
   {:else}

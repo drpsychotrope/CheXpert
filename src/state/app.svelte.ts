@@ -20,6 +20,7 @@ export type View =
   | 'guess'
   | 'vision'
   | 'comeback'
+  | 'insights'
   | 'settings';
 
 class AppState {

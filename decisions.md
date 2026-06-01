@@ -268,3 +268,15 @@ step (Stage 2); the launch screen forced the puzzle ladder. Added a **Skip** but
 model onboarded, and routes straight Home — no ladder, no game. Wide RD, sharpens with play; re-runnable
 from Settings. Reuses the already-tested calibration functions, so no new logic. Verified: launch →
 Skip → onboarded, ratings seeded (~1100/1100, RD 300), Home.
+
+## ADR-0027 — Weakness intelligence: fingerprint + study plan + progress (batch 2, spec A)
+**Date:** 2026-06-01 · **Status:** accepted
+
+The coaching brain, all pure/local/no-LLM over stored `gameAnalyses`. `fingerprint.ts`:
+`buildFingerprint` clusters the player's mistakes by confident motif (else `phase:severity` fallback,
+honesty per ADR-0007), ranks "leaks" by impact (count × avg win-prob loss), keeps 3 example FENs, caps
+8. `weaknessTrend` recomputes the radar over rolling windows of games (no new store). `studyPlan.ts`:
+`buildStudyPlan` turns leaks + the weakest dimension + a time budget into a deterministic daily plan
+(vision warm-up, then worst-impact leaks mapped to Tactics/Endgames/Repertoire/Comeback). New
+`Insights.svelte` view (leaks with one-click Drill, plan, per-dim trend sparkline); reachable from a nav
+button + a Dashboard link. No engine, no schema. AP-CHESS-48…50.

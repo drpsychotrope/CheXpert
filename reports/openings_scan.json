@@ -1,0 +1,22 @@
+{
+  "pr_name": "openings",
+  "scope": "feature",
+  "captured_at": "2026-06-01",
+  "bundles": ["#3 repertoire-gap from games", "opening explorer (name + deviation)"],
+  "target_exists": {
+    "src/opening/openingBook.ts": "steering book only (no ECO names/detection) — add a sibling eco module",
+    "src/opening/eco.ts": "NEW: ECO name + book-line detection",
+    "src/repertoire/repertoire.ts": "repertoire builder (link 'add this line')",
+    "src/analysis/runAnalysis.ts / types.ts": "annotate game with first out-of-book ply",
+    "src/ui/AnalysisResult.svelte": "surface 'left book at move N (Opening X)'",
+    "public/openings/": "NEW: bundled ECO data (CC0)"
+  },
+  "data_source": "Lichess chess-openings TSVs (a-e), CC0 — already used elsewhere (puzzles, syzygy). ~3500 named lines. Ship as a compact bundled JSON (eco code, name, UCI/epd prefix).",
+  "engine_independent": true,
+  "schema_change": "none (opening data is static/bundled; no IndexedDB)",
+  "git_remotes": [],
+  "collision": "disjoint from weakness-intelligence; touches AnalysisResult (shared with eval-graph but additive)",
+  "tests_baseline": 162,
+  "ap_chess_alloc": "51-53",
+  "adr_alloc": "ADR-0028"
+}

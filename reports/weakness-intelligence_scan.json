@@ -1,0 +1,24 @@
+{
+  "pr_name": "weakness-intelligence",
+  "scope": "feature",
+  "captured_at": "2026-06-01",
+  "bundles": ["#1 weakness fingerprint", "#2 study-plan generator", "#10 progress-over-time"],
+  "target_exists": {
+    "src/analysis/weakness.ts": "buildWeaknessProfile + Dimension + drillTarget (extend, don't break)",
+    "src/analysis/runAnalysis.ts": "loadAllAnalyses() -> GameAnalysis[] (data source)",
+    "src/analysis/motif.ts": "motif tags per ply (cluster key)",
+    "src/store/db.ts": "gameAnalyses store keyed by gameId, analyzedAt index",
+    "src/analysis/fingerprint.ts": "NEW pure selector",
+    "src/analysis/studyPlan.ts": "NEW pure generator",
+    "src/ui/Insights.svelte": "NEW view (or extend Dashboard)"
+  },
+  "data_available_per_ply": ["color", "motif{tag,tags,confidence}", "phase", "severity", "winProbLoss", "cpLoss", "playedWhiteCp", "fenBefore", "moveNumber"],
+  "trend_source": "recompute snapshots from stored gameAnalyses sorted by analyzedAt — NO new IndexedDB store",
+  "engine_independent": true,
+  "no_llm": true,
+  "git_remotes": [],
+  "collision": "local-only repo; no tracker. Foundation: scenario-sparring (D) consumes fingerprint positions.",
+  "tests_baseline": 162,
+  "ap_chess_alloc": "48-50",
+  "adr_alloc": "ADR-0027"
+}
