@@ -47,6 +47,10 @@
       turnColor,
       viewOnly,
       check,
+      // Disable chessground's own coordinate labels — their absolute positioning
+      // fought our board frame and drifted by a square. We render our own labels
+      // in the gutters below, so they cannot desync from the squares.
+      coordinates: false,
       lastMove: lastMove ? (lastMove as Key[]) : undefined,
       movable: {
         free: false,
@@ -74,24 +78,74 @@
     if (!cg) return;
     cg.set(config());
   });
+
+  // Our own coordinate labels, ordered to match `orientation`. White view: files
+  // a→h, ranks 8→1 (top to bottom). Black view: both reversed.
+  const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+  const files = $derived(orientation === 'white' ? FILES : [...FILES].reverse());
+  const ranks = $derived(orientation === 'white' ? [8, 7, 6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6, 7, 8]);
 </script>
 
 <div class="board-frame">
+  <!-- rank labels (left gutter), one flex cell per row, aligned to the board grid -->
+  <div class="ranks">
+    {#each ranks as r}<span>{r}</span>{/each}
+  </div>
   <div class="cg-board-host" bind:this={el}></div>
+  <!-- file labels (bottom gutter), one flex cell per column -->
+  <div class="files">
+    {#each files as f}<span>{f}</span>{/each}
+  </div>
 </div>
 
 <style>
-  /* Fixed square frame. Use min() of viewport width/height so it always has a
-     real, non-zero size regardless of the flex parent (the earlier bug: a
-     percentage/70vh height collapsed inside a centered column → 0-size board). */
+  /* Grid: a left gutter for rank labels, the square board, and a bottom gutter for
+     file labels. The board cell is square via aspect-ratio; labels live OUTSIDE it
+     in the gutters, so they can never overlap or drift onto the squares. */
   .board-frame {
-    width: min(86vw, 70vh, 560px);
-    height: min(86vw, 70vh, 560px);
+    --board: min(82vw, 68vh, 540px);
+    --gutter: 18px;
+    display: grid;
+    grid-template-columns: var(--gutter) var(--board);
+    grid-template-rows: var(--board) var(--gutter);
     flex: 0 0 auto;
   }
-  /* chessground replaces this element's contents and adds the .cg-wrap class. */
   .cg-board-host {
-    width: 100%;
-    height: 100%;
+    grid-column: 2;
+    grid-row: 1;
+    width: var(--board);
+    height: var(--board);
+  }
+  /* Rank labels: a column beside the board, evenly split into 8 rows. */
+  .ranks {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .ranks span {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* File labels: a row under the board, evenly split into 8 columns. */
+  .files {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+  }
+  .files span {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ranks span,
+  .files span {
+    color: #111;
+    font-size: 11px;
+    font-weight: 700;
+    opacity: 0.85;
   }
 </style>

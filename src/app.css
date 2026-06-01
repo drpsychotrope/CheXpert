@@ -123,16 +123,9 @@ cg-board piece.pawn::before { content: '\265F'; }
 
 cg-board piece.ghost { opacity: 0.3; }
 
-/* Coordinate labels: ONLY restyle for legibility (black, opaque, bold). Do NOT
-   override position / flex-flow — chessground's own base CSS already places them
-   correctly per orientation; duplicating it here caused conflicts. */
-.cg-wrap coords {
-  opacity: 1;
-  color: #111;
-  font-size: 10px;
-  font-weight: 700;
-  text-shadow: 0 0 2px rgba(255, 255, 255, 0.6);
-}
+/* Coordinate labels are rendered by Board.svelte in gutters OUTSIDE the board
+   (chessground's built-in coords are disabled via `coordinates: false`), so there
+   are no `.cg-wrap coords` to style here — they cannot drift onto the squares. */
 
 /* ---- Misc UI ----------------------------------------------------------- */
 .feedback { font-weight: 600; min-height: 1.5em; }
