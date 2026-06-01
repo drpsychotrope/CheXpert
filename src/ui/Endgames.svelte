@@ -18,6 +18,7 @@
   let tbError = $state('');
 
   const settings = $derived(app.settings);
+  const networkOff = $derived(!(app.settings?.allowNetwork ?? false));
 
   const client = new TablebaseClient({
     allowNetwork: () => app.settings?.allowNetwork ?? false,
@@ -50,7 +51,10 @@
       tb = await client.probe(game.fen);
     } catch (e) {
       tb = null;
-      tbError = e instanceof NetworkNotAllowedError ? e.message : 'Tablebase lookup failed.';
+      tbError =
+        e instanceof NetworkNotAllowedError
+          ? e.message
+          : `Tablebase lookup failed (${e instanceof Error ? e.message : 'unknown'}).`;
     }
   }
 
@@ -83,7 +87,11 @@
         feedbackKind = '';
       }
     } else if (tbError) {
-      feedback = 'Playing without tablebase feedback (network off).';
+      // Distinguish "consent off" from an actual lookup failure (don't claim the
+      // network is off when it's on and the request simply failed).
+      feedback = networkOff
+        ? 'Playing without tablebase feedback (network off — enable it in Settings).'
+        : 'Playing without tablebase feedback (tablebase lookup failed).';
       feedbackKind = '';
     }
 
