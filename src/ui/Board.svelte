@@ -103,7 +103,12 @@
      file labels. The board cell is square via aspect-ratio; labels live OUTSIDE it
      in the gutters, so they can never overlap or drift onto the squares. */
   .board-frame {
-    --board: min(82vw, 68vh, 540px);
+    /* Floor the board to a multiple of 8px so chessground (which rounds its board
+       DOWN to a multiple of 8 for integer squares) fills the host exactly — otherwise
+       the host is e.g. 540px, chessground renders 536px, and the rank/file gutters
+       (sized to the host) drift ~4px against the squares. Multiple-of-8 → host ==
+       chessground board == 8 equal squares, so gutter cells line up by construction. */
+    --board: round(down, min(82vw, 68vh, 540px), 8px);
     --gutter: 18px;
     display: grid;
     grid-template-columns: var(--gutter) var(--board);
