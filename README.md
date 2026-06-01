@@ -66,7 +66,10 @@ Everything runs in the browser. Nothing leaves your device by default.
   full CC0 set is one `npm run etl:eco` away.
 - **Analysis explained** — plain-language *why this was a mistake + what was better*, rule-based and
   derived only from the engine's own evaluation. No LLM; when it can't name a specific tactical
-  pattern, it says so rather than guess.
+  pattern, it says so — and adds honest **positional** context (isolated/doubled/passed pawns) read
+  from the position itself.
+- **Analysis board** — an interactive board with the engine's top lines (MultiPV): move freely, follow
+  a line, walk back, with an eval bar. Explore any critical moment in one click.
 
 ### Train & retain
 - **Tactics** — active recall (you play the move; the solution is never auto-played), Glicko-2

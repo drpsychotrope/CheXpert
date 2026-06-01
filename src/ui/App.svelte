@@ -18,6 +18,7 @@
   import Insights from './Insights.svelte';
   import Explorer from './Explorer.svelte';
   import Calculate from './Calculate.svelte';
+  import AnalysisBoard from './AnalysisBoard.svelte';
   import Sparring from './Sparring.svelte';
 
   let booted = $state(false);
@@ -41,6 +42,7 @@
     <button onclick={() => app.go('review')}>Review</button>
     <button onclick={() => app.go('woodpecker')}>Woodpecker</button>
     <button onclick={() => app.go('import')}>Analyse</button>
+    <button onclick={() => app.go('analysis-board')}>Board</button>
     <button onclick={() => app.go('dashboard')}>Dashboard</button>
     <button onclick={() => app.go('insights')}>Insights</button>
     <button onclick={() => app.go('endgames')}>Endgames</button>
@@ -88,6 +90,8 @@
     <Calculate />
   {:else if app.view === 'sparring'}
     <Sparring />
+  {:else if app.view === 'analysis-board'}
+    <AnalysisBoard />
   {:else if app.view === 'settings'}
     <Settings />
   {:else}

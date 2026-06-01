@@ -6,6 +6,7 @@
 
 import { Chess, type Square } from 'chess.js';
 import type { PlyAnalysis, Severity } from './types';
+import { explainPositional } from './positional';
 
 const SEVERITY_PHRASE: Record<Severity, string> = {
   blunder: 'a blunder',
@@ -110,6 +111,8 @@ export function explainPly(ply: PlyAnalysis): Explanation {
         bestSan ? `${bestSan} and other moves` : 'another move'
       } as clearly better.`,
     );
+    // Add honest, FEN-derived positional context for the player's side (no tactic to name).
+    for (const phrase of explainPositional(ply.fenAfter, ply.color).slice(0, 2)) reasons.push(phrase);
   }
 
   // 3) Material capture cue, if the played move dropped something (from cpLoss).

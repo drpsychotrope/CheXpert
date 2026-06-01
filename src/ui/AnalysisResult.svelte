@@ -97,6 +97,7 @@
     <p class="muted" style="font-size:0.85rem">{selEx.headline}</p>
     {#each selEx.reasons as r}<p class="muted" style="font-size:0.85rem">{r}</p>{/each}
     {#if selEx.better}<p class="better">{selEx.better}</p>{/if}
+    <button class="link" onclick={() => { if (selPly) { app.analysisFen = selPly.fenBefore; app.go('analysis-board'); } }}>Explore this position →</button>
   </div>
 {/if}
 

@@ -24,6 +24,7 @@ export type View =
   | 'explorer'
   | 'calculate'
   | 'sparring'
+  | 'analysis-board'
   | 'settings';
 
 class AppState {
@@ -35,6 +36,8 @@ class AppState {
   tacticsFilterThemes = $state<string[] | null>(null);
   /** Set by the time-management drill; runs Tactics under a per-puzzle clock. */
   tacticsTimed = $state(false);
+  /** Optional start position for the interactive analysis board. */
+  analysisFen = $state<string | null>(null);
 
   readonly engine = new EngineClient();
   readonly puzzles = new PuzzleRepo();

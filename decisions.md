@@ -316,3 +316,14 @@ ending) of legal positions (FENs validated in tests, side-to-move == side-to-tra
 vs the **adaptive opponent at the player's ZPD Elo** (reuses the Comeback loop + AdaptiveOpponent),
 **outcome-graded** (win/hold = success). Library works standalone; the weakness source degrades to
 empty without analyses. No new engine, no schema. AP-CHESS-59…61.
+
+## ADR-0031 — Analysis board: interactive MultiPV + positional explanations (batch 2, spec E)
+**Date:** 2026-06-01 · **Status:** accepted
+
+`AnalysisBoard.svelte`: move freely; `analyzeLines(multipv 3)` shows the top lines (eval + SAN) for the
+current position; click a line to follow it; back/reset; an eval bar from `winPct`. Stale results are
+dropped via a seq token (no per-move engine respawn). Reachable from nav + an "Explore this position"
+link on a critical moment. `positional.ts` (`positionalFeatures`/`explainPositional`, pure, tested)
+derives doubled/isolated/passed pawns + material from the FEN; `explain.ts` appends these **honest**
+phrases ONLY in the no-tactical-motif branch (tactical/mate paths untouched) — extends the
+say-only-what-you-can-prove doctrine to positional features. No LLM, no new engine, no schema. AP-CHESS-62…64.
