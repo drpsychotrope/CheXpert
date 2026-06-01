@@ -109,6 +109,27 @@ npm run check    # svelte-check (type check)
 npm run build    # type-check + production build
 ```
 
+### Desktop launcher (.exe)
+
+```bash
+npm run build:exe   # → build/ChessTrainer.exe + build/dist/
+```
+
+Ships the whole `build/` folder. Double-click **ChessTrainer.exe**: it starts a tiny local server
+(127.0.0.1, random port) for the bundled app and opens it in a borderless app window (Edge/Chrome
+`--app=` mode, falling back to the default browser). No install, no admin, no network — everything
+stays local, IndexedDB persistence works.
+
+Why a local server and not `file://`: the app uses module Web Workers + WASM `fetch` + IndexedDB,
+which browsers block under `file://`. The launcher is built with Node's built-in **SEA** (Single
+Executable Application) — it copies your own `node.exe` and injects the launcher, so building needs
+**no compiler and no extra toolchain**. The exe (~69 MB, mostly the Node runtime) sits beside
+`build/dist/` (the app + engine + puzzles). `npm run launch` runs the same launcher under plain Node
+for development.
+
+For a true native window with a much smaller binary, **Tauri** (Windows WebView2, ~10 MB) is the
+upgrade path — but it requires the Rust + MSVC toolchain to build, which the SEA approach avoids.
+
 ### Engine asset
 
 `npm install` runs `scripts/copy-engine.mjs`, which copies **only** the lite single-thread build
