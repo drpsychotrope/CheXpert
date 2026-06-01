@@ -345,3 +345,15 @@ distributed, AGPL-3.0 source-publication applies — revisit then. Recorded per 
 `require-corp` can block cross-origin fetches — the only one is the opt-in Syzygy lookup; verify it
 still resolves under isolation (AP-CHESS-66), else it stays a documented constraint (endgames work
 offline vs the engine regardless). AP-CHESS-65…67.
+
+## ADR-0033 — Cap the first-solve SRS interval so Review actually fills
+**Date:** 2026-06-01 · **Status:** accepted
+
+Bug: Review was empty even after many Tactics sessions. Root cause (not a storage/index bug —
+investigated): a fast solve (≤8 s) maps to **Easy**, and ts-fsrs graduates a **New** card on Easy
+straight to a ~**10-day** interval (skipping the 1m/10m learning steps), so quickly-solved puzzles
+never came due. Fix: in `gradeCard`, cap **Easy → Good on a New card** (state 0) — the first exposure
+resurfaces in ~10 min, then graduates normally on the next review. Verified: a fast first solve is now
+due in < 1 day (was ~10). Also: Review's empty state now shows **N scheduled · next due in Y**
+(`allCards` + `intervalLabel`) so it's never a mysterious blank. Plus a usability fix: **Tactics shows
+the Retry button at all times** (reset the current puzzle), not only after a miss.

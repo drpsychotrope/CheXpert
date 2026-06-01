@@ -78,8 +78,13 @@ export function newCard(kind: SrsItemKind, refId: string, now: number): SrsCardR
 /** Apply a grade to a card record at time `now`; return the updated record. */
 export function gradeCard(rec: SrsCardRecord, grade: Grade, now: number): SrsCardRecord {
   const card = recordToCard(rec);
+  // A fast FIRST solve (Easy on a brand-new card) would graduate it straight to a
+  // multi-day interval, skipping the short learning steps — so the puzzle never comes
+  // due in Review for days. Cap the first exposure to Good (~10 min) so it reliably
+  // resurfaces; it graduates normally on the next review. (ADR-0033)
+  const effective = grade === Grade.Easy && card.state === State.New ? Grade.Good : grade;
   const result = scheduler.repeat(card, new Date(now));
-  const next = result[grade].card;
+  const next = result[effective].card;
   return cardToRecord(next, { id: rec.id, kind: rec.kind, refId: rec.refId, createdAt: rec.createdAt });
 }
 

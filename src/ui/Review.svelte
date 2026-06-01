@@ -4,8 +4,8 @@
   import { ChessGame } from '../game/ChessGame';
   import { TacticalTrainer, gradeAttempt } from '../trainer/TacticalTrainer';
   import type { Puzzle } from '../trainer/puzzle';
-  import { dueCards, reviewItem } from '../srs/SrsStore';
-  import { resultToGrade } from '../srs/fsrs';
+  import { dueCards, reviewItem, allCards } from '../srs/SrsStore';
+  import { resultToGrade, intervalLabel } from '../srs/fsrs';
   import { openTrainerDB } from '../store/db';
   import { interleave, buildLapseSet } from '../srs/schedule';
   import { createSet, saveSet } from '../woodpecker/woodpecker';
@@ -27,6 +27,8 @@
   let reviewed = $state(0);
   let startedAt = 0;
   let missesMsg = $state('');
+  let scheduledCount = $state(0);
+  let nextDue = $state('');
 
   const model = $derived(app.model);
 
@@ -38,6 +40,11 @@
     queue = interleave(due.map((c) => c.refId), (id) => app.puzzles.byId(id)?.themes?.[0] ?? '');
     index = 0;
     reviewed = 0;
+    // Schedule transparency for the empty state: how many puzzle cards exist + when the next is due.
+    const puz = (await allCards()).filter((c) => c.kind === 'puzzle');
+    scheduledCount = puz.length;
+    const soonest = puz.filter((c) => c.due > now).sort((a, b) => a.due - b.due)[0];
+    nextDue = soonest ? intervalLabel(soonest, now) : '';
     if (queue.length) loadCurrent();
     loading = false;
   }
@@ -152,7 +159,11 @@
   {:else if queue.length === 0}
     <div class="panel col center">
       <p>Nothing due right now. 🎉</p>
-      <p class="muted">Solve puzzles in Tactics or analyse a game to add cards to your review schedule.</p>
+      {#if scheduledCount > 0}
+        <p class="muted">{scheduledCount} {scheduledCount === 1 ? 'puzzle' : 'puzzles'} scheduled{nextDue ? ` · next due ${nextDue}` : ''}. Spaced repetition holds cards back until they're due — solved puzzles resurface in minutes, fast ones later.</p>
+      {:else}
+        <p class="muted">Solve puzzles in Tactics or analyse a game to add cards to your review schedule.</p>
+      {/if}
       <button onclick={() => app.go('tactics')}>Go to Tactics →</button>
       <button class="ghost" onclick={buildMissesSet}>Build a "your misses" set →</button>
       {#if missesMsg}<p class="muted" style="font-size:0.85rem">{missesMsg}</p>{/if}

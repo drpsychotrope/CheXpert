@@ -213,8 +213,6 @@
     feedbackKind = '';
     startTimer();
   }
-
-  const canRetry = $derived(trainer?.state.status === 'failed');
 </script>
 
 <section class="col center">
@@ -255,11 +253,8 @@
   <p class="feedback {feedbackKind}">{feedback}</p>
 
   <div class="row center">
-    {#if canRetry}
-      <button onclick={retry}>↻ Retry</button>
-    {:else}
-      <button onclick={hint} disabled={trainer?.state.status !== 'solving' || locked}>Hint</button>
-    {/if}
+    <button onclick={hint} disabled={trainer?.state.status !== 'solving' || locked}>Hint</button>
+    <button onclick={retry} disabled={!puzzle}>↻ Retry</button>
     <button onclick={loadNext}>Next puzzle →</button>
   </div>
   {#if puzzle}

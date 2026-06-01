@@ -43,6 +43,15 @@ describe('card lifecycle', () => {
     expect(easy.due).toBeGreaterThan(hard.due);
   });
 
+  it('caps a fast FIRST solve so a new puzzle resurfaces soon, not in ~10 days', () => {
+    // ts-fsrs would graduate a New card on Easy straight to a multi-day interval,
+    // skipping the learning steps — so it never comes due in Review. The first
+    // exposure is capped to Good (~10 min) so the puzzle reliably resurfaces.
+    const c = newCard('puzzle', 'pe', T0);
+    const easy = gradeCard(c, Grade.Easy, T0);
+    expect((easy.due - T0) / 86_400_000).toBeLessThan(1); // < 1 day
+  });
+
   it('Again keeps the card due soon (relearn) and counts a lapse on a review card', () => {
     let c = newCard('puzzle', 'p3', T0);
     c = gradeCard(c, Grade.Good, T0); // becomes learning/review
