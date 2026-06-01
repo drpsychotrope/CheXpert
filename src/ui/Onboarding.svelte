@@ -188,6 +188,14 @@
     finishWithoutGame();
   }
 
+  function skipEvaluation() {
+    // Skip the whole evaluation at launch: seed provisional ratings from the declared
+    // level only (wide RD; they sharpen as you play) — no ladder, no game. `ladder` is
+    // null here, so finishWithoutGame() uses the declarative prior. ADR-0005 / ADR-0026.
+    finishWithoutGame();
+    app.go('home');
+  }
+
   async function commit(puzzleR: { rating: number; rd: number; vol: number }, gameR: { rating: number; rd: number; vol: number }) {
     if (!app.model) return;
     app.model.puzzleRating = puzzleR;
@@ -218,8 +226,15 @@
         Rating on another site? (optional)
         <input type="number" bind:value={priorRating} placeholder="e.g. 1450" />
       </label>
-      <button onclick={startLadder} disabled={app.puzzles.size === 0}>Start the ladder →</button>
+      <div class="row center">
+        <button onclick={startLadder} disabled={app.puzzles.size === 0}>Start the ladder →</button>
+        <button style="background:transparent;border:1px solid var(--border)" onclick={skipEvaluation}>Skip</button>
+      </div>
       {#if app.puzzles.size === 0}<p class="muted">Loading puzzles…</p>{/if}
+      <p class="muted" style="font-size:0.8rem">
+        Skip to seed a rough rating from your self-assessment above — it sharpens as you play. Re-run
+        anytime from Settings.
+      </p>
     </div>
 
   {:else if step === 'ladder'}

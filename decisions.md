@@ -257,3 +257,14 @@ eval probes are needed. Positions derive on the fly from stored `gameAnalyses` �
 migration**. Reached only from the Dashboard resilience "Defend" button (Q-D=a; no 13th top-nav
 button). With `played-game-review`, the whole loop is paste-free: play → one-click analyse → your
 collapses become comeback drills. AP-CHESS-40/41/43.
+
+## ADR-0026 — Skip button on the launch evaluation
+**Date:** 2026-06-01 · **Status:** accepted
+
+ADR-0005 specified a skippable onboarding, but the only "Skip" button was on the calibration-game
+step (Stage 2); the launch screen forced the puzzle ladder. Added a **Skip** button to the first
+(`declare`) onboarding step: it seeds provisional puzzle + game ratings from the declared self-level
+(via the existing `priorFromDeclarative` + `seedGameRating(..., null)` path, `ladder` null), marks the
+model onboarded, and routes straight Home — no ladder, no game. Wide RD, sharpens with play; re-runnable
+from Settings. Reuses the already-tested calibration functions, so no new logic. Verified: launch →
+Skip → onboarded, ratings seeded (~1100/1100, RD 300), Home.
