@@ -370,3 +370,12 @@ unavailable); `Play` uses it for the bot's non-book moves. Pure core unit-tested
 no new dependency, reuses the engine. Result: varied, plausible, beatable opponent moves instead of
 always-best. (Comeback/Sparring still use `pickMove`; can opt into `pickHumanMove` later.) ADR-0019 (no
 Maia) stands.
+
+## ADR-0035 — Selectable opponent style in Play (human-like vs engine)
+**Date:** 2026-06-02 · **Status:** accepted
+
+The human-like opponent (ADR-0034) is now a **choice**, not forced. New persisted setting
+`SettingsRecord.opponentStyle: 'human' | 'engine'` (default `'human'`; old records read `?? 'human'`).
+A selector on the Play screen — "Human-like (varied moves)" vs "Engine (best moves)" — sets it and
+persists. `Play.engineMove` branches: `engine` → `pickMove` (best), `human` → `pickHumanMove` (sampled).
+Strength is still the adaptive Elo; this is a *style* knob on top. UI wiring only (no new logic/tests).

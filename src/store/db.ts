@@ -55,6 +55,9 @@ export interface SettingsRecord {
   /** Telemetry/analysis stays local; nothing leaves the device unless true. */
   allowNetwork: boolean;
   boardOrientation: 'white' | 'black';
+  /** Play opponent style: 'human' = top moves sampled by temperature (varied);
+   *  'engine' = always the best move at the current Elo. */
+  opponentStyle?: 'human' | 'engine';
 }
 
 /** A PGN brought in for analysis (Phase 2). Raw source + which side the user was. */

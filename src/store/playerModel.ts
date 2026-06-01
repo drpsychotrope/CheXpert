@@ -18,7 +18,7 @@ export function freshPlayerModel(now: number): PlayerModel {
 }
 
 export function freshSettings(): SettingsRecord {
-  return { id: 'singleton', coachedMode: false, allowNetwork: false, boardOrientation: 'white' };
+  return { id: 'singleton', coachedMode: false, allowNetwork: false, boardOrientation: 'white', opponentStyle: 'human' };
 }
 
 export async function loadPlayerModel(now: number): Promise<PlayerModel> {

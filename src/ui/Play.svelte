@@ -36,6 +36,14 @@
 
   const model = $derived(app.model);
   const coached = $derived(app.settings?.coachedMode ?? false);
+  const opponentStyle = $derived(app.settings?.opponentStyle ?? 'human');
+
+  async function setOpponentStyle(s: 'human' | 'engine') {
+    if (app.settings) {
+      app.settings.opponentStyle = s;
+      await app.persistSettings();
+    }
+  }
 
   async function newGame() {
     if (!model) return;
@@ -97,10 +105,10 @@
     thinking = true;
     try {
       // Loop closure: play the steering opening's book move if still on the line;
-      // otherwise the engine takes over at the calibrated ~55% Elo, playing a HUMAN-LIKE
-      // move (top moves sampled by eval/temperature) rather than always the best.
+      // otherwise the engine takes over at the calibrated ~55% Elo. Opponent style is
+      // selectable: 'human' samples among the top moves (varied); 'engine' plays best.
       let uci = opening ? nextBookMove(opening, playedUci) : null;
-      if (!uci) uci = await opponent.pickHumanMove(game.fen);
+      if (!uci) uci = opponentStyle === 'engine' ? await opponent.pickMove(game.fen, 500) : await opponent.pickHumanMove(game.fen);
       if (uci) {
         game.moveUci(uci);
         playedUci.push(uci);
@@ -242,6 +250,14 @@
       {#if coached}· <span style="color:var(--accent)">coached on</span>{/if}
     </p>
   {/if}
+
+  <label class="muted" style="font-size:0.85rem">
+    Opponent:
+    <select value={opponentStyle} onchange={(e) => setOpponentStyle(e.currentTarget.value === 'engine' ? 'engine' : 'human')}>
+      <option value="human">Human-like (varied moves)</option>
+      <option value="engine">Engine (best moves)</option>
+    </select>
+  </label>
 
   <div class="board-wrap">
     <Board
