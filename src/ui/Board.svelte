@@ -148,9 +148,10 @@
   }
   .ranks span,
   .files span {
-    color: #111;
+    /* Labels live in the gutters on the app's dark background, not on the squares,
+       so they must use the theme's muted text colour (a dark colour is invisible). */
+    color: var(--muted);
     font-size: 11px;
     font-weight: 700;
-    opacity: 0.85;
   }
 </style>
