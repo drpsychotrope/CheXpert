@@ -82,6 +82,8 @@ Everything runs in the browser. Nothing leaves your device by default.
   automatic.
 - **Comeback drills** — replay the moments you fell behind in your own games against a bot at your
   level, and practise holding the draw or turning them around (reached from the weakness dashboard).
+- **Scenario sparring** — play out a targeted position vs the adaptive bot: a curated imbalance
+  (IQP, opposite-side castling, bishop pair, rook-up ending) or one of your own recurring leaks.
 
 ### Endgames & vision
 - **Endgame trainer** — fundamental endgames (K+Q vs K, K+R vs K, K+P opposition, Lucena, Philidor)

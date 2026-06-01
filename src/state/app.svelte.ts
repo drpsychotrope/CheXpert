@@ -23,6 +23,7 @@ export type View =
   | 'insights'
   | 'explorer'
   | 'calculate'
+  | 'sparring'
   | 'settings';
 
 class AppState {

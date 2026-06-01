@@ -306,3 +306,13 @@ Three deliberate-practice mechanics (shipped together; would split 3a/3b/3c as P
   in theme (priority preserved); `buildLapseSet` builds a fixed "Your misses" Woodpecker set from your
   most-failed personal puzzles (on-demand button, namespaced `wp:lapses`, never clobbers user sets).
 Pure cores unit-tested; no schema; no new engine. AP-CHESS-54…58.
+
+## ADR-0030 — Scenario sparring (batch 2, spec D)
+**Date:** 2026-06-01 · **Status:** accepted
+
+`scenarios.ts`: a curated **imbalance library** (IQP, opposite-side castling, bishop pair, rook-up
+ending) of legal positions (FENs validated in tests, side-to-move == side-to-train), plus
+`scenariosFromWeakness` reusing the fingerprint's leak FENs. `Sparring.svelte` plays a chosen scenario
+vs the **adaptive opponent at the player's ZPD Elo** (reuses the Comeback loop + AdaptiveOpponent),
+**outcome-graded** (win/hold = success). Library works standalone; the weakness source degrades to
+empty without analyses. No new engine, no schema. AP-CHESS-59…61.

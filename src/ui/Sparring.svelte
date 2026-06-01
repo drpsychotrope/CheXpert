@@ -1,0 +1,149 @@
+<script lang="ts">
+  // Scenario sparring (spec D / ADR-0030): play out a targeted position (an imbalance,
+  // or one of your own leaks) vs the adaptive opponent at your ZPD Elo. Outcome-graded.
+  import { onMount } from 'svelte';
+  import { app } from '../state/app.svelte';
+  import Board from './Board.svelte';
+  import { ChessGame } from '../game/ChessGame';
+  import { AdaptiveOpponent, initOpponentState } from '../engine/AdaptiveOpponent';
+  import { loadAllAnalyses } from '../analysis/runAnalysis';
+  import { IMBALANCE_LIBRARY, scenariosFromWeakness, type Scenario } from '../analysis/scenarios';
+
+  let scenarios = $state<Scenario[]>([...IMBALANCE_LIBRARY]);
+  let current = $state<Scenario | null>(null);
+  let status = $state<'pick' | 'playing' | 'thinking' | 'over'>('pick');
+  let game = $state(new ChessGame());
+  let fen = $state('');
+  let lastMove = $state<[string, string] | null>(null);
+  let result = $state('');
+  let resultKind = $state<'good' | 'bad' | ''>('');
+  let opponent: AdaptiveOpponent | null = null;
+
+  const model = $derived(app.model);
+  const playerSide = $derived(current?.sideToTrain ?? 'w');
+  const orientation = $derived(playerSide === 'w' ? 'white' : 'black');
+
+  onMount(async () => {
+    try {
+      const w = scenariosFromWeakness(await loadAllAnalyses());
+      scenarios = [...IMBALANCE_LIBRARY, ...w];
+    } catch {
+      /* library still works */
+    }
+  });
+
+  async function start(s: Scenario) {
+    if (!model) return;
+    current = s;
+    result = '';
+    resultKind = '';
+    game = new ChessGame(s.fen);
+    fen = game.fen;
+    lastMove = null;
+    opponent = new AdaptiveOpponent(app.engine, initOpponentState(model.opponentTargetElo));
+    status = 'thinking';
+    try {
+      await opponent.applyStrength();
+      status = 'playing';
+    } catch (e) {
+      result = 'Engine failed to start: ' + String(e);
+      status = 'over';
+    }
+  }
+
+  function turnColor(): 'white' | 'black' {
+    return game.turn === 'w' ? 'white' : 'black';
+  }
+
+  async function onMove(from: string, to: string) {
+    if (status !== 'playing' || game.turn !== playerSide) return;
+    if (!game.move(from, to, 'q')) return;
+    fen = game.fen;
+    lastMove = [from, to];
+    if (checkEnd()) return;
+    await engineMove();
+  }
+
+  async function engineMove() {
+    if (!opponent) return;
+    status = 'thinking';
+    try {
+      const uci = await opponent.pickMove(game.fen, 500);
+      if (uci) {
+        game.moveUci(uci);
+        fen = game.fen;
+        lastMove = [uci.slice(0, 2), uci.slice(2, 4)];
+      }
+    } catch (e) {
+      result = 'Engine error: ' + String(e);
+    }
+    if (!checkEnd()) status = 'playing';
+  }
+
+  function checkEnd(): boolean {
+    const t = game.terminal();
+    if (!t.over) return false;
+    status = 'over';
+    if (t.reason === 'checkmate') {
+      const win = t.winner === playerSide;
+      result = win ? 'You won the scenario! ♚' : 'Checkmated — try again, or pick another.';
+      resultKind = win ? 'good' : 'bad';
+    } else {
+      result = 'Drawn — a fine result from a tough scenario. ✔';
+      resultKind = 'good';
+    }
+    return true;
+  }
+
+  function resign() {
+    status = 'over';
+    result = 'Resigned.';
+    resultKind = 'bad';
+  }
+</script>
+
+<section class="col center">
+  <h2>Scenario sparring</h2>
+  {#if status === 'pick'}
+    <p class="muted" style="max-width:520px">
+      Play out a targeted position vs a bot at your level. Train an imbalance, or one of your own
+      recurring leaks.
+    </p>
+    <div class="col" style="gap:0.3rem;width:100%;max-width:560px">
+      {#each scenarios as s (s.id)}
+        <button class="scenario panel" onclick={() => start(s)}>
+          <span><b>{s.name}</b> <span class="muted" style="font-size:0.78rem">{s.category}</span><br /><span class="muted" style="font-size:0.82rem">{s.goal}</span></span>
+        </button>
+      {/each}
+    </div>
+  {:else if current}
+    <p class="muted" style="max-width:480px">{current.name} — {current.goal}</p>
+    <div class="board-wrap">
+      <Board
+        {fen}
+        {orientation}
+        turnColor={turnColor()}
+        movableColor={status === 'playing' && turnColor() === orientation ? orientation : undefined}
+        dests={status === 'playing' && turnColor() === orientation ? game.dests() : new Map()}
+        {lastMove}
+        check={game.inCheck()}
+        {onMove}
+      />
+    </div>
+    <p class="feedback {resultKind}">{status === 'thinking' ? 'Opponent thinking…' : result}</p>
+    <div class="row center">
+      {#if status === 'over'}
+        <button onclick={() => current && start(current)}>Try again</button>
+        <button class="ghost" onclick={() => (status = 'pick')}>← Scenarios</button>
+      {:else}
+        <button onclick={resign} style="background:var(--bad)">Resign</button>
+        <button class="ghost" onclick={() => (status = 'pick')}>← Scenarios</button>
+      {/if}
+    </div>
+  {/if}
+</section>
+
+<style>
+  .scenario { text-align: left; cursor: pointer; background: var(--panel); border: 1px solid var(--border); color: var(--text); }
+  button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+</style>
