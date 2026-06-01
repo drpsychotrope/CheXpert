@@ -22,6 +22,7 @@ export type View =
   | 'comeback'
   | 'insights'
   | 'explorer'
+  | 'calculate'
   | 'settings';
 
 class AppState {

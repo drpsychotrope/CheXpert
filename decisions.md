@@ -292,3 +292,17 @@ where you left book, with **"Add this line to repertoire"** (builds a line from 
 via the existing `buildLine`/`saveLine`). A minimal `Explorer.svelte` names typed lines + shows book
 continuations (no frequency stats — follow-up). Static data, no schema, no engine. Transposition naming
 is move-order-based (documented limitation). AP-CHESS-51…53.
+
+## ADR-0029 — Practice mechanics: calculation + vision drills + scheduler (batch 2, spec C)
+**Date:** 2026-06-01 · **Status:** accepted
+
+Three deliberate-practice mechanics (shipped together; would split 3a/3b/3c as PRs):
+- **3a Calculation** (`calc.ts` + `Calculate.svelte`): solve a tactic with NO hints — see the whole
+  line first. `gradeCalcLine` validates the user's line against the puzzle's stored solution (the
+  precomputed best line — no live engine). True frozen-board blindfold is a §11 enhancement.
+- **3b Vision** (`tacticsVision.ts` + a Vision "Find them all" drill): pure `allChecks`/`allCaptures`/
+  `hangingPieces` (hanging requires a net-winning capture, defenders checked); count-input drill.
+- **3c Scheduler** (`schedule.ts`): `interleave` reorders the Review due-queue so adjacent cards differ
+  in theme (priority preserved); `buildLapseSet` builds a fixed "Your misses" Woodpecker set from your
+  most-failed personal puzzles (on-demand button, namespaced `wp:lapses`, never clobbers user sets).
+Pure cores unit-tested; no schema; no new engine. AP-CHESS-54…58.

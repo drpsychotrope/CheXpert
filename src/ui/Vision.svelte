@@ -5,8 +5,11 @@
   import {
     squareColor, squareFrom, allSquares, knightShortestPath, knightDistance,
   } from '../vision/vision';
+  import { app } from '../state/app.svelte';
+  import Board from './Board.svelte';
+  import { allChecks, allCaptures, hangingPieces } from '../vision/tacticsVision';
 
-  let drill = $state<'menu' | 'color' | 'knight'>('menu');
+  let drill = $state<'menu' | 'color' | 'knight' | 'findall'>('menu');
 
   // --- shared scoring ---
   let asked = $state(0);
@@ -79,13 +82,52 @@
     }
   }
 
-  function startDrill(which: 'color' | 'knight') {
+  // --- find-all drill (checks / captures / hanging pieces) ---
+  const FALLBACK_FENS = [
+    'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1',
+    '2kr3r/ppp2ppp/2n5/2bqp3/8/2N2N2/PPPP1PPP/R1BQ1RK1 w - - 0 1',
+    'r3k2r/pp1n1ppp/2p1pn2/q7/2BP4/2N1PN2/PP3PPP/R2Q1RK1 w kq - 0 1',
+  ];
+  let faFen = $state('');
+  let faTask = $state<'checks' | 'captures' | 'hanging'>('checks');
+  let faTargets: string[] = [];
+  let faAnswer = $state('');
+  const faLabel = { checks: 'checking moves', captures: 'captures', hanging: 'pieces you can win' };
+
+  function newFindAll() {
+    const p = app.model ? app.puzzles.next({ rating: app.model.puzzleRating.rating, window: 600, exclude: new Set() }) : null;
+    faFen = p?.fen ?? FALLBACK_FENS[Math.floor(rnd() * FALLBACK_FENS.length)];
+    const tasks = ['checks', 'captures', 'hanging'] as const;
+    faTask = tasks[Math.floor(rnd() * 3)];
+    faTargets = faTask === 'checks' ? allChecks(faFen) : faTask === 'captures' ? allCaptures(faFen) : hangingPieces(faFen);
+    faAnswer = '';
+    feedback = '';
+    feedbackKind = '';
+  }
+
+  function answerFindAll() {
+    asked += 1;
+    const truth = faTargets.length;
+    if (Number(faAnswer) === truth) {
+      correct += 1;
+      streak += 1;
+      feedback = `✔ ${truth} ${faLabel[faTask]}.`;
+      feedbackKind = 'good';
+    } else {
+      streak = 0;
+      feedback = `✗ there ${truth === 1 ? 'is' : 'are'} ${truth} ${faLabel[faTask]}.`;
+      feedbackKind = 'bad';
+    }
+  }
+
+  function startDrill(which: 'color' | 'knight' | 'findall') {
     asked = 0;
     correct = 0;
     streak = 0;
     drill = which;
     if (which === 'color') newColor();
-    else newKnight();
+    else if (which === 'knight') newKnight();
+    else newFindAll();
   }
 </script>
 
@@ -105,6 +147,10 @@
       <button class="drill-card" onclick={() => startDrill('knight')}>
         <b>Knight distance</b>
         <span class="muted">How many moves does a knight need from A to B?</span>
+      </button>
+      <button class="drill-card" onclick={() => startDrill('findall')}>
+        <b>Find them all</b>
+        <span class="muted">Count every check, capture, or hanging piece in a position.</span>
       </button>
     </div>
 
@@ -132,6 +178,20 @@
     {#if kRevealed}
       <p class="muted" style="font-size:0.85rem">Path: {kRevealed.join(' → ')}</p>
     {/if}
+    <button class="ghost" onclick={() => (drill = 'menu')}>← Drills</button>
+
+  {:else if drill === 'findall'}
+    <p class="muted">Score {correct}/{asked} · streak {streak}</p>
+    <div class="board-wrap" style="max-width:300px">
+      <Board fen={faFen} viewOnly={true} orientation="white" />
+    </div>
+    <p class="muted">How many <b>{faLabel[faTask]}</b> for the side to move?</p>
+    <div class="row center">
+      <input type="number" min="0" max="40" bind:value={faAnswer} style="width:5rem" onkeydown={(e) => e.key === 'Enter' && answerFindAll()} />
+      <button onclick={answerFindAll} disabled={faAnswer === ''}>Check</button>
+      <button class="ghost" onclick={newFindAll}>Next →</button>
+    </div>
+    <p class="feedback {feedbackKind}">{feedback}</p>
     <button class="ghost" onclick={() => (drill = 'menu')}>← Drills</button>
   {/if}
 </section>

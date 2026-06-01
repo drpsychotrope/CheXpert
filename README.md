@@ -73,7 +73,9 @@ Everything runs in the browser. Nothing leaves your device by default.
   ratings for both you and each puzzle, theme/phase filtering. Prefers your personal puzzles, then a
   curated subset in your rating zone.
 - **Review (FSRS)** — every puzzle you attempt becomes a spaced-repetition card; the Review queue
-  resurfaces your weakest patterns right before you'd forget them.
+  resurfaces your weakest patterns right before you'd forget them, **interleaved** by theme. One click
+  builds a *"your misses"* Woodpecker set from the puzzles you fail most.
+- **Calculation** — solve tactics with **no hints**: you must see the whole forcing line before you move.
 - **Woodpecker** — a *fixed* puzzle set, solved again and again, faster each cycle, to automaticity.
   Complements Review (which spreads an expanding pool over time).
 - **Opening repertoire** — build lines (validated by chess.js), drill them under FSRS until they're
@@ -87,8 +89,8 @@ Everything runs in the browser. Nothing leaves your device by default.
   pieces). This is the one network feature — see [Privacy](#privacy).
 - **Guess the move** — active recall on annotated master games (the Opera, Immortal, and Evergreen
   games). Predict what was played; trains the same prediction you do over the board.
-- **Calculation & vision** — board-free drills: instant square colours, and shortest knight-path
-  distance.
+- **Calculation & vision** — board-free drills: instant square colours, shortest knight-path
+  distance, and a timed **find-them-all** (count every check, capture, or hanging piece).
 
 *Maia (the human-like sparring engine) is **deliberately not shipped**: it needs a backend, and this
 build is local-only with no backend in scope. See `decisions.md` ADR-0019.*

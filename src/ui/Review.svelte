@@ -7,6 +7,8 @@
   import { dueCards, reviewItem } from '../srs/SrsStore';
   import { resultToGrade } from '../srs/fsrs';
   import { openTrainerDB } from '../store/db';
+  import { interleave, buildLapseSet } from '../srs/schedule';
+  import { createSet, saveSet } from '../woodpecker/woodpecker';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -24,6 +26,7 @@
   let feedbackKind = $state<'good' | 'bad' | ''>('');
   let reviewed = $state(0);
   let startedAt = 0;
+  let missesMsg = $state('');
 
   const model = $derived(app.model);
 
@@ -31,7 +34,8 @@
     loading = true;
     const now = Date.now();
     const due = await dueCards(now, 'puzzle', 100);
-    queue = due.map((c) => c.refId);
+    // Interleave by theme (desirable difficulty) so consecutive cards differ where possible.
+    queue = interleave(due.map((c) => c.refId), (id) => app.puzzles.byId(id)?.themes?.[0] ?? '');
     index = 0;
     reviewed = 0;
     if (queue.length) loadCurrent();
@@ -121,6 +125,19 @@
     }
   }
 
+  /** Build a fixed "Your misses" Woodpecker set from your most-failed personal puzzles. */
+  async function buildMissesSet() {
+    const db = await openTrainerDB();
+    const attempts = (await db.getAll('puzzleAttempts')) as Array<{ puzzleId: string; solved: boolean; source: string }>;
+    const ids = buildLapseSet(attempts, 12);
+    if (!ids.length) {
+      missesMsg = 'No failed personal puzzles yet — solve some first.';
+      return;
+    }
+    await saveSet(createSet('wp:lapses', 'Your misses', ids, Date.now()));
+    missesMsg = `Built a ${ids.length}-puzzle "Your misses" set — train it in Woodpecker.`;
+  }
+
   $effect(() => {
     if (model && loading) void loadQueue();
   });
@@ -137,11 +154,15 @@
       <p>Nothing due right now. 🎉</p>
       <p class="muted">Solve puzzles in Tactics or analyse a game to add cards to your review schedule.</p>
       <button onclick={() => app.go('tactics')}>Go to Tactics →</button>
+      <button class="ghost" onclick={buildMissesSet}>Build a "your misses" set →</button>
+      {#if missesMsg}<p class="muted" style="font-size:0.85rem">{missesMsg}</p>{/if}
     </div>
   {:else if !trainer}
     <div class="panel col center">
       <p>Review complete — {reviewed} card{reviewed === 1 ? '' : 's'} done.</p>
       <button onclick={loadQueue}>Check for more →</button>
+      <button class="ghost" onclick={buildMissesSet}>Build a "your misses" set →</button>
+      {#if missesMsg}<p class="muted" style="font-size:0.85rem">{missesMsg}</p>{/if}
     </div>
   {:else}
     <p class="muted">Card {index + 1} of {queue.length} · {reviewed} reviewed</p>
@@ -163,3 +184,7 @@
     {/if}
   {/if}
 </section>
+
+<style>
+  button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+</style>

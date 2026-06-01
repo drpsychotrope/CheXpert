@@ -17,6 +17,7 @@
   import Comeback from './Comeback.svelte';
   import Insights from './Insights.svelte';
   import Explorer from './Explorer.svelte';
+  import Calculate from './Calculate.svelte';
 
   let booted = $state(false);
 
@@ -45,6 +46,7 @@
     <button onclick={() => app.go('explorer')}>Explorer</button>
     <button onclick={() => app.go('guess')}>Guess</button>
     <button onclick={() => app.go('vision')}>Vision</button>
+    <button onclick={() => app.go('calculate')}>Calculate</button>
     <button onclick={() => app.go('settings')}>Settings</button>
   {/if}
 </header>
@@ -80,6 +82,8 @@
     <Insights />
   {:else if app.view === 'explorer'}
     <Explorer />
+  {:else if app.view === 'calculate'}
+    <Calculate />
   {:else if app.view === 'settings'}
     <Settings />
   {:else}
