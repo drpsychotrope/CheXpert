@@ -30,12 +30,24 @@ export class PuzzleRepo {
   async init(): Promise<void> {
     if (this.loaded) return;
     const db = await openTrainerDB();
-    const count = await db.count('puzzles');
-    if (count === 0) {
-      const puzzles = await this.fetchSubset();
+    const curatedCount = (await db.getAllKeysFromIndex('puzzles', 'source', 'curated')).length;
+    // Seed when the store has no curated puzzles, OR when the shipped subset has
+    // GROWN since last seed (e.g. a new seed file or a freshly-run ETL). This lets
+    // a bigger puzzle set land for existing users without wiping their personal
+    // puzzles or attempt history. We never delete existing rows here.
+    const subset = curatedCount === 0 ? await this.fetchSubset() : null;
+    if (subset && subset.length) {
       const tx = db.transaction('puzzles', 'readwrite');
-      await Promise.all(puzzles.map((p) => tx.store.put(p)));
+      await Promise.all(subset.map((p) => tx.store.put(p)));
       await tx.done;
+    } else if (curatedCount > 0) {
+      // Curated rows already present, but check whether the shipped set is bigger.
+      const shipped = await this.fetchSubset();
+      if (shipped.length > curatedCount) {
+        const tx = db.transaction('puzzles', 'readwrite');
+        await Promise.all(shipped.map((p) => tx.store.put(p)));
+        await tx.done;
+      }
     }
     this.cache = await db.getAll('puzzles');
     this.loaded = true;

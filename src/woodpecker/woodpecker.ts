@@ -92,7 +92,10 @@ export function improvement(set: WoodpeckerSet): { fasterMs: number; moreAccurat
 
 export async function saveSet(set: WoodpeckerSet): Promise<void> {
   const db = await openTrainerDB();
-  await db.put('woodpeckerSets', set);
+  // The caller usually passes a Svelte 5 $state proxy, which IndexedDB cannot
+  // structured-clone ("could not be cloned"). The set is pure JSON, so a JSON
+  // round-trip yields a plain, cloneable object. Done here so no caller can forget.
+  await db.put('woodpeckerSets', JSON.parse(JSON.stringify(set)) as WoodpeckerSet);
 }
 
 export async function listSets(): Promise<WoodpeckerSet[]> {
