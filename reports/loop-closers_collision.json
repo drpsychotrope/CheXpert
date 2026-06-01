@@ -1,0 +1,12 @@
+{
+  "pr_name": "loop-closers",
+  "tracker": "none",
+  "git_remotes": [],
+  "verdict": "proceed",
+  "intra_batch_overlap": {
+    "vs_motif_detectors": "3a tags inherit motif themes; depends on spec 1 only for richer themes, not blocking",
+    "vs_eval_graph": "none — eval-graph touches Import.svelte + new files; loop-closers touches Dashboard/Tactics/generatePuzzles/new comeback files",
+    "shared_file": "src/state/app.svelte.ts — both 3b and 3c add state; sequence 3b before/with 3c to avoid churn"
+  },
+  "note": "Local-only repo, no PR tracker. Recommend shipping order spec1 -> spec2 -> 3a -> 3b -> 3c."
+}

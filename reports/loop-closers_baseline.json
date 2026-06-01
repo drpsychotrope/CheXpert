@@ -1,0 +1,27 @@
+{
+  "pr_name": "loop-closers",
+  "scope": "feature (bundled)",
+  "captured_at": "2026-06-01",
+  "decomposition": {
+    "3a_missed_win": { "files": ["src/analysis/generatePuzzles.ts", "+test"], "size": "small", "engine": "reuses existing MultiPV uniqueness gate, no new eval pass" },
+    "3b_drill_routing": { "files": ["src/ui/Dashboard.svelte", "src/state/app.svelte.ts", "src/ui/Tactics.svelte (timed)"], "size": "small-moderate" },
+    "3c_comeback": { "files": ["src/analysis/comeback.ts (new)", "src/ui/Comeback.svelte (new)", "src/state/app.svelte.ts (view)", "src/ui/App.svelte (route)", "src/analysis/weakness.ts (export entry-FEN)"], "size": "large (new view + engine loop)" }
+  },
+  "existing_drill_routing": {
+    "file": "src/ui/Dashboard.svelte",
+    "dimThemes": {
+      "tactics": ["fork", "pin", "hangingPiece", "mate", "knightFork"],
+      "openingAccuracy": ["openingMistake"],
+      "endgameConversion": ["endgameMistake", "rookEndgame"],
+      "timeManagement": [],
+      "resilience": []
+    },
+    "drill_fn": "sets app.tacticsFilterThemes then app.go('tactics') — ALL dims currently land in Tactics; time/resilience show no button"
+  },
+  "missed_win_data": "PlyAnalysis already has mate?, bestWhiteCp, cpLoss, winProbLoss → cheap pre-filter before MultiPV re-check",
+  "adaptive_opponent_api": ["new AdaptiveOpponent(engine,state)", "applyStrength()", "pickMove(fen,movetime)->bestmove|null"],
+  "synergy_note": "Dashboard tactics drill already lists 'pin' — spec 1 (motif-detectors) makes pin/skewer puzzles actually exist, so 3b benefits from spec 1.",
+  "tests_baseline": 135,
+  "ap_chess_alloc": "38-44",
+  "adr_alloc": "ADR-0022 (or 0022/0023/0024 if split)"
+}

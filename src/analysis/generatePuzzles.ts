@@ -44,15 +44,32 @@ export async function generatePuzzlesFromAnalysis(
   const seen = opts.seenFens ?? new Set<string>();
   const out: Puzzle[] = [];
 
-  const candidates = analysis.plies.filter(
-    (p): p is PlyAnalysis =>
-      p.color === analysis.playerColor &&
-      (p.severity === 'mistake' || p.severity === 'blunder') &&
-      !!p.bestUci &&
-      !seen.has(p.fenBefore),
-  );
+  // Candidates: the player's mistakes/blunders, PLUS "missed wins" — plies where a
+  // clearly decisive best move existed but wasn't played, even if the move was
+  // labelled 'good'/'inaccuracy' (you stayed winning but missed the clean kill).
+  // A forced mate always qualifies; a material win is gated by a win-prob floor so a
+  // one-sided game isn't flooded. Missed wins are capped per game (AP-CHESS-38).
+  const DECISIVE_CP = 500;
+  const MAX_MISSED_WIN = 3;
 
-  for (const p of candidates) {
+  function kindOf(p: PlyAnalysis): 'mistake' | 'missed-win' | null {
+    if (p.color !== analysis.playerColor || !p.bestUci || seen.has(p.fenBefore)) return null;
+    if (p.severity === 'mistake' || p.severity === 'blunder') return 'mistake';
+    if (p.cpLoss > 0) {
+      const white = p.color === 'w';
+      if (p.mate != null && p.mate > 0) return 'missed-win';
+      if (moverCp(p.bestWhiteCp, white) >= DECISIVE_CP && p.winProbLoss >= 3) return 'missed-win';
+    }
+    return null;
+  }
+
+  let missedWinCount = 0;
+
+  for (const p of analysis.plies) {
+    const kind = kindOf(p);
+    if (!kind) continue;
+    if (kind === 'missed-win' && missedWinCount >= MAX_MISSED_WIN) continue; // flood control
+
     const whiteToMove = p.color === 'w';
     let top: LineResult[];
     try {
@@ -70,6 +87,7 @@ export async function generatePuzzlesFromAnalysis(
     if (!unique) continue;
 
     seen.add(p.fenBefore);
+    if (kind === 'missed-win') missedWinCount += 1;
     const themes = p.motif ? p.motif.tags.slice() : [`${p.phase}Mistake`];
     out.push({
       id: `personal:${analysis.gameId}:${p.ply}`,
@@ -85,6 +103,7 @@ export async function generatePuzzlesFromAnalysis(
         playedMove: p.san,
         severity: p.severity,
         motifConfidence: p.motif?.confidence ?? 'low',
+        kind,
       },
     });
   }

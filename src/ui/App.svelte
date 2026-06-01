@@ -14,6 +14,7 @@
   import Woodpecker from './Woodpecker.svelte';
   import GuessMove from './GuessMove.svelte';
   import Vision from './Vision.svelte';
+  import Comeback from './Comeback.svelte';
 
   let booted = $state(false);
 
@@ -69,6 +70,8 @@
     <GuessMove />
   {:else if app.view === 'vision'}
     <Vision />
+  {:else if app.view === 'comeback'}
+    <Comeback />
   {:else if app.view === 'settings'}
     <Settings />
   {:else}

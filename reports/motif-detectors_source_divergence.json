@@ -1,0 +1,23 @@
+{
+  "pr_name": "motif-detectors",
+  "referenced_sources": [
+    {
+      "source": "decisions.md ADR-0007",
+      "claim": "small high-confidence detector set; pin/skewer/discovered NOT fabricated from scratch; taxonomy extends in later passes",
+      "relation": "this spec is the sanctioned later-pass extension"
+    },
+    {
+      "source": "README Honesty notes",
+      "claim": "motif tags conservative; low-confidence fallback marked, never a guessed tactic",
+      "relation": "preserved verbatim — the confidence:'low' fallback path is untouched"
+    },
+    {
+      "source": "src/analysis/motif.ts header comment",
+      "claim": "do NOT attempt pin/skewer/discovered from scratch; extended in later passes, not faked",
+      "relation": "satisfied: detectors are geometric (certain), not heuristic guesses"
+    }
+  ],
+  "divergence": "none-structural",
+  "minor": false,
+  "action": "proceed; Phase Z appends ADR-0020 that cross-links and extends ADR-0007 (append-only, never amend in place)"
+}

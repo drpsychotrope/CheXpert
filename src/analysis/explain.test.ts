@@ -63,6 +63,11 @@ describe('explainPly — rule-based, fact-derived only (Q-J / AP-CHESS-19)', () 
     expect(e.reasons.join(' ')).not.toMatch(/Better was/);
   });
 
+  it('explains the new geometric motifs (pin) in plain language', () => {
+    const e = explainPly(ply({ motif: { tag: 'pin', tags: ['pin', 'absolutePin'], confidence: 'high' } }));
+    expect(e.reasons.join(' ')).toMatch(/pin/i);
+  });
+
   it('renders a non-promoting best move as SAN, not raw UCI', () => {
     // Regression: d2d4 from the start position must become "d4", not "d2d4"
     // (chess.js 1.4.0 rejects a promotion field on a non-promoting move).

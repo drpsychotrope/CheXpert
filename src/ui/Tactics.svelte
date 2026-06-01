@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
   import { ChessGame } from '../game/ChessGame';
@@ -24,9 +25,44 @@
   let mode = $state<'mixed' | 'personal' | 'themed'>('mixed');
   const seen = new Set<string>();
 
+  // Timed mode (the time-management drill): a per-puzzle clock; running out = a miss.
+  const PUZZLE_SECONDS = 30;
+  let timeLeft = $state(0);
+  let locked = $state(false);
+  let timer: ReturnType<typeof setInterval> | null = null;
+
   const model = $derived(app.model);
   // Theme filter handed over by the dashboard's "Drill" buttons (loop closure).
   const drillThemes = $derived(app.tacticsFilterThemes);
+  const timed = $derived(app.tacticsTimed === true);
+
+  function stopTimer() {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+  }
+  function startTimer() {
+    stopTimer();
+    locked = false;
+    if (!timed) return;
+    timeLeft = PUZZLE_SECONDS;
+    timer = setInterval(() => {
+      timeLeft -= 1;
+      if (timeLeft <= 0) {
+        stopTimer();
+        void onTimeout();
+      }
+    }, 1000);
+  }
+  async function onTimeout() {
+    if (!trainer || trainer.state.status !== 'solving') return;
+    locked = true;
+    feedback = '⏱ Time — counts as a miss.';
+    feedbackKind = 'bad';
+    await finish(false);
+  }
+  onDestroy(stopTimer);
 
   function loadNext() {
     if (!model) return;
@@ -63,10 +99,13 @@
     lastMove = null;
     // Orient the board to the solver's side, fixed for the whole puzzle.
     orientation = display.turn === 'w' ? 'white' : 'black';
+    startTimer();
   }
 
   function clearDrill() {
     app.tacticsFilterThemes = null;
+    app.tacticsTimed = false;
+    stopTimer();
     seen.clear();
     trainer = null;
     loadNext();
@@ -77,12 +116,13 @@
   }
 
   async function onMove(from: string, to: string) {
-    if (!trainer || !puzzle || trainer.state.status !== 'solving') return;
+    if (!trainer || !puzzle || trainer.state.status !== 'solving' || locked) return;
     const promo = display.isPromotion(from, to) ? 'q' : 'q';
     const uci = from + to + (display.isPromotion(from, to) ? promo : '');
     const result = trainer.playUserMove(uci);
 
     if (result === 'wrong') {
+      stopTimer();
       feedback = 'Not the move — Retry the position, or move on.';
       feedbackKind = 'bad';
       await finish(false);
@@ -100,6 +140,7 @@
     lastMove = [from, to];
 
     if (result === 'solved') {
+      stopTimer();
       feedback = 'Solved! ✔';
       feedbackKind = 'good';
       await finish(true);
@@ -170,6 +211,7 @@
     lastMove = null;
     feedback = 'Retry — find the move.';
     feedbackKind = '';
+    startTimer();
   }
 
   const canRetry = $derived(trainer?.state.status === 'failed');
@@ -191,14 +233,19 @@
   {:else if mode === 'personal'}
     <p class="muted" style="font-size:0.85rem">★ From your own games</p>
   {/if}
+  {#if timed}
+    <p class="feedback {timeLeft <= 5 ? 'bad' : ''}">⏱ {timeLeft}s — beat the clock
+      <button class="link" onclick={clearDrill}>clear</button>
+    </p>
+  {/if}
 
   <div class="board-wrap">
     <Board
       {fen}
       {orientation}
       turnColor={sideToMove()}
-      movableColor={trainer?.state.status === 'solving' ? sideToMove() : undefined}
-      dests={trainer?.state.status === 'solving' ? display.dests() : new Map()}
+      movableColor={!locked && trainer?.state.status === 'solving' ? sideToMove() : undefined}
+      dests={!locked && trainer?.state.status === 'solving' ? display.dests() : new Map()}
       {lastMove}
       check={display.inCheck()}
       {onMove}
@@ -211,7 +258,7 @@
     {#if canRetry}
       <button onclick={retry}>↻ Retry</button>
     {:else}
-      <button onclick={hint} disabled={trainer?.state.status !== 'solving'}>Hint</button>
+      <button onclick={hint} disabled={trainer?.state.status !== 'solving' || locked}>Hint</button>
     {/if}
     <button onclick={loadNext}>Next puzzle →</button>
   </div>

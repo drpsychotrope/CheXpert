@@ -31,6 +31,13 @@ const MOTIF_EXPLANATION: Record<string, string> = {
   hangingPiece: 'wins an undefended piece',
   fork: 'forks two targets at once',
   knightFork: 'lands a knight fork',
+  pin: 'pins a piece against a more valuable one',
+  absolutePin: 'pins a piece to the king',
+  relativePin: 'pins a piece to a more valuable one',
+  skewer: 'skewers two pieces on one line',
+  discoveredAttack: 'unleashes a discovered attack',
+  discoveredCheck: 'gives a discovered check',
+  doubleCheck: 'delivers a double check',
 };
 
 /** Turn a UCI move into a readable SAN in the given position (best-effort).

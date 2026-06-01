@@ -2,7 +2,7 @@
   import { app } from '../state/app.svelte';
   import Radar from './Radar.svelte';
   import { loadAllAnalyses } from '../analysis/runAnalysis';
-  import { buildWeaknessProfile, type WeaknessProfile, type Dimension } from '../analysis/weakness';
+  import { buildWeaknessProfile, drillTarget, type WeaknessProfile, type Dimension } from '../analysis/weakness';
 
   let profile = $state<WeaknessProfile | null>(null);
   let loading = $state(true);
@@ -15,15 +15,6 @@
     endgameConversion: 'Endgame conversion',
     timeManagement: 'Time management',
     resilience: 'Resilience',
-  };
-
-  // Map a weak dimension to puzzle themes for one-click drilling.
-  const dimThemes: Record<Dimension, string[]> = {
-    tactics: ['fork', 'pin', 'hangingPiece', 'mate', 'knightFork'],
-    openingAccuracy: ['openingMistake'],
-    endgameConversion: ['endgameMistake', 'rookEndgame'],
-    timeManagement: [],
-    resilience: [],
   };
 
   $effect(() => {
@@ -39,9 +30,10 @@
   }
 
   function drill(dim: Dimension) {
-    const themes = dimThemes[dim];
-    app.tacticsFilterThemes = themes.length ? themes : null;
-    app.go('tactics');
+    const t = drillTarget(dim);
+    app.tacticsFilterThemes = t.themes ?? null;
+    app.tacticsTimed = t.timed ?? false;
+    app.go(t.view);
   }
 
   function scoreColor(score: number): string {
@@ -82,9 +74,7 @@
             <span class="muted" style="font-size:0.85rem">{d.detail}</span>
             {#if d.sampleSize < 3}<span class="muted" style="font-size:0.75rem"> · low data</span>{/if}
           </div>
-          {#if dimThemes[d.dimension].length > 0}
-            <button onclick={() => drill(d.dimension)}>Drill</button>
-          {/if}
+          <button onclick={() => drill(d.dimension)}>{d.dimension === 'resilience' ? 'Defend' : 'Drill'}</button>
         </div>
       {/each}
     </div>

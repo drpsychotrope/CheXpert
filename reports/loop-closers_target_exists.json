@@ -1,0 +1,15 @@
+{
+  "pr_name": "loop-closers",
+  "scope": "feature (bundled — recommend split, see arbitrages)",
+  "checked_at_commit": "ab008a6",
+  "targets": [
+    { "path": "src/analysis/generatePuzzles.ts", "exists": true, "symbol": "generatePuzzlesFromAnalysis", "note": "3a: candidate filter currently severity mistake/blunder + playerColor; widen for missed-win" },
+    { "path": "src/ui/Dashboard.svelte", "exists": true, "note": "3b: has dimThemes + drill() routing ALL dims to Tactics; time/resilience have no button" },
+    { "path": "src/state/app.svelte.ts", "exists": true, "note": "3b/3c: go(view) is param-less; context via state fields (tacticsFilterThemes). View union needs 'comeback'" },
+    { "path": "src/analysis/weakness.ts", "exists": true, "symbol": "resilienceScore", "note": "3c: detects behind-episodes (cp<=-200) but does NOT return entry FEN — must add a selector" },
+    { "path": "src/engine/AdaptiveOpponent.ts", "exists": true, "symbol": "AdaptiveOpponent.pickMove", "note": "3c: pickMove(fen, movetime)->bestmove; play comeback positions at player ZPD Elo" },
+    { "path": "src/ui/Tactics.svelte", "exists": true, "note": "3b: consumes app.tacticsFilterThemes; NO timer today (timed mode = new state+UI)" },
+    { "path": "src/ui/Comeback.svelte", "exists": false, "note": "3c: NEW view" }
+  ],
+  "verdict": "pass"
+}

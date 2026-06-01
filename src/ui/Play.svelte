@@ -5,9 +5,11 @@
   import { AdaptiveOpponent, initOpponentState, type GameOutcome } from '../engine/AdaptiveOpponent';
   import { updateRating } from '../rating/glicko2';
   import { openTrainerDB, type GameRecord } from '../store/db';
-  import { loadAllAnalyses } from '../analysis/runAnalysis';
+  import { loadAllAnalyses, runAnalysis } from '../analysis/runAnalysis';
   import { buildWeaknessProfile, type Dimension } from '../analysis/weakness';
   import { selectOpening, nextBookMove, steeringNote, type OpeningEntry } from '../opening/openingBook';
+  import AnalysisResult from './AnalysisResult.svelte';
+  import type { GameAnalysis } from '../analysis/types';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   let game = $state(new ChessGame());
@@ -20,6 +22,14 @@
   let opponent: AdaptiveOpponent | null = null;
   const playerColor: 'white' | 'black' = 'white';
 
+  // One-click post-game analysis (ADR-0022): no PGN paste needed.
+  let lastGame = $state<{ id: string; pgn: string } | null>(null);
+  let aStatus = $state<'idle' | 'analyzing' | 'done'>('idle');
+  let aResult = $state<GameAnalysis | null>(null);
+  let aPuzzles = $state(0);
+  let aProgress = $state(0);
+  let aTotal = $state(0);
+
   // Loop closure: the bot (Black here) opens toward the player's weakest area.
   let opening: OpeningEntry | null = null;
   let playedUci: string[] = [];
@@ -30,6 +40,10 @@
   async function newGame() {
     if (!model) return;
     result = '';
+    lastGame = null;
+    aResult = null;
+    aStatus = 'idle';
+    aPuzzles = 0;
     game = new ChessGame();
     fen = game.fen;
     lastMove = null;
@@ -164,7 +178,50 @@
       coached,
     };
     await db.put('games', rec);
+    lastGame = { id: rec.id, pgn: rec.pgn };
     await app.persistModel(now);
+  }
+
+  /** One-click analysis of the game just played — same pipeline as Import, no paste. */
+  async function analyzePlayed() {
+    if (!lastGame || !model) return;
+    aStatus = 'analyzing';
+    aProgress = 0;
+    try {
+      const { openTrainerDB } = await import('../store/db');
+      const db = await openTrainerDB();
+      const existing = await db.get('gameAnalyses', lastGame.id);
+      if (existing) {
+        aResult = existing;
+        aPuzzles = 0;
+        aStatus = 'done';
+        return;
+      }
+      // The opponent left the engine at a limited Elo — restore full strength to analyse.
+      await app.engine.init();
+      app.engine.setOption('UCI_LimitStrength', false);
+      await app.engine.isready();
+
+      const res = await runAnalysis(app.engine, app.puzzles, {
+        gameId: lastGame.id,
+        pgn: lastGame.pgn,
+        playerColor: playerColor[0] as 'w' | 'b',
+        source: 'played',
+        baseRating: Math.round(model.puzzleRating.rating),
+        now: Date.now(),
+        movetimeMs: 200,
+        onProgress: (d, t) => {
+          aProgress = d;
+          aTotal = t;
+        },
+      });
+      aResult = res.analysis;
+      aPuzzles = res.puzzles.length;
+      aStatus = 'done';
+    } catch (e) {
+      result = 'Analysis failed: ' + String(e);
+      aStatus = 'idle';
+    }
   }
 
   function resign() {
@@ -212,9 +269,35 @@
     {:else}
       <button onclick={resign} style="background:var(--bad)">Resign</button>
     {/if}
+    {#if status === 'over' && lastGame}
+      <button class="ghost" onclick={analyzePlayed} disabled={aStatus === 'analyzing'}>
+        {aStatus === 'analyzing' ? 'Analysing…' : aResult ? 'Re-analyse' : 'Analyse this game'}
+      </button>
+    {/if}
   </div>
-  <p class="muted" style="font-size:0.8rem; max-width:420px">
-    Tip: play slowly and think, then import the game in <b>Analyse</b> to turn your mistakes into puzzles —
-    the bot will then steer future openings toward whatever you're weakest at.
+
+  {#if aStatus === 'analyzing'}
+    <div class="panel" style="max-width:420px">
+      <p>Analysing position {aProgress} / {aTotal}…</p>
+      <div class="bar"><div class="bar-fill" style="width:{aTotal ? (aProgress / aTotal) * 100 : 0}%"></div></div>
+    </div>
+  {/if}
+
+  {#if aResult}
+    <div class="panel col" style="max-width:680px;width:100%">
+      <AnalysisResult analysis={aResult} puzzlesMade={aPuzzles} />
+    </div>
+  {/if}
+
+  <p class="muted" style="font-size:0.8rem; max-width:440px">
+    Tip: play slowly and think. After the game, hit <b>Analyse this game</b> — one click turns your
+    mistakes into puzzles and updates your weakness dashboard (nothing to paste). The bot then steers
+    future openings toward whatever you're weakest at.
   </p>
 </section>
+
+<style>
+  button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .bar { height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin-top: 0.5rem; }
+  .bar-fill { height: 100%; background: var(--accent); transition: width 0.1s linear; }
+</style>

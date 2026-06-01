@@ -1,8 +1,8 @@
 <script lang="ts">
   import { app } from '../state/app.svelte';
+  import AnalysisResult from './AnalysisResult.svelte';
   import { parsePgn, inferPlayerColor } from '../analysis/pgn';
   import { runAnalysis } from '../analysis/runAnalysis';
-  import { explainPly } from '../analysis/explain';
   import type { GameAnalysis } from '../analysis/types';
 
   let pgn = $state('');
@@ -17,15 +17,6 @@
   let elapsedMs = $state(0);
 
   const model = $derived(app.model);
-
-  // Player's significant mistakes, each with a rule-based explanation (no LLM).
-  const mistakes = $derived(
-    result
-      ? result.plies
-          .filter((p) => p.color === result!.playerColor && (p.severity === 'mistake' || p.severity === 'blunder'))
-          .map((p) => ({ ply: p, ex: explainPly(p) }))
-      : [],
-  );
 
   const SAMPLE =
     '[Event "Casual"]\n[White "You"]\n[Black "Opponent"]\n[TimeControl "300+3"]\n\n' +
@@ -99,9 +90,10 @@
 <section class="col" style="max-width:680px;margin:0 auto">
   <h2>Analyse a game</h2>
   <p class="muted">
-    Paste a PGN. We run the engine locally over every move, flag your inaccuracies / mistakes /
-    blunders, tag the missed idea, and turn your real mistakes into personalised puzzles. Nothing
-    leaves your device.
+    Paste a PGN from an external game. We run the engine locally over every move, flag your
+    inaccuracies / mistakes / blunders, tag the missed idea, and turn your real mistakes into
+    personalised puzzles. Nothing leaves your device. (Games you play in <b>Play</b> can be analysed
+    in one click — no paste needed.)
   </p>
 
   <textarea
@@ -150,46 +142,7 @@
     <div class="panel col">
       <h3>Result</h3>
       <p class="muted">Analysed in {(elapsedMs / 1000).toFixed(1)}s ({result.movetimeMs}ms/ply)</p>
-      <div class="row" style="gap:1.5rem">
-        <div><b style="font-size:1.5rem">{result.acpl}</b><br /><span class="muted">your ACPL</span></div>
-        <div><b style="font-size:1.5rem;color:var(--bad)">{result.blunders}</b><br /><span class="muted">blunders</span></div>
-        <div><b style="font-size:1.5rem">{result.mistakes}</b><br /><span class="muted">mistakes</span></div>
-        <div><b style="font-size:1.5rem">{result.inaccuracies}</b><br /><span class="muted">inaccuracies</span></div>
-      </div>
-      {#if puzzlesMade > 0}
-        <p class="feedback good">
-          Created {puzzlesMade} personalised {puzzlesMade === 1 ? 'puzzle' : 'puzzles'} from your
-          mistakes — find them in <button class="link" onclick={() => app.go('tactics')}>Tactics</button>.
-        </p>
-      {:else}
-        <p class="muted">No clear-cut, unique-solution mistakes found to turn into puzzles.</p>
-      {/if}
-      <div class="row">
-        <button onclick={() => app.go('dashboard')}>See your weakness dashboard →</button>
-      </div>
-
-      {#if mistakes.length}
-        <h4>Your mistakes, explained</h4>
-        <div class="col" style="gap:0.4rem">
-          {#each mistakes as m (m.ply.ply)}
-            <details class="mistake">
-              <summary>
-                <span>Move {m.ply.moveNumber}: <b>{m.ply.san}</b></span>
-                <span class="muted sev">{m.ply.severity}</span>
-                <span class="muted">−{Math.round(m.ply.winProbLoss)}% win</span>
-              </summary>
-              <div class="why">
-                {#each m.ex.reasons as r}<p>{r}</p>{/each}
-                {#if m.ex.better}<p class="better">{m.ex.better}</p>{/if}
-              </div>
-            </details>
-          {/each}
-        </div>
-        <p class="muted" style="font-size:0.75rem">
-          Explanations are rule-based and derived only from the engine's own evaluation — never invented.
-          When we can't name a specific tactical pattern, we say so rather than guess.
-        </p>
-      {/if}
+      <AnalysisResult analysis={result} {puzzlesMade} />
     </div>
   {/if}
 </section>
@@ -198,12 +151,4 @@
   .bar { height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin-top: 0.5rem; }
   .bar-fill { height: 100%; background: var(--accent); transition: width 0.1s linear; }
   button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
-  button.link { background: none; border: none; color: var(--accent); padding: 0; text-decoration: underline; cursor: pointer; }
-  h4 { color: var(--muted); margin: 0.5rem 0 0; }
-  .mistake { border-bottom: 1px solid var(--border); padding: 0.25rem 0; }
-  .mistake summary { display: flex; justify-content: space-between; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; }
-  .mistake summary .sev { text-transform: capitalize; }
-  .mistake .why { padding: 0.4rem 0 0.2rem 1rem; font-size: 0.85rem; }
-  .mistake .why p { margin: 0.2rem 0; }
-  .mistake .why .better { color: var(--good); font-weight: 600; }
 </style>

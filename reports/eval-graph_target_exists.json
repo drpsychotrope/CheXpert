@@ -1,0 +1,14 @@
+{
+  "pr_name": "eval-graph",
+  "scope": "feature",
+  "checked_at_commit": "ab008a6",
+  "targets": [
+    { "path": "src/analysis/winProb.ts", "exists": true, "symbol": "winPct", "note": "winPct(whiteCp) → 0..100; drives the curve, no re-eval" },
+    { "path": "src/analysis/types.ts", "symbol": "GameAnalysis.byPhase", "exists": true, "note": "PhaseStat.acpl per phase already computed" },
+    { "path": "src/ui/Import.svelte", "exists": true, "note": "the ONLY view rendering GameAnalysis results today; text-only, no board" },
+    { "path": "src/ui/Board.svelte", "exists": true, "note": "chessground wrapper; supports viewOnly + fen + lastMove → static mini-board feasible" },
+    { "path": "src/analysis/criticalMoments.ts", "exists": false, "note": "NEW pure selector" },
+    { "path": "src/ui/EvalGraph.svelte", "exists": false, "note": "NEW SVG sparkline component" }
+  ],
+  "verdict": "pass"
+}

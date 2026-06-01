@@ -1,0 +1,20 @@
+{
+  "pr_name": "eval-graph",
+  "scope": "feature",
+  "captured_at": "2026-06-01",
+  "engine_independent": true,
+  "data_already_present_on_PlyAnalysis": ["playedWhiteCp", "winProbLoss", "severity", "phase", "fenBefore", "san", "color"],
+  "data_already_present_on_GameAnalysis": ["byPhase (PhaseStat.acpl per phase)", "acpl", "blunders", "mistakes", "inaccuracies", "plies", "playerColor"],
+  "curve_source": "winPct(ply.playedWhiteCp) from winProb.ts — NO engine re-eval",
+  "current_analysis_ui": {
+    "file": "src/ui/Import.svelte",
+    "renders": ["ACPL/blunders/mistakes/inaccuracies stat row", "list of player mistakes with explainPly()"],
+    "has_board": false
+  },
+  "no_charting_dependency": "stack has none; hand-rolled inline SVG to avoid bundle/license creep",
+  "locked_decision": "NO global Accuracy% grade (brainstorm) — honesty notes / ADR-0009 directional only",
+  "files_likely_touched": ["src/analysis/criticalMoments.ts (new)", "src/ui/EvalGraph.svelte (new)", "src/ui/Import.svelte", "decisions.md"],
+  "tests_baseline": 135,
+  "ap_chess_alloc": "32-37 (spec 1 used 25-31; reconcile at merge)",
+  "adr_alloc": "ADR-0021"
+}

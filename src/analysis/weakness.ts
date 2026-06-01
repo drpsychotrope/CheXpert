@@ -15,6 +15,38 @@ export type Dimension =
   | 'timeManagement'
   | 'resilience';
 
+/** Where a weak dimension's one-click "Drill" should route (loop-closers 3b). */
+export interface DrillTarget {
+  view: 'tactics' | 'repertoire' | 'endgames' | 'comeback';
+  /** Puzzle theme filter (Tactics only). */
+  themes?: string[];
+  /** Run Tactics under a per-puzzle clock. */
+  timed?: boolean;
+}
+
+const TACTICS_THEMES = ['fork', 'knightFork', 'pin', 'skewer', 'hangingPiece', 'discoveredAttack', 'doubleCheck', 'mate'];
+
+/**
+ * Map each radar dimension to a drill destination. Every dimension is drillable in
+ * one click: tactics→Tactics(themes), opening→Repertoire, endgame→Endgames,
+ * time→timed Tactics, resilience→Comeback drills. (Fixes the old all-to-Tactics route.)
+ */
+export function drillTarget(dim: Dimension): DrillTarget {
+  switch (dim) {
+    case 'openingAccuracy':
+      return { view: 'repertoire' };
+    case 'endgameConversion':
+      return { view: 'endgames' };
+    case 'timeManagement':
+      return { view: 'tactics', timed: true };
+    case 'resilience':
+      return { view: 'comeback' };
+    case 'tactics':
+    default:
+      return { view: 'tactics', themes: TACTICS_THEMES };
+  }
+}
+
 export interface DimensionScore {
   dimension: Dimension;
   /** 0..100, higher = stronger. 50 ≈ at the level-band expectation. */

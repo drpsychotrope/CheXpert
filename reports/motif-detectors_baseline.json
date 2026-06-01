@@ -1,0 +1,34 @@
+{
+  "pr_name": "motif-detectors",
+  "scope": "feature",
+  "captured_at": "2026-06-01",
+  "engine_independent": true,
+  "note": "No engine calls added; detectMotif runs only on already-flagged mistakes/blunders.",
+  "current_detectors": ["mate", "mateInN", "backRankMate", "hangingPiece", "fork", "knightFork"],
+  "fallback": { "confidence": "low", "tag": "<phase>Mistake", "magnitude": ["crushing", "advantage"] },
+  "motif_result_type": {
+    "fields": ["tag", "tags[]", "confidence"],
+    "confidence_values": ["high", "low"],
+    "medium_supported": false
+  },
+  "files_likely_touched": [
+    "src/analysis/motif.ts",
+    "src/analysis/motif.test.ts",
+    "src/analysis/explain.ts",
+    "decisions.md"
+  ],
+  "similar_features_for_pattern": [
+    { "detector": "hangingPiece", "approach": "capture target value/defense evaluated on fenAfter" },
+    { "detector": "fork", "approach": "capture targets value>=3 from landing square on fenAfter (turn tweaked)" }
+  ],
+  "downstream_consumers": [
+    { "file": "src/analysis/explain.ts", "mechanism": "MOTIF_EXPLANATION[tag] phrase, gated on confidence==='high' (AP-CHESS-19)" },
+    { "file": "src/analysis/generatePuzzles.ts", "line": 73, "mechanism": "themes = p.motif.tags.slice() — inherits new tags automatically, no change needed" }
+  ],
+  "helpers_available": ["tweakTurn", "captureTargetsFrom", "isDefendedBy", "VALUE", "isBackRankMate"],
+  "tests_baseline": 135,
+  "motif_tests_baseline": 5,
+  "ap_chess_max": 24,
+  "adr_max": 19,
+  "motif_ts_loc": 154
+}

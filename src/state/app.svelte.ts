@@ -19,6 +19,7 @@ export type View =
   | 'woodpecker'
   | 'guess'
   | 'vision'
+  | 'comeback'
   | 'settings';
 
 class AppState {
@@ -28,6 +29,8 @@ class AppState {
   settings = $state<SettingsRecord | null>(null);
   /** Set by the dashboard "Drill" buttons; consumed by the tactics trainer. */
   tacticsFilterThemes = $state<string[] | null>(null);
+  /** Set by the time-management drill; runs Tactics under a per-puzzle clock. */
+  tacticsTimed = $state(false);
 
   readonly engine = new EngineClient();
   readonly puzzles = new PuzzleRepo();

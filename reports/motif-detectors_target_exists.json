@@ -1,0 +1,12 @@
+{
+  "pr_name": "motif-detectors",
+  "scope": "feature",
+  "checked_at_commit": "ab008a6",
+  "targets": [
+    { "path": "src/analysis/motif.ts", "exists": true, "symbol": "detectMotif", "symbol_line": 60, "loc": 154 },
+    { "path": "src/analysis/motif.test.ts", "exists": true, "tests": 5 },
+    { "path": "src/analysis/explain.ts", "exists": true, "symbol": "MOTIF_EXPLANATION", "symbol_line": 25 },
+    { "path": "src/analysis/types.ts", "exists": true, "symbol": "MotifResult", "symbol_line": 30 }
+  ],
+  "verdict": "pass"
+}

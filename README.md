@@ -41,16 +41,23 @@ Everything runs in the browser. Nothing leaves your device by default.
   game toward a ~55% player win-rate band (your zone of proximal development). Instructive, not just
   hard — strength is set honestly, never via random blunder injection.
 - **Coached mode** — optional engine check that warns before an obvious blunder while you play.
+- **One-click review** — after a game, *Analyse this game* runs the full local analysis (puzzles +
+  weakness dashboard) with no PGN to copy or paste.
 
 ### The differentiating loop
 - **Analyse a game** — paste a PGN; the engine reviews every move locally (~20 s for a 40-move
   game), classifies each by **win-probability loss** (inaccuracy / mistake / blunder), and tags the
-  missed motif and phase.
+  missed motif and phase. A **win-probability curve** plots the game's shape and surfaces its
+  **critical moments** (biggest swings, either side) — click one to see the position and the
+  explanation. No single "accuracy" grade is shown — only directional pointers.
 - **From your games** — significant mistakes with a *uniquely* better move (verified by a MultiPV
-  re-check) become personalised puzzles, served in Tactics. Your losses train you.
+  re-check) become personalised puzzles, served in Tactics. **Missed wins** count too: forced mates
+  and decisive shots you had but didn't play (even while already winning), so you drill converting
+  won positions. Your games train you.
 - **Weakness dashboard** — a radar across five dimensions (tactics · opening accuracy · endgame
-  conversion · time management · resilience), benchmarked against your level band, with one-click
-  drill-through into the matching puzzles.
+  conversion · time management · resilience), benchmarked against your level band. **Every** dimension
+  is one-click drillable to the right training: tactics → Tactics, opening → Repertoire, endgame →
+  Endgames, time → timed Tactics, resilience → comeback drills.
 - **Analysis explained** — plain-language *why this was a mistake + what was better*, rule-based and
   derived only from the engine's own evaluation. No LLM; when it can't name a specific tactical
   pattern, it says so rather than guess.
@@ -65,6 +72,8 @@ Everything runs in the browser. Nothing leaves your device by default.
   Complements Review (which spreads an expanding pool over time).
 - **Opening repertoire** — build lines (validated by chess.js), drill them under FSRS until they're
   automatic.
+- **Comeback drills** — replay the moments you fell behind in your own games against a bot at your
+  level, and practise holding the draw or turning them around (reached from the weakness dashboard).
 
 ### Endgames & vision
 - **Endgame trainer** — fundamental endgames (K+Q vs K, K+R vs K, K+P opposition, Lucena, Philidor)
@@ -225,9 +234,9 @@ The brief this was built from asked for intellectual honesty in the product, so:
 - **Puzzle rating ≠ playing strength.** They're tracked as separate numbers and the UI says so.
 - **Weakness benchmarks are directional.** The radar uses rough community ACPL anchors, presented as
   "where to focus", never as a precise grade.
-- **Motif tags are conservative.** Only a small set of patterns (mate, hanging piece, fork, …) is
-  detected with confidence; anything else is a low-confidence phase/magnitude fallback, marked as
-  such, rather than a guessed tactic.
+- **Motif tags are conservative.** Only patterns we can verify geometrically (mate, hanging piece,
+  fork, pin, skewer, discovered attack, double check) are detected with confidence; anything else is
+  a low-confidence phase/magnitude fallback, marked as such, rather than a guessed tactic.
 
 ---
 

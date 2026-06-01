@@ -1,0 +1,13 @@
+{
+  "pr_name": "eval-graph",
+  "referenced_sources": [
+    {
+      "source": "README Honesty notes + ADR-0009 (AP-CHESS-13)",
+      "claim": "benchmarks/grades are directional, never a precise grade",
+      "relation": "aligned — this spec deliberately omits a global Accuracy% number; shows the raw win% curve + per-phase ACPL only"
+    }
+  ],
+  "divergence": "none",
+  "minor": false,
+  "action": "proceed; Phase Z appends ADR-0021 recording the 'no global accuracy grade' choice, cross-linking ADR-0009"
+}

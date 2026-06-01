@@ -1,0 +1,10 @@
+{
+  "pr_name": "motif-detectors",
+  "tracker": "none",
+  "git_remotes": [],
+  "gh_available": "no remote configured",
+  "branch_checked": "claude/agitated-babbage-e01086 (single worktree)",
+  "open_prs_matching": "n/a (local-only repo, ADR-0002)",
+  "verdict": "proceed",
+  "note": "No PR tracker; remote-based collision cannot occur. Spec 2 (eval-graph) and spec 3 (loop-closers) target disjoint files; no overlap with motif.ts core detector logic."
+}

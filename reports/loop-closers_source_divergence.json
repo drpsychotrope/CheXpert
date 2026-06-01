@@ -1,0 +1,17 @@
+{
+  "pr_name": "loop-closers",
+  "referenced_sources": [
+    {
+      "source": "README Honesty notes — \"Personalised beats generic is plausible, not proven\"",
+      "claim": "the loop is built because the mechanism is sound, not because a study proves it",
+      "relation": "comeback-drill grading and missed-win framing must not over-claim; present as practice, track locally"
+    },
+    {
+      "source": "ADR-0009 (AP-CHESS-13) directional benchmarks",
+      "relation": "resilience drill is the action arm of a directional dimension; UI must keep the 'directional' framing"
+    }
+  ],
+  "divergence": "none-structural",
+  "scope_finding": "Invocation bundles 3 concerns (3a/3b/3c). Single-concern doctrine (skill §3.4) → recommend ROUTE B split into 3 PRs. Surfaced as headline arbitrage Q-A.",
+  "action": "proceed as a decomposing meta-spec; Phase Z appends ADR-0022 (or 0022/0023/0024 if split)"
+}

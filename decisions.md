@@ -177,3 +177,83 @@ Q-A=b (local-only, no distribution) ⇒ no backend in scope; Q-B=a deferred Maia
 doesn't exist. So Maia is not built. The adaptive Stockfish opponent + the loop-closure opening
 steering (ADR-0014) cover the "instructive adversary" goal client-side. Revisit only if a backend
 is ever adopted (which also reopens the licensing posture — hosting triggers GPL/AGPL).
+
+## ADR-0020 — Motif taxonomy extension: four geometric detectors (extends ADR-0007)
+**Date:** 2026-06-01 · **Status:** accepted
+
+The "later pass" ADR-0007 anticipated. `detectMotif` now also tags **pin** (absolute + relative),
+**skewer**, **discoveredAttack**, and **doubleCheck**, all at `confidence:'high'`. Every relation is
+verified by clear-ray geometry on the position after the missed best move (`detectGeometric` in
+`motif.ts`) — no engine re-check (Q-B=a), so motif tagging stays pure/synchronous like fork/hanging.
+Decisions taken: Q-A primary-tag precedence `mate > doubleCheck > fork > skewer > pin >
+discoveredAttack > hangingPiece`; Q-C relative pins tagged when the back piece is more valuable and
+`≥5` (rook/queen), plus all absolute pins. Tag strings are the exact Lichess theme keys, so they flow
+into personal-puzzle themes (`generatePuzzles`) and NL explanations (`explain.ts`, gated on high
+confidence per AP-CHESS-19) for free. **The `confidence:'low'` phase/magnitude fallback is unchanged**:
+a detector fires only when geometrically certain, else the honest generic tag stands (ADR-0007 intact).
+New anti-patterns AP-CHESS-25…31. `doubleCheck` is computed as direct + discovered check (no chess.js
+`attackers()`), so it needs no API beyond geometry.
+
+## ADR-0021 — Analysis visualization: win% curve + critical moments, no global accuracy grade
+**Date:** 2026-06-01 · **Status:** accepted
+
+The analysis view gains a **player-POV win-probability curve** (`EvalGraph.svelte`, inline SVG — no
+charting dependency) and a **critical-moments** list (`criticalMoments.ts`, a pure selector: top 5
+plies by win-prob loss ≥ 10, both sides distinguished), plus per-phase ACPL read straight from
+`byPhase`. Everything derives from the stored `GameAnalysis` — **no engine re-evaluation**. We
+deliberately show **no single "accuracy %" grade**: per the honesty notes and ADR-0009 (benchmarks are
+directional), a precise-looking grade would overstate confidence. Selecting a moment shows a
+**read-only** mini-board at that position + the rule-based `explainPly` text. Decisions Q-A..Q-D all
+took the recommended defaults. AP-CHESS-32…37.
+
+## ADR-0022 — One-click played-game review (no PGN paste); shared AnalysisResult
+**Date:** 2026-06-01 · **Status:** accepted
+
+Supersedes the old workflow where the only way to analyse a game you played in-app was to copy its
+PGN and paste it into the Analyse view. `Play` now offers **"Analyse this game"** on the game-over
+screen, running the same `runAnalysis` pipeline with `source:'played'` (the function's header already
+anticipated this caller). The engine is reset to full strength first (the adaptive opponent had left
+`UCI_LimitStrength` on at a low Elo). The result panel — stat row, win% curve, critical moments,
+explained mistakes — is extracted into a shared `AnalysisResult.svelte` used by both Import and Play
+(DRY). A guard reuses an existing `gameAnalyses` row instead of re-running. Motivated by the user's
+"simplest UI / avoid external manipulations" directive: games you play become puzzles + weakness data
+with one click, nothing to paste. Paste-import stays for external games. AP-CHESS-45…47.
+
+## ADR-0023 — Missed-win puzzle mining (loop-closers 3a)
+**Date:** 2026-06-01 · **Status:** accepted
+
+`generatePuzzlesFromAnalysis` now also mines **missed wins** — player plies where a decisive best
+move existed but wasn't played, even if the move was scored `good`/`inaccuracy` (you stayed winning
+but missed the clean kill — the most rating-relevant skill, converting won positions). Trigger
+(Q-B=a): you didn't play best (`cpLoss>0`) AND either a **forced mate** existed (always qualifies) or
+the best move was worth **≥ 500 cp** (mover POV) with **win-prob loss ≥ 3** (the floor stops a
+one-sided game flooding). The existing MultiPV uniqueness gate is reused unchanged (it already treats
+"only best is mate" as unique). Missed wins are capped at **3 per game**; they carry `meta.kind:
+'missed-win'` (ordinary errors carry `meta.kind:'mistake'`) — a string in the existing freeform
+`meta`, no Lichess-theme string invented. No new engine eval pass (reuses the generator's MultiPV
+call). AP-CHESS-38 (flood control), AP-CHESS-44 (`meta.kind`).
+
+## ADR-0024 — Per-dimension drill routing (loop-closers 3b)
+**Date:** 2026-06-01 · **Status:** accepted
+
+The dashboard used to route **every** weak dimension into Tactics (opening/endgame mis-filtered by
+theme) and showed no button for time/resilience. Now a pure `drillTarget(dim)` (in `weakness.ts`,
+unit-tested) maps each dimension to its proper destination: tactics→Tactics (themes, now including the
+geometric motifs from ADR-0020), openingAccuracy→Repertoire, endgameConversion→Endgames,
+timeManagement→**timed Tactics** (`app.tacticsTimed`, a per-puzzle clock; running out = a graded miss
+via the existing `finish(false)`; reset on clear, AP-CHESS-39), resilience→**Comeback** (ADR-0025).
+Every dimension now shows a one-click Drill button (AP-CHESS-42 — never route opening/endgame back into
+Tactics). `'comeback'` added to the `View` union here; its route + view ship in ADR-0025.
+
+## ADR-0025 — Comeback drills (loop-closers 3c)
+**Date:** 2026-06-01 · **Status:** accepted
+
+The resilience dimension's drill. `comeback.ts` (`comebackPositions`, unit-tested) replays the
+**player-to-move** positions where you first fell behind (mirrors `resilienceScore`'s behind-episode
+detection: entry at player-POV cp ≤ −200, one per episode), **excluding hopeless dips** (≤ −900) so a
+drill stays winnable. `Comeback.svelte` plays each vs the **adaptive opponent at your ZPD Elo** (NOT
+full strength — AP-CHESS-41), graded on **outcome** (hold a draw or win = success, Q-C=a) so no extra
+eval probes are needed. Positions derive on the fly from stored `gameAnalyses` — **no IndexedDB
+migration**. Reached only from the Dashboard resilience "Defend" button (Q-D=a; no 13th top-nav
+button). With `played-game-review`, the whole loop is paste-free: play → one-click analyse → your
+collapses become comeback drills. AP-CHESS-40/41/43.

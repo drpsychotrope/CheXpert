@@ -73,10 +73,11 @@ describe('generatePuzzlesFromAnalysis', () => {
     expect(a.puzzlesGenerated).toBe(1);
   });
 
-  it('skips opponent moves and non-mistakes', async () => {
+  it('skips opponent moves and ordinary non-decisive good moves', async () => {
     const a = analysis([
       ply({ ply: 0, color: 'b', severity: 'blunder' }), // opponent
-      ply({ ply: 1, color: 'w', severity: 'good' }), // fine move
+      // A fine move that did NOT miss a decisive win: small edge, tiny loss.
+      ply({ ply: 1, color: 'w', severity: 'good', bestWhiteCp: 60, cpLoss: 8, winProbLoss: 1, mate: undefined }),
     ]);
     const lines: LineEvaluator = { async evaluateLines() { return [{ uci: 'a1a8', whiteCp: 900 }]; } };
     const puzzles = await generatePuzzlesFromAnalysis(a, lines, { baseRating: 1400 });
@@ -110,5 +111,50 @@ describe('generatePuzzlesFromAnalysis', () => {
     };
     const puzzles = await generatePuzzlesFromAnalysis(a, lines, { baseRating: 1400 });
     expect(puzzles).toHaveLength(1);
+  });
+
+  // --- Missed-win mining (spec missed-win, ADR-0023) ------------------------
+
+  it('mines a missed forced mate even when you stayed winning (meta.kind=missed-win)', async () => {
+    const a = analysis([
+      ply({ ply: 0, color: 'w', severity: 'good', fenBefore: 'missFen', bestUci: 'a1a8', mate: 1, cpLoss: 400, winProbLoss: 2 }),
+    ]);
+    const lines: LineEvaluator = {
+      async evaluateLines() {
+        return [ { uci: 'a1a8', whiteCp: 99999, mate: 1 }, { uci: 'c1c2', whiteCp: 300 } ];
+      },
+    };
+    const puzzles = await generatePuzzlesFromAnalysis(a, lines, { baseRating: 1400 });
+    expect(puzzles).toHaveLength(1);
+    expect(puzzles[0].meta?.kind).toBe('missed-win');
+  });
+
+  it('does NOT mine a "still winning" slip below the loss floor', async () => {
+    const a = analysis([
+      ply({ ply: 0, color: 'w', severity: 'good', fenBefore: 'edgeFen', bestUci: 'a1a8', mate: undefined, bestWhiteCp: 600, cpLoss: 40, winProbLoss: 1 }),
+    ]);
+    const lines: LineEvaluator = { async evaluateLines() { return [ { uci: 'a1a8', whiteCp: 600 }, { uci: 'c1c2', whiteCp: 0 } ]; } };
+    const puzzles = await generatePuzzlesFromAnalysis(a, lines, { baseRating: 1400 });
+    expect(puzzles).toHaveLength(0);
+  });
+
+  it('tags ordinary mistakes with meta.kind=mistake', async () => {
+    const a = analysis([ply({ ply: 0, fenBefore: 'mistakeFen', severity: 'blunder', bestUci: 'a1a8' })]);
+    const lines: LineEvaluator = { async evaluateLines() { return [ { uci: 'a1a8', whiteCp: 600 }, { uci: 'c1c2', whiteCp: 0 } ]; } };
+    const puzzles = await generatePuzzlesFromAnalysis(a, lines, { baseRating: 1400 });
+    expect(puzzles[0].meta?.kind).toBe('mistake');
+  });
+
+  it('caps missed-win puzzles per game at 3', async () => {
+    const plies = [0, 1, 2, 3, 4].map((i) =>
+      ply({ ply: i, color: 'w', severity: 'good', fenBefore: `mw${i}`, bestUci: 'a1a8', mate: 1, cpLoss: 400, winProbLoss: 2 }),
+    );
+    const lines: LineEvaluator = {
+      async evaluateLines() {
+        return [ { uci: 'a1a8', whiteCp: 99999, mate: 1 }, { uci: 'c1c2', whiteCp: 300 } ];
+      },
+    };
+    const puzzles = await generatePuzzlesFromAnalysis(analysis(plies), lines, { baseRating: 1400 });
+    expect(puzzles.filter((p) => p.meta?.kind === 'missed-win')).toHaveLength(3);
   });
 });

@@ -1,0 +1,7 @@
+{
+  "pr_name": "eval-graph",
+  "tracker": "none",
+  "git_remotes": [],
+  "verdict": "proceed",
+  "note": "Local-only repo. Touches Import.svelte (shared with spec 3? no — spec 3 touches Dashboard.svelte + generatePuzzles.ts, disjoint). New files criticalMoments.ts/EvalGraph.svelte do not exist. No overlap with motif-detectors (analysis logic) beyond reading the same GameAnalysis type."
+}

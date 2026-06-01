@@ -12,6 +12,162 @@ import type { GamePhase, MotifResult, Severity } from './types';
 
 const VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
+// --- Geometric helpers for pin / skewer / discovered attack (high confidence) ---
+const FILES = 'abcdefgh';
+function fileRank(sq: string): { f: number; r: number } {
+  return { f: FILES.indexOf(sq[0]), r: Number(sq[1]) - 1 };
+}
+function toSquare(f: number, r: number): string | null {
+  if (f < 0 || f > 7 || r < 0 || r > 7) return null;
+  return FILES[f] + (r + 1);
+}
+const ROOK_DIRS: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const BISHOP_DIRS: Array<[number, number]> = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+function sliderDirs(type: string): Array<[number, number]> {
+  if (type === 'r') return ROOK_DIRS;
+  if (type === 'b') return BISHOP_DIRS;
+  if (type === 'q') return [...ROOK_DIRS, ...BISHOP_DIRS];
+  return [];
+}
+interface Occ { square: string; type: string; color: 'w' | 'b'; }
+/** First `max` occupied squares walking from `from` along (df,dr), nearest first. */
+function occupiedAlong(c: Chess, from: string, df: number, dr: number, max: number): Occ[] {
+  const out: Occ[] = [];
+  let { f, r } = fileRank(from);
+  while (out.length < max) {
+    f += df;
+    r += dr;
+    const s = toSquare(f, r);
+    if (!s) break;
+    const p = c.get(s as Square);
+    if (p) out.push({ square: s, type: p.type, color: p.color });
+  }
+  return out;
+}
+/** Is `x` strictly between `a` and `b` along their straight ray? */
+function isStrictlyBetween(a: string, b: string, x: string): boolean {
+  const A = fileRank(a), B = fileRank(b), X = fileRank(x);
+  const sf = Math.sign(B.f - A.f), sr = Math.sign(B.r - A.r);
+  let f = A.f + sf, r = A.r + sr;
+  while (toSquare(f, r) && !(f === B.f && r === B.r)) {
+    if (f === X.f && r === X.r) return true;
+    f += sf;
+    r += sr;
+  }
+  return false;
+}
+/** Are all squares strictly between `a` and `b` empty? */
+function rayClear(c: Chess, a: string, b: string): boolean {
+  const A = fileRank(a), B = fileRank(b);
+  const sf = Math.sign(B.f - A.f), sr = Math.sign(B.r - A.r);
+  let f = A.f + sf, r = A.r + sr;
+  while (!(f === B.f && r === B.r)) {
+    const s = toSquare(f, r);
+    if (!s) return false;
+    if (c.get(s as Square)) return false;
+    f += sf;
+    r += sr;
+  }
+  return true;
+}
+/** Geometric: does the piece on `fromSq` attack `target` (its own movement rules)? */
+function pieceAttacksSquare(c: Chess, fromSq: string, target: string): boolean {
+  const p = c.get(fromSq as Square);
+  if (!p) return false;
+  const A = fileRank(fromSq), T = fileRank(target);
+  const df = T.f - A.f, dr = T.r - A.r, adf = Math.abs(df), adr = Math.abs(dr);
+  switch (p.type) {
+    case 'n': return (adf === 1 && adr === 2) || (adf === 2 && adr === 1);
+    case 'k': return adf <= 1 && adr <= 1 && adf + adr > 0;
+    case 'p': return adf === 1 && dr === (p.color === 'w' ? 1 : -1);
+    case 'b': return adf === adr && adf > 0 && rayClear(c, fromSq, target);
+    case 'r': return ((df === 0) !== (dr === 0)) && rayClear(c, fromSq, target);
+    case 'q': return ((adf === adr && adf > 0) || ((df === 0) !== (dr === 0))) && rayClear(c, fromSq, target);
+  }
+  return false;
+}
+function findKing(c: Chess, color: 'w' | 'b'): string | null {
+  for (const row of c.board()) for (const sq of row) if (sq && sq.type === 'k' && sq.color === color) return sq.square;
+  return null;
+}
+function pushUnique(tags: string[], t: string): void {
+  if (!tags.includes(t)) tags.push(t);
+}
+
+/**
+ * Detect pin / skewer / discovered attack / double check created by the move that
+ * produced `fenAfter`. High confidence only — every relation is verified by clear-ray
+ * geometry (ADR-0020, extends ADR-0007). Pushes Lichess theme keys into `tags`.
+ */
+function detectGeometric(
+  fenAfter: string,
+  from: string,
+  to: string,
+  moverColor: 'w' | 'b',
+  oppColor: 'w' | 'b',
+  tags: string[],
+): void {
+  let after: Chess;
+  try {
+    after = new Chess(fenAfter);
+  } catch {
+    return; // unusual FEN (castling/en-passant edge) → no tag rather than a wrong one
+  }
+
+  // Pin / skewer: the moved slider on `to` lines up two enemy pieces on one ray.
+  // Read the moved piece from `to` (post-move) so promotions are seen correctly.
+  const moved = after.get(to as Square);
+  if (moved && (moved.type === 'b' || moved.type === 'r' || moved.type === 'q')) {
+    for (const [df, dr] of sliderDirs(moved.type)) {
+      const occ = occupiedAlong(after, to, df, dr, 2);
+      if (occ.length < 2) continue;
+      const [front, back] = occ;
+      if (front.color !== oppColor || back.color !== oppColor) continue;
+      const fv = VALUE[front.type] ?? 0;
+      const bv = VALUE[back.type] ?? 0;
+      if (back.type === 'k') {
+        pushUnique(tags, 'pin');
+        pushUnique(tags, 'absolutePin');
+      } else if (front.type === 'k') {
+        pushUnique(tags, 'skewer');
+      } else if (bv > fv && bv >= 5) {
+        pushUnique(tags, 'pin');
+        pushUnique(tags, 'relativePin');
+      } else if (fv > bv && bv >= 3) {
+        pushUnique(tags, 'skewer');
+      }
+    }
+  }
+
+  // Discovered attack: vacating `from` unveils a friendly slider onto an enemy target.
+  const enemyKing = findKing(after, oppColor);
+  let discoveredCheck = false;
+  for (const row of after.board()) {
+    for (const sq of row) {
+      if (!sq || sq.color !== moverColor || sq.square === to) continue;
+      if (sq.type !== 'b' && sq.type !== 'r' && sq.type !== 'q') continue;
+      for (const [df, dr] of sliderDirs(sq.type)) {
+        const occ = occupiedAlong(after, sq.square, df, dr, 1);
+        if (occ.length < 1 || occ[0].color !== oppColor) continue;
+        const t = occ[0];
+        if (!isStrictlyBetween(sq.square, t.square, from)) continue; // `from` was the blocker
+        if (t.type === 'k') {
+          pushUnique(tags, 'discoveredAttack');
+          pushUnique(tags, 'discoveredCheck');
+          discoveredCheck = true;
+        } else if ((VALUE[t.type] ?? 0) >= 3) {
+          pushUnique(tags, 'discoveredAttack');
+        }
+      }
+    }
+  }
+
+  // Double check is only ever a direct + a discovered check (no chess.js attackers() needed).
+  if (discoveredCheck && enemyKing && pieceAttacksSquare(after, to, enemyKing)) {
+    pushUnique(tags, 'doubleCheck');
+  }
+}
+
 /** Same position but with the side-to-move forced to `color` (for attack queries). */
 function tweakTurn(fen: string, color: 'w' | 'b'): string {
   const f = fen.split(' ');
@@ -114,6 +270,9 @@ export function detectMotif(ctx: MotifContext): MotifResult {
         tags.push('fork');
         if (movedPiece === 'n') tags.push('knightFork');
       }
+
+      // --- Pin / skewer / discovered attack / double check (geometric) ------
+      detectGeometric(fenAfter, from, to, moverColor, oppColor, tags);
     }
   }
 
@@ -121,7 +280,10 @@ export function detectMotif(ctx: MotifContext): MotifResult {
     // Add a coarse magnitude tag alongside specific motifs.
     if (severity === 'blunder') tags.push('crushing');
     else tags.push('advantage');
-    return { tag: tags[0], tags, confidence: 'high' };
+    // Primary tag by precedence (most forcing first) — Q-A accepted default.
+    const PRECEDENCE = ['doubleCheck', 'fork', 'skewer', 'pin', 'discoveredAttack', 'hangingPiece'];
+    const primary = PRECEDENCE.find((t) => tags.includes(t)) ?? tags[0];
+    return { tag: primary, tags, confidence: 'high' };
   }
 
   // --- Fallback: no specific detector fired. Tag by phase + magnitude (low). ---

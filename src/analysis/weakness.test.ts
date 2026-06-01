@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildWeaknessProfile, expectedAcpl, resilienceScore } from './weakness';
+import { buildWeaknessProfile, drillTarget, expectedAcpl, resilienceScore } from './weakness';
 import type { GameAnalysis, PlyAnalysis, GamePhase } from './types';
 
 function ply(partial: Partial<PlyAnalysis>): PlyAnalysis {
@@ -91,5 +91,27 @@ describe('weakness aggregation', () => {
     const r = resilienceScore([recovered]);
     expect(r.n).toBe(1);
     expect(r.score).toBe(100);
+  });
+});
+
+describe('drillTarget — every dimension routes to a view (loop-closers 3b)', () => {
+  it('routes opening and endgame away from Tactics', () => {
+    expect(drillTarget('openingAccuracy').view).toBe('repertoire');
+    expect(drillTarget('endgameConversion').view).toBe('endgames');
+  });
+
+  it('routes time management to timed Tactics', () => {
+    expect(drillTarget('timeManagement')).toEqual({ view: 'tactics', timed: true });
+  });
+
+  it('routes resilience to comeback drills', () => {
+    expect(drillTarget('resilience').view).toBe('comeback');
+  });
+
+  it('routes tactics to Tactics with geometric-motif themes', () => {
+    const t = drillTarget('tactics');
+    expect(t.view).toBe('tactics');
+    expect(t.themes).toContain('pin');
+    expect(t.themes).toContain('fork');
   });
 });
