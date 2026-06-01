@@ -9,7 +9,7 @@
 //    to interrupt.
 
 import { parseBestmove, parseInfo, parseMultiPv, scoreToWhiteCp, type ScoreInfo } from './uci';
-import { ENGINE_WORKER_URL } from './stockfish.worker';
+import { engineWorkerUrl, multiThreadAvailable, forceLiteFallback, threadCount } from './stockfish.worker';
 
 export interface GoOptions {
   /** Fixed search time in ms (used by the adaptive opponent for snappy moves). */
@@ -58,17 +58,32 @@ export class EngineClient {
   }
 
   private async bootInternal(): Promise<void> {
+    const useMt = multiThreadAvailable() && !forceLiteFallback.get();
     this.worker = this.makeWorker();
     this.worker.onmessage = (e: MessageEvent) => {
       const line = typeof e.data === 'string' ? e.data : String(e.data);
       for (const l of this.listeners) l(line);
     };
 
-    // The engine queues commands sent before it finishes loading, so we can send
-    // `uci` immediately and just wait for `uciok`.
-    await this.waitFor(() => this.send('uci'), (line) => line.trim() === 'uciok', 20000, 'uciok');
-    for (const [k, v] of Object.entries(this.options)) this.send(`setoption name ${k} value ${v}`);
-    await this.isready();
+    try {
+      // The engine queues commands sent before it finishes loading, so we can send
+      // `uci` immediately and just wait for `uciok`.
+      await this.waitFor(() => this.send('uci'), (line) => line.trim() === 'uciok', 20000, 'uciok');
+      if (useMt) this.send(`setoption name Threads value ${threadCount()}`);
+      for (const [k, v] of Object.entries(this.options)) this.send(`setoption name ${k} value ${v}`);
+      await this.isready();
+    } catch (e) {
+      // If the multi-thread engine failed to boot, fall back to lite for this session
+      // (never leave the app without a working engine — AP-CHESS-65).
+      if (useMt && !forceLiteFallback.get()) {
+        forceLiteFallback.set(true);
+        this.terminate();
+        this.bootPromise = null;
+        return this.bootInternal();
+      }
+      this.bootPromise = null;
+      throw e;
+    }
     this.ready = true;
     this.bootPromise = null;
   }
@@ -206,5 +221,6 @@ export class EngineClient {
 
 function defaultWorkerFactory(): Worker {
   // Classic worker: the vendored engine file installs its own onmessage handler.
-  return new Worker(ENGINE_WORKER_URL);
+  // Picks the multi-thread build when the page is cross-origin isolated, else lite.
+  return new Worker(engineWorkerUrl(multiThreadAvailable(), forceLiteFallback.get()));
 }

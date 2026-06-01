@@ -66,7 +66,13 @@ const server = http.createServer(async (req, res) => {
     const st = await stat(filePath).catch(() => null);
     if (!st || st.isDirectory()) filePath = join(ROOT, 'index.html'); // SPA fallback
     const body = await readFile(filePath);
-    res.writeHead(200, { 'Content-Type': MIME[extname(filePath)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    res.writeHead(200, {
+      'Content-Type': MIME[extname(filePath)] || 'application/octet-stream',
+      'Cache-Control': 'no-cache',
+      // Cross-origin isolation → SharedArrayBuffer → the multi-thread engine (ADR-0032).
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    });
     res.end(body);
   } catch (err) {
     res.writeHead(500).end('Server error: ' + String(err));

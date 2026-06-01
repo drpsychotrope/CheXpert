@@ -154,11 +154,12 @@ upgrade path — but it requires the Rust + MSVC toolchain to build, which the S
 
 ### Engine asset
 
-`npm install` runs `scripts/copy-engine.mjs`, which copies **only** the lite single-thread build
-(~7 MB) out of the `stockfish` npm package (which unpacks to ~251 MB of all variants) into
-`public/stockfish/`. The lite single-thread build needs **no** COOP/COEP headers, so it works on any
-static host. The full multi-thread build (faster, requires those headers, AGPL-3.0) is an unused
-opt-in.
+`npm install` runs `scripts/copy-engine.mjs`, which copies the lite single-thread build (~7 MB) **and**
+the multi-thread build (`stockfish-mt.*`) out of the `stockfish` npm package (which unpacks to ~251 MB
+of all variants) into `public/stockfish/`. The launcher + vite send COOP/COEP headers, so the app is
+cross-origin isolated and uses the faster **multi-thread** engine (`Threads` set to cores−1); on any
+host that can't set those headers it **falls back to the lite single-thread** build automatically
+(needs no headers). See `decisions.md` ADR-0032. The multi-thread build is **AGPL-3.0** (see Licensing).
 
 ### Puzzles
 

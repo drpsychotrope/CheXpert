@@ -81,6 +81,26 @@ if (pickWasm) take(pickWasm, 'stockfish.wasm');
 // Copy the original-named wasm too, so either resolution path works.
 if (pickWasm && pickWasm.name !== 'stockfish.wasm') take(pickWasm);
 
+// --- multi-thread build (spec F / ADR-0032): vendored as stockfish-mt.*, loaded ONLY
+// when the page is cross-origin isolated (COOP/COEP). In this package the MT builds are
+// the ones WITHOUT "single" (and not asm); prefer the smaller "lite" multi-thread build.
+const isAsm = (n) => /asm/i.test(n);
+const mtJs =
+  js.filter((f) => /lite/i.test(f.name) && !isSingle(f.name) && !isAsm(f.name)).sort((a, b) => b.size - a.size)[0] ||
+  js.filter((f) => !isSingle(f.name) && !isAsm(f.name)).sort((a, b) => a.size - b.size)[0];
+if (mtJs) {
+  const mtStem = basename(mtJs.name).replace(/\.js$/, '');
+  const mtWasm = wasm.find((f) => f.name.replace(/\.wasm$/, '') === mtStem) || null;
+  take(mtJs, 'stockfish-mt.js');
+  if (mtWasm) {
+    take(mtWasm, 'stockfish-mt.wasm');
+    if (mtWasm.name !== 'stockfish-mt.wasm') take(mtWasm);
+  }
+  console.log('[copy-engine] multi-thread JS:', mtJs.name, `(${(mtJs.size / 1048576).toFixed(2)} MB)`);
+} else {
+  console.log('[copy-engine] no multi-thread build found — MT disabled (lite only).');
+}
+
 console.log('[copy-engine] selected JS  :', pickJs.name, `(${(pickJs.size / 1048576).toFixed(2)} MB)`);
 console.log('[copy-engine] selected WASM:', pickWasm ? pickWasm.name : '(none — JS-embedded?)');
 console.log('[copy-engine] wrote to public/stockfish/:', copied.map((c) => `${c.name} ${c.mb}MB`).join(', '));

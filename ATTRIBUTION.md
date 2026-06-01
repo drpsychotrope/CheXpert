@@ -18,6 +18,10 @@ The Stockfish.js loader wrapper (`index.js`) is MIT; the engine itself (the `.wa
 generated `.js`) is GPL-3.0. Bundling it means the distributed app, if distributed, is governed
 by GPL-3.0. See `README.md` → Licensing.
 
+The **multi-thread** engine build (`stockfish-mt.*`, used when the app is cross-origin isolated —
+ADR-0032) is **AGPL-3.0**: if the app is ever publicly hosted or distributed, AGPL-3.0's
+source-publication terms apply. Under local/personal use (ADR-0002) the obligation is dormant.
+
 ## Data (all CC0 — public domain)
 
 - **Lichess puzzle database** — https://database.lichess.org/#puzzles

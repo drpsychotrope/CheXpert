@@ -327,3 +327,21 @@ link on a critical moment. `positional.ts` (`positionalFeatures`/`explainPositio
 derives doubled/isolated/passed pawns + material from the FEN; `explain.ts` appends these **honest**
 phrases ONLY in the no-tactical-motif branch (tactical/mate paths untouched) — extends the
 say-only-what-you-can-prove doctrine to positional features. No LLM, no new engine, no schema. AP-CHESS-62…64.
+
+## ADR-0032 — Multi-thread engine under cross-origin isolation (batch 2, spec F; extends ADR-0004)
+**Date:** 2026-06-01 · **Status:** accepted
+
+Adopt the **multi-thread** Stockfish for faster analysis (Q-A=a). The launcher (`server.cjs`) and vite
+dev/preview now send **COOP `same-origin` + COEP `require-corp`**, so the app window is cross-origin
+isolated and `SharedArrayBuffer` is available. `copy-engine.mjs` vendors the multi-thread build as
+`stockfish-mt.*` (the non-"single" build; lite-MT chosen for size) alongside the lite single-thread
+default. `EngineClient` loads MT when `crossOriginIsolated`, sets `Threads`, and **falls back to lite if
+the MT engine fails to boot** (AP-CHESS-65 — never leave the app without an engine). Lite single-thread
+remains the universal fallback for hosts that can't set the headers.
+
+**Licensing (Q-A accepted):** the multi-thread build is **AGPL-3.0** (vs lite's GPL-3.0). Under ADR-0002
+(local / no public distribution) the obligation stays dormant; if the app is ever publicly hosted or
+distributed, AGPL-3.0 source-publication applies — revisit then. Recorded per AP-CHESS-67. COEP
+`require-corp` can block cross-origin fetches — the only one is the opt-in Syzygy lookup; verify it
+still resolves under isolation (AP-CHESS-66), else it stays a documented constraint (endgames work
+offline vs the engine regardless). AP-CHESS-65…67.

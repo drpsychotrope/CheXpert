@@ -1,25 +1,22 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 
-// Q-C=a (hybrid): default build is lite single-thread Stockfish, which does NOT
-// need SharedArrayBuffer, so we ship WITHOUT COOP/COEP headers by default.
-// Flip ENABLE_COEP=1 only when serving a multi-thread engine build on a host
-// that can set these headers (Phase 2 opt-in). See specs/phase1-mvp-spec.md G3.
-const enableCoep = process.env.ENABLE_COEP === '1';
+// ADR-0032: cross-origin isolation (COOP/COEP) is ON by default so the multi-thread
+// engine can use SharedArrayBuffer in dev + preview (the .exe launcher sends the same
+// headers). Opt out with ENABLE_COEP=0 for a host that can't set them (engine falls
+// back to lite single-thread automatically). The launcher mirrors this in server.cjs.
+const enableCoep = process.env.ENABLE_COEP !== '0';
+const coepHeaders = enableCoep
+  ? { 'Cross-Origin-Embedder-Policy': 'require-corp', 'Cross-Origin-Opener-Policy': 'same-origin' }
+  : {};
 
 export default defineConfig({
   plugins: [svelte()],
   worker: {
     format: 'es',
   },
-  server: {
-    headers: enableCoep
-      ? {
-          'Cross-Origin-Embedder-Policy': 'require-corp',
-          'Cross-Origin-Opener-Policy': 'same-origin',
-        }
-      : {},
-  },
+  server: { headers: coepHeaders },
+  preview: { headers: coepHeaders },
   // Vitest config
   test: {
     globals: true,
