@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "license": "CC0. Curated didactic positions + text. Compatible with the Lichess puzzle DB (CC0).",
+  "cards": [
+    {
+      "motif": "mate",
+      "title": "Checkmate (incl. back-rank)",
+      "idea": "Attack the enemy king so it has no legal move. A king trapped on its back rank by its own pawns is the classic pattern.",
+      "examples": [
+        { "fen": "6k1/5ppp/8/8/8/8/5PPP/4R1K1 w - - 0 1", "keyMove": "e1e8", "why": "Back-rank mate: the king is boxed in by its own pawns; Re8# along the open file ends it." },
+        { "fen": "6k1/5ppp/8/8/8/8/5PPP/3Q2K1 w - - 0 1", "keyMove": "d1d8", "why": "Same idea with the queen: Qd8# delivers mate on the undefended back rank." },
+        { "fen": "6k1/R7/1R6/8/8/8/8/6K1 w - - 0 1", "keyMove": "b6b8", "why": "Ladder mate: Rb8# while the rook on a7 covers the 7th rank — the king has no escape square." }
+      ]
+    },
+    {
+      "motif": "hangingPiece",
+      "title": "Hanging piece (free material)",
+      "idea": "An undefended enemy piece can simply be taken. Always scan for pieces your opponent left unprotected.",
+      "examples": [
+        { "fen": "6k1/5ppp/8/8/8/n7/5PPP/R3R1K1 w - - 0 1", "keyMove": "a1a3", "why": "The knight on a3 is undefended; Rxa3 wins a whole piece for nothing." },
+        { "fen": "6k1/5ppp/8/r7/8/8/5PPP/R5K1 w - - 0 1", "keyMove": "a1a5", "why": "The rook on a5 hangs; Rxa5 wins a full rook." }
+      ]
+    },
+    {
+      "motif": "fork",
+      "title": "Fork (double attack)",
+      "idea": "One piece attacks two targets at once; the opponent can save only one. Knights and pawns fork especially well.",
+      "examples": [
+        { "fen": "6kr/8/8/4N3/8/8/8/6K1 w - - 0 1", "keyMove": "e5f7", "why": "Knight fork: Nf7+ checks the king and attacks the rook on h8 — after the king moves, take the rook." },
+        { "fen": "3r2k1/8/8/4N3/8/8/5PPP/6K1 w - - 0 1", "keyMove": "e5f7", "why": "Same knight fork against king and rook: Nf7 hits g8 (check) and d8 at once." },
+        { "fen": "4k3/3r1n2/8/4P3/8/8/8/4K3 w - - 0 1", "keyMove": "e5e6", "why": "Pawn fork: e6 attacks the rook on d7 and the knight on f7 simultaneously — one of them falls." }
+      ]
+    },
+    {
+      "motif": "pin",
+      "title": "Pin (absolute & relative)",
+      "idea": "A piece can't (or shouldn't) move because a more valuable piece — or the king — sits behind it on the same line.",
+      "examples": [
+        { "fen": "4k3/8/2n5/8/8/8/8/5BK1 w - - 0 1", "keyMove": "f1b5", "why": "Absolute pin: Bb5 pins the knight on c6 to the king on e8 — the knight is frozen." },
+        { "fen": "4k3/8/8/4n3/8/8/8/R5K1 w - - 0 1", "keyMove": "a1e1", "why": "Absolute pin on the file: Re1 pins the knight on e5 to the king on e8." },
+        { "fen": "4r1k1/8/8/3n4/8/8/8/5BK1 w - - 0 1", "keyMove": "f1c4", "why": "Relative pin: Bc4 pins the knight on d5 — moving it would lose material along the diagonal." }
+      ]
+    },
+    {
+      "motif": "skewer",
+      "title": "Skewer (the reverse pin)",
+      "idea": "Attack a valuable piece on a line; when it steps aside, capture the less valuable piece behind it. The king is often the front piece.",
+      "examples": [
+        { "fen": "4q3/8/8/8/4k3/8/8/R5K1 w - - 0 1", "keyMove": "a1e1", "why": "Re1+ skewers the king on e4 to the queen on e8 — the king must move, then Rxe8 wins the queen." },
+        { "fen": "8/8/8/q3k3/8/8/8/6KR w - - 0 1", "keyMove": "h1h5", "why": "Rh5+ skewers the king on e5 to the queen on a5 along the rank; the king steps off and Rxa5 wins the queen." }
+      ]
+    },
+    {
+      "motif": "discoveredAttack",
+      "title": "Discovered attack (incl. discovered check)",
+      "idea": "Move one piece to unveil an attack from the piece behind it. When the unveiled attack is a check, the moving piece can grab material with tempo.",
+      "examples": [
+        { "fen": "6k1/8/8/8/6N1/8/8/6RK w - - 0 1", "keyMove": "g4e5", "why": "Ne5 steps off the g-file and discovers check from the rook on g1 — a discovered check, and the knight lands actively." },
+        { "fen": "7k/8/8/4N3/8/8/8/B5K1 w - - 0 1", "keyMove": "e5c4", "why": "Nc4 unveils the bishop on a1, giving check along the long diagonal to the king on h8 while the knight escapes with tempo." }
+      ]
+    },
+    {
+      "motif": "doubleCheck",
+      "title": "Double check",
+      "idea": "Two pieces give check at once — one moving, one discovered. The king MUST move; nothing can block or capture both checkers.",
+      "examples": [
+        { "fen": "6k1/8/8/8/6N1/8/8/6RK w - - 0 1", "keyMove": "g4f6", "why": "Nf6+ checks the king on g8 and simultaneously discovers the rook on g1 — double check, so the king is forced to move." },
+        { "fen": "7k/8/8/4N3/8/8/8/B5K1 w - - 0 1", "keyMove": "e5g6", "why": "Ng6+ checks the king on h8 and discovers the bishop on a1 along the diagonal — double check; only a king move is legal." }
+      ]
+    }
+  ]
+}
