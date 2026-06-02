@@ -2,8 +2,9 @@
 
 A client-side chess app whose **only** job is to make you stronger per hour of practice.
 
-Not a Chess.com clone: no online matchmaking, no social ranking, no variant catalogue. Just one
-closed improvement loop, fully integrated:
+Not a Chess.com clone: no online matchmaking, no social ranking, no variant *catalogue* — with one
+on-doctrine exception, **Chess960**, which trains understanding over memorisation (ADR-0041).
+(Matchmaking and social ranking remain out.) Just one closed improvement loop, fully integrated:
 
 ```
    play (slow games)
@@ -50,6 +51,9 @@ Everything runs in the browser. Nothing leaves your device by default.
   result no longer moves your classical number. The headline rating shown elsewhere is your classical pool;
   the practice drills (Comeback/Sparring) remain untimed = classical.
 - **Coached mode** — optional engine check that warns before an obvious blunder while you play.
+- **Chess960 (Wild)** — play a random Fischer-random position or a specific SP-ID (0–959) against
+  the adaptive bot. Castle by dragging the king onto its own rook. v1 is untimed and not yet
+  auto-analysed (the standard analysis pipeline assumes opening theory; see ADR-0041).
 - **One-click review** — after a game, *Analyse this game* runs the full local analysis (puzzles +
   weakness dashboard) with no PGN to copy or paste.
 

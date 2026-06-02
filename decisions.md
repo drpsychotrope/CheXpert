@@ -592,3 +592,62 @@ Cross-links: ADR-0007 (high-confidence motifs only), ADR-0020 (geometric motifs 
 ADR-0015 (no LLM), ADR-0017 (legal-content-in-tests), ADR-0029 (`buildLapseSet`/lapse logic).
 Deferred (§11): personalised cards from the user's own failed puzzles; an interactive "now you try"
 mini-puzzle; positional-motif cards (ADR-0031); spaced review of cards; localisation.
+
+## ADR-0041 — Chess960 ("wild" mode): castling shim + own rating pool; README override
+**Date:** 2026-06-02 · **Status:** accepted
+
+Adds **one** variant, Chess960, vs the adaptive bot, untimed and not auto-analysed in v1.
+
+**README override.** Reverses the "no variant catalogue" non-goal — narrowly. Chess960 is
+anti-memorisation (no opening theory → trains understanding), so it is *on-doctrine*, not a step
+toward a Chess.com-style variant menu. The matchmaking and social-ranking non-goals stand. README
+line 5 amended.
+
+**chess.js finding (drives the design, re-verified 2026-06-02).** chess.js 1.4.0 loads a scrambled
+960 start but generates **zero** castling moves, echoes `KQkq` verbatim even when both rooks sit on
+one side of the king, and **rejects** Shredder/X-FEN file-letter rights (`Invalid FEN: castling
+availability is invalid`). So a local **castling shim** in/around `ChessGame` is the **sole** source
+of castling rights and the sole path that generates/validates/applies a 960 castle; chess.js stays
+the rules authority for every non-castling move. (AP-960-1, AP-960-11.)
+
+chess.js's castling field is **neutralized to `'-'` in 960 mode** (constructor/load/reload) to stop
+chess.js generating phantom standard castles — a CRITICAL bug found and fixed in review. This makes
+the shim the unambiguous sole source of 960 castling rights.
+
+**Shim design.** Detect king-onto-own-rook intent (Q-B=a — the only unambiguous encoding); validate
+generalised legality (king not in/through check; king-path ∪ rook-path empty except the two castling
+pieces; right live; fixed 960 targets king g/c, rook f/d); apply king+rook relocation manually; track
+960 rights by rook file as the sole truth; `fenForEngine()` emits X-FEN (collapses to `KQkq` for the
+outermost-rook case) / Shredder file-letters for the engine; route the engine's king-to-rook castle
+UCI (`e1h1`) back through the shim (AP-960-5).
+
+**Engine integration.** `AdaptiveOpponent` sets `UCI_Chess960` per game via `applyStrength` (interrupt
+= respawn drops options, so it is re-applied on every respawn). `EngineClient.resetVariant()` resets
+`UCI_Chess960` to `false` for every standard engine consumer — Endgames, AnalysisBoard, Import,
+Onboarding, analyzePlayed — so 960 never leaks into standard analysis. This was a CRITICAL leak
+found and fixed in review.
+
+**G-gate result (Q-E) — PASSED.** Verified in-browser on BOTH vendored builds: lite single-thread
+`stockfish.js` AND multi-thread `stockfish-mt.js` honor `UCI_Chess960`. Each: parsed a
+king-on-f-file + `KQkq` position (legal only in 960), returned legal moves, evaluated post-castle
+positions, and returned `f1h1` (king-onto-h-rook = 960 O-O) as best move in a natural castling
+position.
+
+**Rating.** `chess960` is its own pool, orthogonal to time category (Lichess model). Standard pools
+untouched by 960 games and vice-versa (AP-960-7). Pool seeded lazily on the first 960 game. Source:
+`RatingPool` union owned by `time-controls`; if 960 shipped first, §4.6 fallback defines the union +
+idempotent `PlayerModel` load-path reshape with **no `DB_VERSION` bump** (DB stays v4 — AP-960-8;
+`time-controls` later no-ops it). `GameRecord.variant` and `GameRecord.startFen` are additive fields.
+
+**v1 limitations.** Untimed-only (Q-C); **no auto-analysis** — the pipeline assumes standard rules
+and opening theory, so a 960 game would mislead (AP-960-6, Q-D). The "Analyse this game" button is
+disabled for 960 games with an honest note. Both lift in §11.
+
+**Arbitrages.** Q-A both (random default + SP-ID 0–959); Q-B drag king onto own rook; Q-C
+untimed-only; Q-D defer analysis (disabled for 960); Q-E both-build in-browser G-gate — PASSED;
+Q-F `time-controls` owns the union, fallback if 960 ships first. Anti-patterns AP-960-1…11.
+
+**§11 follow-ups (recorded).** Add a 960 guard to `ChessGame.loadPgn` (latent — unreachable today,
+becomes relevant if 960 games are ever analyzed/imported); a unit test pinning `resetVariant`/
+`UCI_Chess960`; a clarifying comment on `coachCheck`'s engine-variant ownership; the
+currently-unreachable Shredder branch in `fenForEngine`; timed 960; 960 auto-analysis.
