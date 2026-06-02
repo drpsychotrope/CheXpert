@@ -26,6 +26,7 @@ export type View =
   | 'calculate'
   | 'sparring'
   | 'analysis-board'
+  | 'concepts'
   | 'when-to-think'
   | 'session'
   | 'settings';
@@ -41,6 +42,8 @@ class AppState {
   tacticsTimed = $state(false);
   /** Optional start position for the interactive analysis board. */
   analysisFen = $state<string | null>(null);
+  /** Optional motif to focus the Concepts library on (set by a "Learn the pattern" link). */
+  conceptFocusMotif = $state<string | null>(null);
   /** Active deliberate-practice session (in-memory, survives view swaps; NOT persisted). */
   activeSession = $state<{ plan: SessionPlan; current: number; startedAt: number; reflection: string } | null>(null);
 

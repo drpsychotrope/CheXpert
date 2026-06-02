@@ -21,6 +21,7 @@
   import Calculate from './Calculate.svelte';
   import AnalysisBoard from './AnalysisBoard.svelte';
   import Sparring from './Sparring.svelte';
+  import Concepts from './Concepts.svelte';
   import Session from './Session.svelte';
 
   let booted = $state(false);
@@ -53,6 +54,7 @@
     <button onclick={() => app.go('explorer')}>Explorer</button>
     <button onclick={() => app.go('guess')}>Guess</button>
     <button onclick={() => app.go('vision')}>Vision</button>
+    <button onclick={() => app.go('concepts')}>Concepts</button>
     <button onclick={() => app.go('calculate')}>Calculate</button>
     <button onclick={() => app.go('settings')}>Settings</button>
   {/if}
@@ -95,6 +97,8 @@
     <Calculate />
   {:else if app.view === 'sparring'}
     <Sparring />
+  {:else if app.view === 'concepts'}
+    <Concepts />
   {:else if app.view === 'session'}
     <Session />
   {:else if app.view === 'analysis-board'}
