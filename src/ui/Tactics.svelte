@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
+  import ConceptCard from './ConceptCard.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { TacticalTrainer, gradeAttempt } from '../trainer/TacticalTrainer';
   import type { Puzzle } from '../trainer/puzzle';
@@ -9,6 +10,8 @@
   import { reviewItem } from '../srs/SrsStore';
   import { resultToGrade } from '../srs/fsrs';
   import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
+  import { cardForThemes, loadConcepts, type ConceptCard as ConceptCardData } from '../concepts/concepts';
+  import { failCountByPuzzle, isLeech } from '../srs/schedule';
 
   let trainer = $state<TacticalTrainer | null>(null);
   let puzzle = $state<Puzzle | null>(null);
@@ -26,6 +29,17 @@
   let mode = $state<'mixed' | 'personal' | 'themed'>('mixed');
   const seen = new Set<string>();
 
+  // Concept cards (teach-before-test, ADR-0040). Loaded once; [] if the asset is missing
+  // (graceful — the link just won't appear). Non-blocking: never gates the next puzzle.
+  let cards = $state<ConceptCardData[]>([]);
+  let card = $state<ConceptCardData | null>(null);
+  let leech = $state(false);
+  const LEECH_THRESHOLD = 3; // Q-B
+
+  loadConcepts().then((c) => {
+    cards = c;
+  });
+
   // Timed mode (the time-management drill): a per-puzzle clock; running out = a miss.
   const PUZZLE_SECONDS = 30;
   let timeLeft = $state(0);
@@ -42,6 +56,28 @@
   // Theme filter handed over by the dashboard's "Drill" buttons (loop closure).
   const drillThemes = $derived(app.tacticsFilterThemes);
   const timed = $derived(app.tacticsTimed === true);
+
+  // First-exposure: this motif's card has NOT been offered before. Keyed off the
+  // RESOLVED card motif (card.motif), not raw themes (Q-A / spec §2.3). Independent of leech.
+  const firstExposure = $derived(!!card && !(model?.conceptSeen ?? []).includes(card.motif));
+  // Show the "Learn the pattern" link on EITHER trigger (both non-blocking).
+  const showLearn = $derived(!!card && (firstExposure || leech));
+
+  /** Mark this motif's card as offered at first-exposure (one-shot per motif; persisted). */
+  async function markConceptOffered(): Promise<void> {
+    if (!model || !card) return;
+    const seenList = model.conceptSeen ?? [];
+    if (seenList.includes(card.motif)) return;
+    model.conceptSeen = [...seenList, card.motif];
+    await app.persistModel(Date.now());
+  }
+
+  let showCard = $state(false);
+
+  async function openLearn(): Promise<void> {
+    showCard = true;
+    await markConceptOffered(); // records first-exposure the moment the card is opened
+  }
 
   function stopTimer() {
     if (timer) {
@@ -78,6 +114,7 @@
     confidence = undefined;
     selfTag = undefined;
     lastAttemptId = undefined;
+    showCard = false;
 
     // Selection priority closes the loop: a dashboard drill filter wins; else
     // prefer the player's own personal puzzles (from their real mistakes); else
@@ -110,6 +147,10 @@
     // Orient the board to the solver's side, fixed for the whole puzzle.
     orientation = display.turn === 'w' ? 'white' : 'black';
     startTimer();
+    // Resolve the teaching card for this puzzle's motif (null → no link shown).
+    card = cardForThemes(p.themes, cards);
+    // Leech = this puzzle has already been failed >= N times (PRIOR attempts only).
+    void refreshLeech(p.id);
   }
 
   function clearDrill() {
@@ -119,6 +160,19 @@
     seen.clear();
     trainer = null;
     loadNext();
+  }
+
+  /** Recompute the leech flag for `puzzleId` from stored attempts (prior failures only). */
+  async function refreshLeech(puzzleId: string): Promise<void> {
+    leech = false;
+    try {
+      const db = await openTrainerDB();
+      const prior = await db.getAllFromIndex('puzzleAttempts', 'puzzleId', puzzleId);
+      const fails = failCountByPuzzle(prior).get(puzzleId) ?? 0;
+      leech = isLeech(fails, LEECH_THRESHOLD);
+    } catch {
+      leech = false; // never block the loop on a count failure
+    }
   }
 
   function sideToMove(): 'white' | 'black' {
@@ -295,6 +349,18 @@
   </div>
 
   <p class="feedback {feedbackKind}">{feedback}</p>
+
+  {#if showLearn && card}
+    <p class="feedback">
+      {#if leech}This one keeps beating you.{/if}
+      <button class="link" onclick={openLearn}>Learn the pattern →</button>
+      <button class="link" onclick={() => { app.conceptFocusMotif = card!.motif; app.go('concepts'); }}>open in library</button>
+    </p>
+  {/if}
+
+  {#if showCard && card}
+    <ConceptCard {card} onClose={() => (showCard = false)} />
+  {/if}
 
   {#if metacog && trainer?.state.status === 'failed'}
     <div class="col center metacog" role="group" aria-label="Why did you miss?">
