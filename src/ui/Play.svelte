@@ -2,9 +2,19 @@
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
   import { ChessGame } from '../game/ChessGame';
-  import { AdaptiveOpponent, initOpponentState, type GameOutcome } from '../engine/AdaptiveOpponent';
+  import { AdaptiveOpponent, initOpponentState, recordGame, type GameOutcome } from '../engine/AdaptiveOpponent';
   import { updateRating } from '../rating/glicko2';
   import { openTrainerDB, type GameRecord } from '../store/db';
+  import { poolRating, poolOpponent } from '../store/playerModel';
+  import type { RatingPool } from '../rating/pools';
+  import {
+    initClock, startClock, stopClock, tick, press, flagged,
+    type ClockState, type Side,
+  } from '../clock/Clock';
+  import {
+    categoryFor, fmtClock, insufficientMatingMaterial, TIME_CONTROL_PRESETS,
+    type Category, type TimeControlPreset,
+  } from '../clock/categories';
   import { loadAllAnalyses, runAnalysis } from '../analysis/runAnalysis';
   import { buildWeaknessProfile, type Dimension } from '../analysis/weakness';
   import { selectOpening, nextBookMove, steeringNote, type OpeningEntry } from '../opening/openingBook';
@@ -22,6 +32,34 @@
   let opponent: AdaptiveOpponent | null = null;
   const playerColor: 'white' | 'black' = 'white';
 
+  // Clock-aware bot move budget bounds per category (ms) — [floor, ceil] (spec §4.3, Q-D).
+  const BUDGET_BOUNDS: Record<Category, [number, number]> = {
+    bullet: [40, 250], blitz: [80, 500], rapid: [150, 1200], classical: [200, 2000],
+  };
+
+  // Time-control state. `clock` is null for the untimed ("No clock") path = today's behavior.
+  let selectedTC = $state<TimeControlPreset>(TIME_CONTROL_PRESETS.find((p) => p.id === 'rapid-10-0')!);
+  let clock = $state<ClockState | null>(null);
+  let customInitialSec = $state(300);
+  let customIncrementSec = $state(0);
+  let rafId: number | null = null;
+  let lastTs = 0;
+
+  // The bot plays Black here; the player is White.
+  const botSide: Side = playerColor === 'white' ? 'b' : 'w';
+  const playerSideClock: Side = playerColor === 'white' ? 'w' : 'b';
+
+  function initialSecOf(p: TimeControlPreset): number {
+    return p.id === 'custom' ? customInitialSec : p.initialSec;
+  }
+  function incrementSecOf(p: TimeControlPreset): number {
+    return p.id === 'custom' ? customIncrementSec : p.incrementSec;
+  }
+
+  const selectedPool = $derived<RatingPool>(
+    selectedTC.untimed ? 'classical' : categoryFor(initialSecOf(selectedTC), incrementSecOf(selectedTC)),
+  );
+
   // One-click post-game analysis (ADR-0022): no PGN paste needed.
   let lastGame = $state<{ id: string; pgn: string } | null>(null);
   let aStatus = $state<'idle' | 'analyzing' | 'done'>('idle');
@@ -37,6 +75,23 @@
   const model = $derived(app.model);
   const coached = $derived(app.settings?.coachedMode ?? false);
   const opponentStyle = $derived(app.settings?.opponentStyle ?? 'human');
+  const live = $derived(status === 'playing' || status === 'thinking');
+
+  // Restore the last-used time control on mount (spec §4.5).
+  $effect(() => {
+    const last = app.settings?.lastTimeControl;
+    if (!last) return;
+    const match = TIME_CONTROL_PRESETS.find(
+      (p) => !p.untimed && p.id !== 'custom' && p.initialSec === last.initialSec && p.incrementSec === last.incrementSec,
+    );
+    if (match) {
+      selectedTC = match;
+    } else {
+      selectedTC = TIME_CONTROL_PRESETS.find((p) => p.id === 'custom')!;
+      customInitialSec = last.initialSec;
+      customIncrementSec = last.incrementSec;
+    }
+  });
 
   async function setOpponentStyle(s: 'human' | 'engine') {
     if (app.settings) {
@@ -61,23 +116,101 @@
     let weakest: Dimension | null = null;
     try {
       const analyses = await loadAllAnalyses();
-      if (analyses.length) weakest = buildWeaknessProfile(analyses, model.gameRating.rating).weakest;
+      if (analyses.length) weakest = buildWeaknessProfile(analyses, poolRating(model, selectedPool).rating).weakest;
     } catch {
       /* no analyses yet → neutral variety */
     }
     opening = selectOpening('b', weakest, Math.random());
     steerNote = steeringNote(opening, weakest);
 
-    const state = initOpponentState(model.opponentTargetElo);
+    // Seed the bot from the SELECTED pool's adaptive state (spec §4.4, AP-TC-3).
+    const state = initOpponentState(poolOpponent(model, selectedPool).targetElo);
     opponent = new AdaptiveOpponent(app.engine, state);
+
+    // Build the clock for timed controls; "No clock" keeps clock = null (today's path verbatim).
+    if (selectedTC.untimed) {
+      clock = null;
+    } else {
+      clock = startClock(initClock(initialSecOf(selectedTC) * 1000, incrementSecOf(selectedTC) * 1000, 'w'));
+    }
+
+    // Persist the chosen time control for next time (skip for untimed).
+    if (!selectedTC.untimed && app.settings) {
+      app.settings.lastTimeControl = { initialSec: initialSecOf(selectedTC), incrementSec: incrementSecOf(selectedTC) };
+      await app.persistSettings();
+    }
+
     status = 'thinking';
     try {
       await opponent.applyStrength();
       status = 'playing';
+      startClockLoop();
     } catch (e) {
       result = 'Engine failed to start: ' + String(e);
       status = 'idle';
     }
+  }
+
+  // ---- Clock loop (the ONLY place time is read; Clock.ts stays Date-free, AP-TC-1) ----
+
+  /** Start the rAF tick loop. Runs while the game is live (playing OR thinking) so the
+   *  bot's clock keeps decrementing during its turn and the bot can flag (AP-TC-4). */
+  function startClockLoop() {
+    if (!clock || rafId !== null) return;
+    lastTs = performance.now();
+    const step = () => {
+      if (!clock || !live) {
+        rafId = null;
+        return;
+      }
+      const now = performance.now();
+      const elapsed = now - lastTs;
+      lastTs = now;
+      clock = tick(clock, elapsed);
+      const flag = flagged(clock);
+      if (flag) {
+        rafId = null;
+        clock = stopClock(clock);
+        void onFlag(flag);
+        return;
+      }
+      rafId = requestAnimationFrame(step);
+    };
+    rafId = requestAnimationFrame(step);
+  }
+
+  function stopClockLoop() {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+  }
+
+  /** Clock-aware bot movetime (spec §4.3, Q-D): scale with the bot's remaining time,
+   *  using a phase-aware moves-left estimate, clamped per category. */
+  function botMovetime(remainingMs: number, ply: number, cat: Category): number {
+    const movesLeft = Math.max(8, 40 - Math.floor(ply / 2));
+    const raw = remainingMs / movesLeft;
+    const [floor, ceil] = BUDGET_BOUNDS[cat];
+    return Math.round(Math.min(ceil, Math.max(floor, raw)));
+  }
+
+  /** A side flagged: game over. FIDE Art. 6.9 — if the OTHER side cannot mate, it's a draw
+   *  (Q-C); otherwise the side that flagged loses. */
+  async function onFlag(flaggedSide: Side) {
+    stopClockLoop();
+    status = 'over';
+    const winnerSide: Side = flaggedSide === 'w' ? 'b' : 'w';
+    let outcome: GameOutcome;
+    if (insufficientMatingMaterial(game.fen, winnerSide)) {
+      outcome = 'draw';
+      result = 'Flag — but insufficient mating material: draw (FIDE Art. 6.9).';
+    } else {
+      const playerFlagged = flaggedSide === playerSideClock;
+      outcome = playerFlagged ? 'loss' : 'win';
+      result = playerFlagged ? 'You flagged — out of time.' : 'Opponent flagged — you win on time! ♚';
+    }
+    await finishGame(outcome);
   }
 
   function turnColor(): 'white' | 'black' {
@@ -92,6 +225,7 @@
     playedUci.push(uci);
     fen = game.fen;
     lastMove = [from, to];
+    if (clock) clock = press(clock, playerSideClock);
 
     if (coached) await coachCheck();
 
@@ -108,12 +242,23 @@
       // otherwise the engine takes over at the calibrated ~55% Elo. Opponent style is
       // selectable: 'human' samples among the top moves (varied); 'engine' plays best.
       let uci = opening ? nextBookMove(opening, playedUci) : null;
-      if (!uci) uci = opponentStyle === 'engine' ? await opponent.pickMove(game.fen, 500) : await opponent.pickHumanMove(game.fen);
+      if (!uci) {
+        // Clock-aware budget from the BOT's own remaining time (AP-TC-4); untimed keeps the defaults.
+        const budget = clock
+          ? botMovetime(botSide === 'w' ? clock.whiteMs : clock.blackMs, game.history().length, selectedPool as Category)
+          : null;
+        if (opponentStyle === 'engine') {
+          uci = await opponent.pickMove(game.fen, budget ?? 500);
+        } else {
+          uci = budget != null ? await opponent.pickHumanMove(game.fen, budget) : await opponent.pickHumanMove(game.fen);
+        }
+      }
       if (uci) {
         game.moveUci(uci);
         playedUci.push(uci);
         fen = game.fen;
         lastMove = [uci.slice(0, 2), uci.slice(2, 4)];
+        if (clock) clock = press(clock, botSide);
       }
     } catch (e) {
       result = 'Engine error: ' + String(e);
@@ -150,6 +295,8 @@
     const t = game.terminal();
     if (!t.over) return false;
     status = 'over';
+    stopClockLoop();
+    if (clock) clock = stopClock(clock);
     let outcome: GameOutcome;
     if (t.reason === 'checkmate') {
       outcome = t.winner === playerColor[0] ? 'win' : 'loss';
@@ -166,15 +313,20 @@
     const m = model;
     const opp = opponent;
     if (!m || !opp) return;
+    const pool = selectedPool;
     const botElo = opp.state.targetElo;
-    // Adjust opponent strength toward the 55% band and persist.
-    const newState = await opp.finishGame(outcome).catch(() => opp.state);
-    m.opponentTargetElo = newState.targetElo;
-    m.recentOutcomes = newState.recent;
 
-    // Update the player's GAME rating via one Glicko match vs the bot Elo.
+    // Adjust the SELECTED pool's adaptive bot toward the 55% band (AP-TC-3) and re-apply
+    // strength. recordGame is pure; we mirror it into the per-pool state and persist.
+    const prevOpp = poolOpponent(m, pool);
+    const nextOpp = recordGame({ targetElo: prevOpp.targetElo, recent: prevOpp.recent }, outcome);
+    m.opponentByPool[pool] = nextOpp;
+    opp.state = nextOpp;
+    await opp.applyStrength().catch(() => {});
+
+    // Update the SELECTED pool's game rating via one Glicko match vs the bot Elo (AP-TC-3).
     const score = outcome === 'win' ? 1 : outcome === 'draw' ? 0.5 : 0;
-    m.gameRating = updateRating(m.gameRating, [{ opponentRating: botElo, opponentRd: 60, score }]);
+    m.gameRatings[pool] = updateRating(poolRating(m, pool), [{ opponentRating: botElo, opponentRd: 60, score }]);
 
     const now = Date.now();
     const db = await openTrainerDB();
@@ -185,6 +337,13 @@
       botElo,
       playedAt: now,
       coached,
+      timeControl: selectedTC.untimed
+        ? { initialSec: 0, incrementSec: 0, category: 'classical', untimed: true }
+        : {
+            initialSec: initialSecOf(selectedTC),
+            incrementSec: incrementSecOf(selectedTC),
+            category: categoryFor(initialSecOf(selectedTC), incrementSecOf(selectedTC)),
+          },
     };
     await db.put('games', rec);
     lastGame = { id: rec.id, pgn: rec.pgn };
@@ -236,6 +395,8 @@
   function resign() {
     if (status === 'playing' || status === 'thinking') {
       status = 'over';
+      stopClockLoop();
+      if (clock) clock = stopClock(clock);
       result = 'You resigned.';
       void finishGame('loss');
     }
@@ -246,18 +407,51 @@
   <h2>Play the adaptive bot</h2>
   {#if model}
     <p class="muted">
-      Your game rating {Math.round(model.gameRating.rating)} · bot ≈ {model.opponentTargetElo} Elo
+      Your {selectedPool} rating {Math.round(poolRating(model, selectedPool).rating)} · bot ≈ {poolOpponent(model, selectedPool).targetElo} Elo
       {#if coached}· <span style="color:var(--accent)">coached on</span>{/if}
     </p>
   {/if}
 
-  <label class="muted" style="font-size:0.85rem">
-    Opponent:
-    <select value={opponentStyle} onchange={(e) => setOpponentStyle(e.currentTarget.value === 'engine' ? 'engine' : 'human')}>
-      <option value="human">Human-like (varied moves)</option>
-      <option value="engine">Engine (best moves)</option>
-    </select>
-  </label>
+  <div class="row center" style="gap:1rem;flex-wrap:wrap">
+    <label class="muted" style="font-size:0.85rem">
+      Opponent:
+      <select value={opponentStyle} onchange={(e) => setOpponentStyle(e.currentTarget.value === 'engine' ? 'engine' : 'human')}>
+        <option value="human">Human-like (varied moves)</option>
+        <option value="engine">Engine (best moves)</option>
+      </select>
+    </label>
+
+    <label class="muted" style="font-size:0.85rem">
+      Time:
+      <select
+        value={selectedTC.id}
+        disabled={live}
+        onchange={(e) => { selectedTC = TIME_CONTROL_PRESETS.find((p) => p.id === e.currentTarget.value) ?? selectedTC; }}
+      >
+        {#each TIME_CONTROL_PRESETS as p (p.id)}
+          <option value={p.id}>{p.label}</option>
+        {/each}
+      </select>
+    </label>
+
+    {#if selectedTC.id === 'custom'}
+      <label class="muted" style="font-size:0.85rem">
+        min <input type="number" min="0" style="width:3.5rem" disabled={live}
+          oninput={(e) => { customInitialSec = Math.max(0, Number(e.currentTarget.value) * 60); }}
+          value={customInitialSec / 60} />
+      </label>
+      <label class="muted" style="font-size:0.85rem">
+        +sec <input type="number" min="0" style="width:3.5rem" bind:value={customIncrementSec} disabled={live} />
+      </label>
+    {/if}
+  </div>
+
+  {#if clock}
+    <div class="clocks">
+      <div class="clock {clock.side === botSide ? 'active' : ''}">{fmtClock(botSide === 'w' ? clock.whiteMs : clock.blackMs)}</div>
+      <div class="clock {clock.side === playerSideClock ? 'active' : ''}">{fmtClock(playerSideClock === 'w' ? clock.whiteMs : clock.blackMs)}</div>
+    </div>
+  {/if}
 
   <div class="board-wrap">
     <Board
@@ -317,4 +511,7 @@
   button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
   .bar { height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin-top: 0.5rem; }
   .bar-fill { height: 100%; background: var(--accent); transition: width 0.1s linear; }
+  .clocks { display: flex; flex-direction: column; gap: 0.3rem; align-items: center; margin: 0.4rem 0; }
+  .clock { font-variant-numeric: tabular-nums; font-size: 1.6rem; font-weight: 700; padding: 0.1rem 0.8rem; border-radius: 6px; background: var(--panel-2); color: var(--text); min-width: 5rem; text-align: center; }
+  .clock.active { background: var(--accent); color: #000; }
 </style>
