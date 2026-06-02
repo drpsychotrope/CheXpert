@@ -1,0 +1,12 @@
+{
+  "pr_name": "critical-moment-drill",
+  "date": "2026-06-02",
+  "skip_cycle_3": true,
+  "rule": "skip_cycle_3 = (cycle_2_critical_count == 0) AND (cycle_2_polish_count <= 8)",
+  "cycle_2_critical_count": 0,
+  "cycle_2_polish_count": 6,
+  "polish_cap": 8,
+  "decreasing_returns": "cycle_1 -> cycle_2 introduced 0 new critical findings",
+  "decision": "Cycle 3 skipped; spec promoted V0.2 -> V1. Residual items are user arbitrages (Q-A..Q-G), not spec defects.",
+  "spec": "specs/critical-moment-drill-spec.md"
+}
