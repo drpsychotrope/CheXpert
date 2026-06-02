@@ -8,12 +8,16 @@
   import { buildFingerprint, weaknessTrend, type Leak, type TrendPoint } from '../analysis/fingerprint';
   import { buildStudyPlan } from '../analysis/studyPlan';
   import { poolRating } from '../store/playerModel';
+  import { openTrainerDB } from '../store/db';
+  import { calibration, SELF_TAG_LABELS, type Calibration, type MetacogAttempt } from '../metacog/metacog';
 
   let loading = $state(true);
   let leaks = $state<Leak[]>([]);
   let trend = $state<TrendPoint[]>([]);
   let weakest = $state<Dimension | null>(null);
   let minutes = $state(30);
+  let cal = $state<Calibration | null>(null);
+  const metacog = $derived(app.settings?.metacogEnabled ?? false);
 
   const model = $derived(app.model);
   const plan = $derived(buildStudyPlan(leaks, weakest, minutes));
@@ -30,6 +34,9 @@
       trend = weaknessTrend(analyses, { window: 5 });
       weakest = buildWeaknessProfile(analyses, model ? poolRating(model, 'classical').rating : 1200).weakest;
     }
+    const db = await openTrainerDB();
+    const attempts = (await db.getAll('puzzleAttempts')) as MetacogAttempt[];
+    cal = calibration(attempts);
     loading = false;
   });
 
@@ -112,6 +119,39 @@
         {/each}
         <p class="muted" style="font-size:0.75rem">Score per window (higher = stronger). Directional, not a grade.</p>
       </div>
+    {/if}
+
+    {#if metacog && cal && cal.reportedAttempts > 0}
+      <h3>Calibration</h3>
+      {#if cal.readout}
+        <div class="panel col" style="gap:0.4rem">
+          <p>{cal.readout.sentence}</p>
+          <div class="col" style="gap:0.15rem">
+            {#each cal.byConfidence as r}
+              <div class="row" style="align-items:center;gap:0.6rem">
+                <span style="width:80px;font-size:0.82rem;text-transform:capitalize">{r.confidence}</span>
+                <span style="font-size:0.82rem">{r.n ? Math.round(r.accuracy * 100) + '%' : '—'}</span>
+                <span class="muted" style="font-size:0.78rem">({r.correct}/{r.n})</span>
+              </div>
+            {/each}
+          </div>
+          {#if cal.readout.topCause}
+            <p style="font-size:0.85rem">Most common self-diagnosed cause:
+              <b>{SELF_TAG_LABELS[cal.readout.topCause.tag]}</b> ({Math.round(cal.readout.topCause.pct * 100)}% of tagged misses).
+            </p>
+          {/if}
+          {#if cal.selfTags.length}
+            <div class="col" style="gap:0.1rem">
+              {#each cal.selfTags as t}
+                <span class="muted" style="font-size:0.8rem">{SELF_TAG_LABELS[t.tag]} — {t.n} ({Math.round(t.pct * 100)}%)</span>
+              {/each}
+            </div>
+          {/if}
+          <p class="muted" style="font-size:0.75rem">Descriptive, not a grade — this reflects how your confidence lines up with your results.</p>
+        </div>
+      {:else}
+        <p class="muted">Calibration needs a few more reported attempts ({cal.reportedAttempts}/10 so far).</p>
+      {/if}
     {/if}
   {/if}
 </section>
