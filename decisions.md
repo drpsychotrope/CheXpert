@@ -418,3 +418,32 @@ standard pools). The chess960 spec/ADR **consumes** this `RatingPool` union (add
 populates the `chess960` pool) — no migration conflict by construction. Deferred (§11): per-pool rating
 history + multi-rating Dashboard; delay/Bronstein increments; low-time warnings; timed onboarding/drills;
 PGN `TimeControl` header on export.
+
+## ADR-0037 — Metacognition: confidence + self-diagnosed error cause on puzzle attempts
+**Date:** 2026-06-02 · **Status:** accepted
+
+Captures two signals the engine cannot see — how *sure* the player felt before the reveal, and *why*
+they think they missed — as **optional, additive** fields on `PuzzleAttemptRecord`
+(`confidence?: 'sure'|'unsure'|'guess'`, `selfTag?: string`). Per the data-model contract these are
+additive only: **no `DB_VERSION` bump** (stays 4), no migration; legacy records simply lack the fields and
+`calibration()` treats `undefined` as "not reported". A new pure core `src/metacog/metacog.ts`
+(`calibration(attempts, opts?)`, default sample floor 10) returns a per-confidence accuracy table, a
+self-tag breakdown over a **fixed closed taxonomy** (`miscalculated | missed-opponent-resource | rushed |
+unfamiliar-pattern | wrong-plan | other`; unknown/legacy values bucket under `other`), and an honest
+readout — a fact-sentence ("when you said sure, you were right 78%") plus a *descriptive* verdict word
+(`well-calibrated | overconfident | underconfident | mixed`), **never a grade** (extends the
+say-only-what-you-can-prove / no-fake-grade doctrine, cf. ADR-0007/0009/0027). Metric = confidence×accuracy
+table, **not** Brier (Q-B; Brier deferred). The whole feature is **opt-in** via
+`SettingsRecord.metacogEnabled?` (**default off**, read `?? false`) so the chips never appear unless chosen
+and **never gate** the active-recall move flow; chips are skippable and confidence is captured live during
+`solving` (hindsight would destroy the signal). Chips ship in **Tactics** (attached to its existing
+`puzzleAttempts` write) and **Calculate** — which previously logged **no** attempt and now writes one
+minimal `puzzleAttempts` row per position (Q-C=a, a deliberate scoped side effect: calc attempts begin
+counting in history/calibration; calc's in-memory grading is unchanged and it is not a Glicko writer, so
+`ratingBefore === ratingAfter`). **Review chips deferred** (it has no attempt write of its own — adding one
+would double-count, AP-META-5). **Self-tags persist** via an in-place UPDATE of the just-written
+`puzzleAttempts` row by `id` (an `updateSelfTag` handler doing `db.get` then `db.put` with the same id —
+one row, no second insert, AP-META-5 preserved), so the Insights self-tag breakdown populates from real
+data. The readout surfaces in **Insights** (descriptive self-knowledge already lives there), gated on
+opt-in + the sample floor. Pure core unit-tested (no `Date.now`/`Math.random`);
+chips/persistence manually verified.

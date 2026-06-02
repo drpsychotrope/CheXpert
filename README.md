@@ -90,6 +90,7 @@ Everything runs in the browser. Nothing leaves your device by default.
 - **Calculation** — solve tactics with **no hints**: you must see the whole forcing line before you move.
 - **Woodpecker** — a *fixed* puzzle set, solved again and again, faster each cycle, to automaticity.
   Complements Review (which spreads an expanding pool over time).
+- **Metacognition (opt-in):** optional confidence (before the reveal) and error-cause self-report (after a miss) on puzzles, with a descriptive calibration readout in Insights — how your confidence lines up with your results. Descriptive, not a grade.
 - **Opening repertoire** — build lines (validated by chess.js), drill them under FSRS until they're
   automatic.
 - **Comeback drills** — replay the moments you fell behind in your own games against a bot at your
