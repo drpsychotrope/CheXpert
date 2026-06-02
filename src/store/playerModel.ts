@@ -63,6 +63,7 @@ export function migratePlayerModel(raw: Record<string, unknown>): PlayerModel {
     gameRatings,
     opponentByPool,
     weaknessCounters: r.weaknessCounters ?? {},
+    conceptSeen: r.conceptSeen ?? [],
     onboarded: r.onboarded ?? false,
     createdAt: r.createdAt ?? Date.now(),
     updatedAt: r.updatedAt ?? Date.now(),
