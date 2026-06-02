@@ -97,6 +97,7 @@ Everything runs in the browser. Nothing leaves your device by default.
   level, and practise holding the draw or turning them around (reached from the weakness dashboard).
 - **Scenario sparring** — play out a targeted position vs the adaptive bot: a curated imbalance
   (IQP, opposite-side castling, bishop pair, rook-up ending) or one of your own recurring leaks.
+- **When to think** — a recognition drill: call positions from your own games CRITICAL (invest time) or ROUTINE (play fast) and see the real win-probability swing that hung on the move. Recognition practice, not a graded method (no clock, no accuracy %).
 
 ### Endgames & vision
 - **Endgame trainer** — fundamental endgames (K+Q vs K, K+R vs K, K+P opposition, Lucena, Philidor)
