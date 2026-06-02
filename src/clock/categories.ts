@@ -1,6 +1,8 @@
 // Time-control categories + presets + clock formatting (spec §4.2, §4.6, Q-A).
 // Pure: no Date / Math.random inside.
 
+import type { Side } from './Clock';
+
 export type Category = 'bullet' | 'blitz' | 'rapid' | 'classical';
 
 /**
@@ -48,4 +50,59 @@ export function fmtClock(ms: number): string {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/**
+ * FIDE Art. 6.9 helper for the flag rule (Q-C): true if `side` has no possible
+ * mating material — bare king, or K + a single bishop/knight, or K + only
+ * same-colour bishops (no other pieces). Pure: derives solely from the FEN's
+ * piece-placement field. A flag against a side with insufficient mating
+ * material is a DRAW, not a loss. Conservative: for anything richer (a pawn,
+ * rook, queen, two knights, opposite-colour bishops) it returns false — only
+ * declare a draw when provably no mate (honesty doctrine, AP-TC-6).
+ */
+export function insufficientMatingMaterial(fen: string, side: Side): boolean {
+  const placement = fen.split(' ')[0];
+  let bishops = 0;
+  let knights = 0;
+  let bishopSquaresLight = false;
+  let bishopSquaresDark = false;
+  let file = 0; // 0-based file as we scan a rank left→right
+  let rank = 8; // FEN ranks run 8 down to 1, top row first
+
+  for (const ch of placement) {
+    if (ch === '/') {
+      rank -= 1;
+      file = 0;
+      continue;
+    }
+    if (ch >= '1' && ch <= '8') {
+      file += Number(ch);
+      continue;
+    }
+    const isWhitePiece = ch === ch.toUpperCase();
+    const mine = side === 'w' ? isWhitePiece : !isWhitePiece;
+    const type = ch.toLowerCase();
+    if (mine) {
+      if (type === 'q' || type === 'r' || type === 'p') return false; // mate possible
+      if (type === 'n') knights += 1;
+      if (type === 'b') {
+        bishops += 1;
+        // Square colour: (file + rank) parity. file is 0-based here, rank is 1..8.
+        const light = (file + rank) % 2 === 1;
+        if (light) bishopSquaresLight = true;
+        else bishopSquaresDark = true;
+      }
+    }
+    file += 1;
+  }
+
+  // Two or more knights → mate is not impossible (FIDE: only force-impossible is a draw,
+  // but Art. 6.9 draws on "cannot checkmate by ANY series of legal moves"; K+N+N CAN, so false).
+  if (knights >= 2) return false;
+  if (knights >= 1 && bishops >= 1) return false; // K+B+N can force mate
+  // Bishops: insufficient only if all on a single colour.
+  if (bishops >= 1 && bishopSquaresLight && bishopSquaresDark) return false;
+  // Remaining cases: bare K, K+1N, K+1B, K + only same-colour bishops → insufficient.
+  return true;
 }
