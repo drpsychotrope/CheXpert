@@ -18,6 +18,7 @@ export function freshPlayerModel(now: number): PlayerModel {
     gameRatings,
     opponentByPool,
     weaknessCounters: {},
+    conceptSeen: [],
     onboarded: false,
     createdAt: now,
     updatedAt: now,

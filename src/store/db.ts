@@ -53,6 +53,9 @@ export interface PlayerModel {
   opponentByPool: Partial<Record<RatingPool, { targetElo: number; recent: GameOutcome[] }>>;
   /** Nascent weakness counters keyed by theme — Phase 2 fleshes this out. */
   weaknessCounters: Record<string, number>;
+  /** Resolved motif keys whose concept card has already been offered at first-exposure
+   *  (ADR-0040). Additive; old records lack it and read `?? []`. NO DB_VERSION bump. */
+  conceptSeen?: string[];
   onboarded: boolean;
   createdAt: number;
   updatedAt: number;
