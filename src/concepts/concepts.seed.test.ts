@@ -1,14 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { Chess } from 'chess.js';
 import { CARD_PRECEDENCE, type ConceptCard } from './concepts';
 
 // Read the committed asset straight from disk — no fetch, no loadConcepts (no repo
 // test fetches a real public/** asset; PuzzleRepo.test.ts injects a fake fetchFn).
-// Use process.cwd() + path.resolve because jsdom resolves import.meta.url relative
-// paths against http://localhost (not file://) so new URL(..., import.meta.url)
+// Use require('fs'/'path') + process.cwd() because jsdom resolves import.meta.url
+// relative paths against http://localhost (not file://) so new URL(..., import.meta.url)
 // produces a non-file URL that readFileSync rejects.
+// node-compat.d.ts (src/test/) declares require/process for tsc without @types/node.
+const { readFileSync } = require('fs') as { readFileSync(p: string, enc: string): string };
+const { resolve } = require('path') as { resolve(...s: string[]): string };
 const raw = readFileSync(resolve(process.cwd(), 'public/concepts/concepts.json'), 'utf8');
 const data = JSON.parse(raw) as { version: number; cards: ConceptCard[] };
 const cards = data.cards;
