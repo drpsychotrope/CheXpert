@@ -70,7 +70,7 @@ Everything runs in the browser. Nothing leaves your device by default.
 - **Weakness dashboard** — a radar across five dimensions (tactics · opening accuracy · endgame
   conversion · time management · resilience), benchmarked against your level band. **Every** dimension
   is one-click drillable to the right training: tactics → Tactics, opening → Repertoire, endgame →
-  Endgames, time → timed Tactics, resilience → comeback drills.
+  Endgames, time → timed Tactics or the "when to think" drill, resilience → comeback drills.
 - **Insights** — your recurring **leaks** (mistakes clustered across all games, ranked by impact, with
   example positions), a deterministic **study plan** for a chosen daily time budget, and a **progress**
   trend per dimension over time. Recomputed locally from your analyses; no grade, just where to focus.
@@ -127,7 +127,7 @@ build is local-only with no backend in scope. See `decisions.md` ADR-0019.*
 |---|---|---|
 | Rules / move-gen / FEN / PGN | [chess.js](https://github.com/jhlywa/chess.js) 1.4.0 | BSD-2-Clause |
 | Board UI | [chessground](https://github.com/lichess-org/chessground) 9.2.1 | GPL-3.0 |
-| Engine (analysis + opponent) | [Stockfish.js](https://github.com/nmrugg/stockfish.js) 18 — lite single-thread WASM, in a Web Worker | GPL-3.0 |
+| Engine (analysis + opponent) | [Stockfish.js](https://github.com/nmrugg/stockfish.js) 18 — multi-thread WASM (lite single-thread fallback), in a Web Worker; `UCI_Chess960` for wild | GPL-3.0 / AGPL-3.0 (MT) |
 | Spaced repetition | [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs) 5 | MIT |
 | Storage | [idb](https://github.com/jakearchibald/idb) 8 (IndexedDB) | ISC |
 | Build / UI | [Svelte](https://svelte.dev) 5 + [Vite](https://vite.dev) 6 + TypeScript (strict) | MIT |
@@ -145,7 +145,7 @@ Requires **Node ≥ 18** (developed on 20.x).
 ```bash
 npm install      # also vendors the ~7 MB lite engine into public/stockfish (postinstall)
 npm run dev      # http://localhost:5173
-npm test         # Vitest — 135 tests
+npm test         # Vitest — 376 tests
 npm run check    # svelte-check (type check)
 npm run build    # type-check + production build
 ```
@@ -198,18 +198,23 @@ the app prefers over the seed set when present.
 ## Architecture
 
 Client-only PWA. The engine runs in a Web Worker (it never blocks the UI); everything else is plain
-TypeScript with a thin Svelte 5 layer on top. ~63 TS modules + 16 Svelte components, 23 test files.
+TypeScript with a thin Svelte 5 layer on top. ~62 TS modules + 28 Svelte components, 51 test files.
 
 ```
 src/
-  engine/        Stockfish Web Worker + promise-based UCI client; adaptive opponent
-  game/          chess.js wrapper (legal dests, promotion, terminal state, FEN/PGN)
-  rating/        Glicko-2 (player + puzzle ratings, kept separate)
+  engine/        Stockfish Web Worker + promise-based UCI client; adaptive opponent (per-pool Elo, UCI_Chess960)
+  game/          chess.js wrapper (legal dests, promotion, FEN/PGN) + Chess960 castling shim
+  clock/         pure Fischer chess-clock core + time-control categories (bullet…classical)
+  rating/        Glicko-2 + per-time-control rating pools (bullet/blitz/rapid/classical/chess960)
+  variant/       Chess960 start-position generator (SP-ID 0–959, rand injected)
   trainer/       puzzle model + repo (IndexedDB-seeded) + active-recall tactical trainer
   calibration/   launch-time skill evaluation (puzzle ladder + ACPL game)
   analysis/      PGN parse · batch analysis · win-prob gaffe classify · motif tag ·
-                 from-your-games generator · weakness radar · NL explanations
-  srs/           FSRS scheduling wrapper + due-queue store
+                 from-your-games generator · weakness radar · NL explanations ·
+                 critical-moment drill · efficacy readout · deliberate-practice session
+  metacog/       confidence + self-diagnosis calibration (pure, descriptive — not a grade)
+  concepts/      curated teach-before-test concept cards (loader + lookup, no LLM)
+  srs/           FSRS scheduling wrapper + due-queue store + leech detection
   repertoire/    opening line builder + FSRS-drilled lines
   endgame/       Syzygy client (consent-gated, cache-first) + drill catalogue
   opening/       opening book used to steer the opponent toward your weakness
@@ -229,6 +234,11 @@ All local. Migrations are additive — each schema bump only adds stores, never 
 - **v2** — `importedGames`, `gameAnalyses`
 - **v3** — `srsCards`, `repertoire`
 - **v4** — `woodpeckerSets`
+
+Recent features are **additive fields on existing v4 stores**, migrated in the load path with **no
+`DB_VERSION` bump** (schema stays v4, old data preserved): per-time-control + Chess960 rating pools and
+per-pool opponent state on `playerModel`; `confidence`/`selfTag` on `puzzleAttempts`;
+`timeControl`/`variant`/`startFen` on `games`; opt-in `metacogEnabled` and `conceptSeen`.
 
 The Syzygy tablebase cache lives in a separate IndexedDB (`chess-trainer-tbcache`) so each position
 is fetched at most once. Settings → *Delete all my data* wipes every store plus that cache.
@@ -284,7 +294,11 @@ every non-obvious choice):
 2. **The loop** — PGN import → analysis → personal puzzles → weakness dashboard.
 3. **Retention** — FSRS review, Syzygy endgames, opening repertoire.
 4. **Closing the loop** — weakness-steering opponent, NL explanations, Woodpecker, guess-the-move,
-   calculation/vision drills, and a guided practice-**session** runner that walks the study plan
-   end-to-end through the real trainers, ending in a reflection.
+   calculation/vision drills.
+5. **Guided improvement** (ADR-0036…0041) — time controls + per-time-control ratings; Chess960
+   ("wild"); opt-in metacognition (confidence + self-diagnosis calibration); the "when to think"
+   critical-moment drill; a descriptive efficacy readout + a guided practice-**session** runner that
+   walks the study plan end-to-end through the real trainers, ending in a reflection; and curated
+   teach-before-test concept cards.
 
-Status: **135 tests passing**, type-clean (`svelte-check` 0 errors), production build green.
+Status: **376 tests passing**, type-clean (`svelte-check` 0 errors), production build green.
