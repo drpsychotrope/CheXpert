@@ -50,18 +50,13 @@
   .concept-card header { justify-content: space-between; align-items: baseline; }
   .idea { color: var(--muted); margin: 0.25rem 0 0.75rem; }
   .examples { display: flex; flex-wrap: wrap; gap: 1rem; }
-  .example { margin: 0; width: var(--mini); }
-  /* A fixed-size, clipped wrapper so the scaled board reserves correct layout space
-     (no height:0 hacks, no dead rules). --scale shrinks the board; --mini is the
-     wrapper's footprint at that scale. */
-  .mini-board {
-    --scale: 0.62;
-    --mini: calc(min(82vw, 68vh, 540px) * var(--scale) + 18px * var(--scale));
-    width: var(--mini);
-    height: var(--mini);
-    overflow: hidden;
-  }
-  .mini-board :global(.board-frame) { transform: scale(var(--scale)); transform-origin: top left; }
+  .example { margin: 0; }
+  /* Shrink the board by sizing it directly via --board-size (read by Board's
+     .board-frame), NOT via `transform: scale()`. chessground places pieces with
+     pixel offsets derived from getBoundingClientRect(); a transformed ancestor
+     corrupts that measurement and the pieces drift off their squares. The board's
+     own multiple-of-8 flooring keeps the rank/file gutters aligned at this size. */
+  .mini-board { --board-size: min(51vw, 42vh, 336px); }
   .why { font-size: 0.85rem; color: var(--muted); margin-top: 0.4rem; }
   button.link { background: none; border: none; color: var(--accent); text-decoration: underline; cursor: pointer; }
 </style>
