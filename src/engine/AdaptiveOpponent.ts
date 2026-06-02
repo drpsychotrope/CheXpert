@@ -61,6 +61,8 @@ export class AdaptiveOpponent {
   constructor(
     private engine: EngineClient,
     public state: OpponentState,
+    /** Chess960 (ADR-0041): when true, set UCI_Chess960 on every (re)boot. */
+    private chess960 = false,
   ) {}
 
   /** Apply the current target Elo to the engine. Call after init / after changes. */
@@ -68,6 +70,9 @@ export class AdaptiveOpponent {
     await this.engine.init();
     this.engine.setOption('UCI_LimitStrength', true);
     this.engine.setOption('UCI_Elo', clampElo(this.state.targetElo));
+    // Re-applied here so a respawn (interrupt) doesn't silently drop it (AP-960-4).
+    // Setting false for standard games also overwrites any cached true from a prior 960 game.
+    this.engine.setOption('UCI_Chess960', this.chess960);
     await this.engine.isready();
   }
 

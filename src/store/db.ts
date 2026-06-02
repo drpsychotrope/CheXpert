@@ -27,6 +27,10 @@ export interface GameRecord {
   coached: boolean;
   /** Time control this game was played under (absent on legacy records = untimed classical). */
   timeControl?: { initialSec: number; incrementSec: number; category: Category; untimed?: boolean };
+  /** Chess960 (ADR-0041): default 'standard'. Additive — no DB_VERSION bump. */
+  variant?: 'standard' | 'chess960';
+  /** The 960 start FEN, for replay/audit. Present only when variant==='chess960'. */
+  startFen?: string;
 }
 
 export interface PuzzleAttemptRecord {

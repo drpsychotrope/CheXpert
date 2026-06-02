@@ -21,6 +21,7 @@
   import { selectOpening, nextBookMove, steeringNote, type OpeningEntry } from '../opening/openingBook';
   import AnalysisResult from './AnalysisResult.svelte';
   import type { GameAnalysis } from '../analysis/types';
+  import { chess960Position, chess960PositionById } from '../variant/chess960';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   let game = $state(new ChessGame());
@@ -32,6 +33,12 @@
   let steerNote = $state('');
   let opponent: AdaptiveOpponent | null = null;
   const playerColor: 'white' | 'black' = 'white';
+
+  // Chess960 state (ADR-0041)
+  let variant = $state<'standard' | 'chess960'>('standard');
+  let sp960Input = $state(''); // optional SP-ID string; blank = random
+  let startFen960 = $state<string | null>(null);
+  let castle960 = $state<import('../game/ChessGame').Chess960CastleFiles | null>(null);
 
   // Clock-aware bot move budget bounds per category (ms) — [floor, ceil] (spec §4.3, Q-D).
   const BUDGET_BOUNDS: Record<Category, [number, number]> = {
@@ -60,6 +67,8 @@
   const selectedPool = $derived<RatingPool>(
     selectedTC.untimed ? 'classical' : categoryFor(initialSecOf(selectedTC), incrementSecOf(selectedTC)),
   );
+  /** The pool used for rating display and updates: chess960 for 960, selectedPool for standard. */
+  const displayPool = $derived<RatingPool>(variant === 'chess960' ? 'chess960' : selectedPool);
 
   // One-click post-game analysis (ADR-0022): no PGN paste needed.
   let lastGame = $state<{ id: string; pgn: string } | null>(null);
@@ -108,42 +117,58 @@
     aResult = null;
     aStatus = 'idle';
     aPuzzles = 0;
-    game = new ChessGame();
-    fen = game.fen;
+    startFen960 = null;
+    castle960 = null;
     lastMove = null;
     playedUci = [];
 
-    // Read the weakness profile (from analysed games) and steer the opening.
-    let weakest: Dimension | null = null;
-    try {
-      const analyses = await loadAllAnalyses();
-      if (analyses.length) weakest = buildWeaknessProfile(analyses, poolRating(model, selectedPool).rating).weakest;
-    } catch {
-      /* no analyses yet → neutral variety */
+    if (variant === 'chess960') {
+      const id = sp960Input.trim() === '' ? null : Math.max(0, Math.min(959, Number(sp960Input) | 0));
+      const pos = id === null ? chess960Position(Math.random()) : chess960PositionById(id);
+      startFen960 = pos.startFen;
+      castle960 = pos.castle;
+      sp960Input = String(pos.id); // reflect the chosen id back to the field
+      game = new ChessGame(startFen960, { variant: 'chess960', castle: castle960 });
+      opening = null; // no opening book / steering for 960 (no theory)
+      steerNote = `Chess960 · SP-ID ${pos.id} · drag the king onto its own rook to castle`;
+    } else {
+      game = new ChessGame();
+      // Read the weakness profile (from analysed games) and steer the opening.
+      let weakest: Dimension | null = null;
+      try {
+        const analyses = await loadAllAnalyses();
+        if (analyses.length) weakest = buildWeaknessProfile(analyses, poolRating(model, selectedPool).rating).weakest;
+      } catch {
+        /* no analyses yet → neutral variety */
+      }
+      opening = selectOpening('b', weakest, Math.random());
+      steerNote = steeringNote(opening, weakest);
     }
-    opening = selectOpening('b', weakest, Math.random());
-    steerNote = steeringNote(opening, weakest);
 
-    // Seed the bot from the SELECTED pool's adaptive state (spec §4.4, AP-TC-3).
-    const state = initOpponentState(poolOpponent(model, selectedPool).targetElo);
-    opponent = new AdaptiveOpponent(app.engine, state);
+    fen = game.fen;
 
-    // Build the clock for timed controls; "No clock" keeps clock = null (today's path verbatim).
-    if (selectedTC.untimed) {
+    // Seed the bot from the active pool's adaptive state.
+    // 960 uses the chess960 pool (lazy seed from classical); standard uses selectedPool (AP-TC-3).
+    const activePool: RatingPool = variant === 'chess960' ? 'chess960' : selectedPool;
+    const state = initOpponentState(poolOpponent(model, activePool).targetElo);
+    opponent = new AdaptiveOpponent(app.engine, state, variant === 'chess960');
+
+    // Chess960 is always untimed (Q-C); standard respects the selected time control.
+    if (variant === 'chess960' || selectedTC.untimed) {
       clock = null;
     } else {
       clock = startClock(initClock(initialSecOf(selectedTC) * 1000, incrementSecOf(selectedTC) * 1000, 'w'));
     }
 
-    // Persist the chosen time control for next time (skip for untimed).
-    if (!selectedTC.untimed && app.settings) {
+    // Persist the chosen time control for next time (skip for untimed and 960).
+    if (variant !== 'chess960' && !selectedTC.untimed && app.settings) {
       app.settings.lastTimeControl = { initialSec: initialSecOf(selectedTC), incrementSec: incrementSecOf(selectedTC) };
       await app.persistSettings();
     }
 
     status = 'thinking';
     try {
-      await opponent.applyStrength();
+      await opponent.applyStrength(); // sets UCI_Chess960 = (variant==='chess960') on boot
       status = 'playing';
       startClockLoop();
     } catch (e) {
@@ -240,24 +265,25 @@
     status = 'thinking';
     thinking = true;
     try {
+      // In 960, feed the engine X-FEN/Shredder rights via fenForEngine(); standard uses game.fen.
+      const engineFen = variant === 'chess960' ? game.fenForEngine() : game.fen;
       // Loop closure: play the steering opening's book move if still on the line;
-      // otherwise the engine takes over at the calibrated ~55% Elo. Opponent style is
-      // selectable: 'human' samples among the top moves (varied); 'engine' plays best.
+      // opening is null in 960 (no theory), so the engine always picks its own move.
       let uci = opening ? nextBookMove(opening, playedUci) : null;
       if (!uci) {
-        // Clock-aware budget from the BOT's own remaining time (AP-TC-4); untimed keeps the defaults.
+        // Clock-aware budget from the BOT's own remaining time (AP-TC-4); untimed/960 keeps the defaults.
         const budget = clock
           ? botMovetime(botSide === 'w' ? clock.whiteMs : clock.blackMs, game.history().length, selectedPool as Category)
           : null;
         if (opponentStyle === 'engine') {
-          uci = await opponent.pickMove(game.fen, budget ?? 500);
+          uci = await opponent.pickMove(engineFen, budget ?? 500);
         } else {
-          uci = budget != null ? await opponent.pickHumanMove(game.fen, budget) : await opponent.pickHumanMove(game.fen);
+          uci = budget != null ? await opponent.pickHumanMove(engineFen, budget) : await opponent.pickHumanMove(engineFen);
         }
       }
       if ((status as string) === 'over') { thinking = false; return; }
       if (uci) {
-        game.moveUci(uci);
+        game.moveUci(uci); // shim routes a king-to-rook castle UCI (e.g. e1h1); chess.js handles the rest
         playedUci.push(uci);
         fen = game.fen;
         lastMove = [uci.slice(0, 2), uci.slice(2, 4)];
@@ -316,20 +342,31 @@
     const m = model;
     const opp = opponent;
     if (!m || !opp) return;
-    const pool = selectedPool;
     const botElo = opp.state.targetElo;
 
-    // Adjust the SELECTED pool's adaptive bot toward the 55% band (AP-TC-3) and re-apply
-    // strength. recordGame is pure; we mirror it into the per-pool state and persist.
-    const prevOpp = poolOpponent(m, pool);
-    const nextOpp = recordGame({ targetElo: prevOpp.targetElo, recent: prevOpp.recent }, outcome);
-    m.opponentByPool[pool] = nextOpp;
-    opp.state = nextOpp;
-    await opp.applyStrength().catch(() => {});
-
-    // Update the SELECTED pool's game rating via one Glicko match vs the bot Elo (AP-TC-3).
     const score = outcome === 'win' ? 1 : outcome === 'draw' ? 0.5 : 0;
-    m.gameRatings[pool] = updateRating(poolRating(m, pool), [{ opponentRating: botElo, opponentRd: 60, score }]);
+
+    if (variant === 'chess960') {
+      // Update the chess960 pool — seeded lazily on the first 960 game from classical (AP-960-7).
+      const prevOpp = poolOpponent(m, 'chess960');
+      const nextOpp = recordGame({ targetElo: prevOpp.targetElo, recent: prevOpp.recent }, outcome);
+      m.opponentByPool.chess960 = nextOpp;
+      opp.state = nextOpp;
+      await opp.applyStrength().catch(() => {});
+      // Seed chess960 rating lazily from classical if not yet present.
+      const seed = m.gameRatings.chess960 ?? m.gameRatings.classical ?? poolRating(m, 'classical');
+      m.gameRatings.chess960 = updateRating(seed, [{ opponentRating: botElo, opponentRd: 60, score }]);
+    } else {
+      // Standard path: adjust the SELECTED pool's adaptive bot toward the 55% band (AP-TC-3).
+      const pool = selectedPool;
+      const prevOpp = poolOpponent(m, pool);
+      const nextOpp = recordGame({ targetElo: prevOpp.targetElo, recent: prevOpp.recent }, outcome);
+      m.opponentByPool[pool] = nextOpp;
+      opp.state = nextOpp;
+      await opp.applyStrength().catch(() => {});
+      // Update the SELECTED pool's game rating via one Glicko match vs the bot Elo (AP-TC-3).
+      m.gameRatings[pool] = updateRating(poolRating(m, pool), [{ opponentRating: botElo, opponentRd: 60, score }]);
+    }
 
     const now = Date.now();
     const db = await openTrainerDB();
@@ -340,13 +377,17 @@
       botElo,
       playedAt: now,
       coached,
-      timeControl: selectedTC.untimed
-        ? { initialSec: 0, incrementSec: 0, category: 'classical', untimed: true }
+      ...(variant === 'chess960'
+        ? { variant: 'chess960', startFen: startFen960 ?? undefined }
         : {
-            initialSec: initialSecOf(selectedTC),
-            incrementSec: incrementSecOf(selectedTC),
-            category: categoryFor(initialSecOf(selectedTC), incrementSecOf(selectedTC)),
-          },
+            timeControl: selectedTC.untimed
+              ? { initialSec: 0, incrementSec: 0, category: 'classical', untimed: true }
+              : {
+                  initialSec: initialSecOf(selectedTC),
+                  incrementSec: incrementSecOf(selectedTC),
+                  category: categoryFor(initialSecOf(selectedTC), incrementSecOf(selectedTC)),
+                },
+          }),
     };
     await db.put('games', rec);
     lastGame = { id: rec.id, pgn: rec.pgn };
@@ -369,8 +410,10 @@
         return;
       }
       // The opponent left the engine at a limited Elo — restore full strength to analyse.
+      // Also reset UCI_Chess960 so analysis never runs in 960 mode (AP-960-4).
       await app.engine.init();
       app.engine.setOption('UCI_LimitStrength', false);
+      app.engine.setOption('UCI_Chess960', false);
       await app.engine.isready();
 
       const res = await runAnalysis(app.engine, app.puzzles, {
@@ -410,7 +453,7 @@
   <h2>Play the adaptive bot</h2>
   {#if model}
     <p class="muted">
-      Your {selectedPool} rating {Math.round(poolRating(model, selectedPool).rating)} · bot ≈ {poolOpponent(model, selectedPool).targetElo} Elo
+      Your {displayPool} rating {Math.round(poolRating(model, displayPool).rating)} · bot ≈ {poolOpponent(model, displayPool).targetElo} Elo
       {#if coached}· <span style="color:var(--accent)">coached on</span>{/if}
     </p>
   {/if}
@@ -425,27 +468,46 @@
     </label>
 
     <label class="muted" style="font-size:0.85rem">
-      Time:
-      <select
-        value={selectedTC.id}
-        disabled={live}
-        onchange={(e) => { selectedTC = TIME_CONTROL_PRESETS.find((p) => p.id === e.currentTarget.value) ?? selectedTC; }}
-      >
-        {#each TIME_CONTROL_PRESETS as p (p.id)}
-          <option value={p.id}>{p.label}</option>
-        {/each}
+      Mode:
+      <select value={variant} disabled={live}
+              onchange={(e) => (variant = e.currentTarget.value === 'chess960' ? 'chess960' : 'standard')}>
+        <option value="standard">Standard</option>
+        <option value="chess960">Chess960 (Wild)</option>
       </select>
     </label>
 
-    {#if selectedTC.id === 'custom'}
+    {#if variant === 'chess960'}
       <label class="muted" style="font-size:0.85rem">
-        min <input type="number" min="0" style="width:3.5rem" disabled={live}
-          oninput={(e) => { customInitialSec = Math.max(0, Number(e.currentTarget.value) * 60); }}
-          value={customInitialSec / 60} />
+        Start (blank = random 960):
+        <input type="number" min="0" max="959" placeholder="0–959" bind:value={sp960Input}
+               disabled={live} style="width:6rem" />
       </label>
+    {/if}
+
+    {#if variant !== 'chess960'}
       <label class="muted" style="font-size:0.85rem">
-        +sec <input type="number" min="0" style="width:3.5rem" bind:value={customIncrementSec} disabled={live} />
+        Time:
+        <select
+          value={selectedTC.id}
+          disabled={live}
+          onchange={(e) => { selectedTC = TIME_CONTROL_PRESETS.find((p) => p.id === e.currentTarget.value) ?? selectedTC; }}
+        >
+          {#each TIME_CONTROL_PRESETS as p (p.id)}
+            <option value={p.id}>{p.label}</option>
+          {/each}
+        </select>
       </label>
+
+      {#if selectedTC.id === 'custom'}
+        <label class="muted" style="font-size:0.85rem">
+          min <input type="number" min="0" style="width:3.5rem" disabled={live}
+            oninput={(e) => { customInitialSec = Math.max(0, Number(e.currentTarget.value) * 60); }}
+            value={customInitialSec / 60} />
+        </label>
+        <label class="muted" style="font-size:0.85rem">
+          +sec <input type="number" min="0" style="width:3.5rem" bind:value={customIncrementSec} disabled={live} />
+        </label>
+      {/if}
     {/if}
   </div>
 
@@ -483,12 +545,18 @@
     {:else}
       <button onclick={resign} style="background:var(--bad)">Resign</button>
     {/if}
-    {#if status === 'over' && lastGame}
+    {#if status === 'over' && lastGame && variant !== 'chess960'}
       <button class="ghost" onclick={analyzePlayed} disabled={aStatus === 'analyzing'}>
         {aStatus === 'analyzing' ? 'Analysing…' : aResult ? 'Re-analyse' : 'Analyse this game'}
       </button>
     {/if}
   </div>
+  {#if status === 'over' && variant === 'chess960'}
+    <p class="muted" style="font-size:0.8rem; max-width:440px">
+      Chess960 games aren't auto-analysed yet — the analysis pipeline assumes standard rules
+      and opening theory, so it would mislead. (Tracked for a future 960-aware analyser.)
+    </p>
+  {/if}
 
   {#if aStatus === 'analyzing'}
     <div class="panel" style="max-width:420px">
