@@ -1,0 +1,112 @@
+import { describe, it, expect } from 'vitest';
+import { Chess } from 'chess.js';
+import { ChessGame, type Chess960CastleFiles } from './ChessGame';
+import { chess960PositionById } from '../variant/chess960';
+
+function castleFor(kingFile: number, rookFiles: [number, number]): Chess960CastleFiles {
+  const rf = [...rookFiles].sort((a, b) => a - b) as [number, number];
+  return { whiteKingFile: kingFile, whiteRookFiles: rf, blackKingFile: kingFile, blackRookFiles: rf };
+}
+function game(fen: string, kingFile: number, rookFiles: [number, number]): ChessGame {
+  return new ChessGame(fen, { variant: 'chess960', castle: castleFor(kingFile, rookFiles) });
+}
+
+// Each row: a position where exactly ONE castle is just-legal. [label, fen, kingSq, rookSq,
+// kingFile, rookFiles, expectedSan, kingTarget, rookTarget]. All FENs pre-verified legal.
+const LEGAL: Array<[string, string, string, string, number, [number, number], string, string, string]> = [
+  // SP-518 standard: king e1, rooks a1/h1 — both sides legal on an open back rank.
+  ['518-short', '4k3/8/8/8/8/8/8/R3K2R w - - 0 1', 'e1', 'h1', 4, [0, 7], 'O-O', 'g1', 'f1'],
+  ['518-long',  '4k3/8/8/8/8/8/8/R3K2R w - - 0 1', 'e1', 'a1', 4, [0, 7], 'O-O-O', 'c1', 'd1'],
+  // SP-0 files (king g1, rooks f1+h1): king already sits on its SHORT target, the f1-rook
+  // blocks the short rook-target → only LONG is reachable (king g1→c1, rook f1→d1).
+  ['sp0-long',  '6k1/8/8/8/8/8/8/5RKR w - - 0 1', 'g1', 'f1', 6, [5, 7], 'O-O-O', 'c1', 'd1'],
+  // King b1, rooks a1+c1 (off-centre king): SHORT legal (king b1→g1, rook c1→f1; a-rook stays).
+  ['kingb-short', '6k1/8/8/8/8/8/8/RKR5 w - - 0 1', 'b1', 'c1', 1, [0, 2], 'O-O', 'g1', 'f1'],
+  // Black to move, standard files mirrored.
+  ['518b-short', 'r3k2r/8/8/8/8/8/8/4K3 b - - 0 1', 'e8', 'h8', 4, [0, 7], 'O-O', 'g8', 'f8'],
+];
+
+// Negatives: a king-to-rook attempt that MUST be refused. [label, fen, kingSq, rookSq, kingFile, rookFiles].
+const ILLEGAL: Array<[string, string, string, string, number, [number, number]]> = [
+  // King passes through g1 which a black rook on g8 attacks → no short castle.
+  ['thru-check', '4k1r1/8/8/8/8/8/8/R3K2R w - - 0 1', 'e1', 'h1', 4, [0, 7]],
+  // King currently in check (black rook e8 hits e1) → no castle.
+  ['in-check', '4r2k/8/8/8/8/8/8/R3K2R w - - 0 1', 'e1', 'h1', 4, [0, 7]],
+  // Knight on g1 blocks the king's short target → no short castle.
+  ['blocked', '4k3/8/8/8/8/8/8/R3K1NR w - - 0 1', 'e1', 'h1', 4, [0, 7]],
+];
+
+describe('Chess960 castling shim — legal castles', () => {
+  it.each(LEGAL)('%s generates the king-onto-rook dest', (_l, fen, kingSq, rookSq, kf, rfs) => {
+    const g = game(fen, kf, rfs);
+    expect(g.dests().get(kingSq) ?? []).toContain(rookSq);
+  });
+
+  it.each(LEGAL)('%s applies: SAN, king/rook on targets, turn flips', (_l, fen, kingSq, rookSq, kf, rfs, san, kT, rT) => {
+    const g = game(fen, kf, rfs);
+    const color = fen.split(' ')[1] as 'w' | 'b';
+    expect(g.move(kingSq, rookSq)).toBe(san);
+    const after = new Chess(g.fen);
+    expect(after.get(kT as never)).toEqual({ type: 'k', color });
+    expect(after.get(rT as never)).toEqual({ type: 'r', color });
+    expect(g.turn).toBe(color === 'w' ? 'b' : 'w');
+    expect(g.fen).toBeTruthy(); // resulting FEN re-loads (constructed via chess.js)
+  });
+
+  it.each(LEGAL)('%s accepts the equivalent king-to-rook UCI', (_l, fen, kingSq, rookSq, kf, rfs, san) => {
+    const g = game(fen, kf, rfs);
+    expect(g.moveUci(kingSq + rookSq)).toBe(san);
+  });
+});
+
+describe('Chess960 castling shim — illegal castles refused', () => {
+  it.each(ILLEGAL)('%s: no castle dest, move() null, UCI null, king unmoved', (_l, fen, kingSq, rookSq, kf, rfs) => {
+    const g = game(fen, kf, rfs);
+    expect(g.dests().get(kingSq) ?? []).not.toContain(rookSq);
+    expect(g.move(kingSq, rookSq)).toBeNull();
+    const g2 = game(fen, kf, rfs);
+    expect(g2.moveUci(kingSq + rookSq)).toBeNull();
+    expect(new Chess(g2.fen).get(kingSq as never)?.type).toBe('k'); // unmoved
+  });
+});
+
+describe('Chess960 castling shim — rights bookkeeping & FEN', () => {
+  it('king-side and queen-side rights are independent (spending short leaves nothing after a king move)', () => {
+    const g = game('4k3/8/8/8/8/8/8/R3K2R w - - 0 1', 4, [0, 7]);
+    expect(g.move('e1', 'h1')).toBe('O-O'); // spend short; king now on g1, both rights gone
+    g.move('e8', 'd8'); // black waits
+    expect(g.move('g1', 'a1')).toBeNull(); // long no longer available (king moved by castling)
+  });
+
+  it('a normal king move clears both that side rights', () => {
+    const g = game('4k3/8/8/8/8/8/8/R3K2R w - - 0 1', 4, [0, 7]);
+    g.move('e1', 'e2');
+    g.move('e8', 'e7');
+    g.move('e2', 'e1');
+    g.move('e7', 'e8');
+    expect(g.move('e1', 'h1')).toBeNull();
+    expect(g.move('e1', 'a1')).toBeNull();
+  });
+
+  it('a rook leaving its home file clears that side right only', () => {
+    const g = game('4k3/8/8/8/8/8/8/R3K2R w - - 0 1', 4, [0, 7]);
+    g.move('h1', 'g1'); // kingside rook moves off home
+    g.move('e8', 'd8');
+    expect(g.move('e1', 'h1')).toBeNull(); // rook no longer on h1 → no short
+    expect(g.move('e1', 'a1')).toBe('O-O-O'); // long still fine
+  });
+
+  it('SP-518 fenForEngine collapses to KQkq (outermost rooks)', () => {
+    const p = chess960PositionById(518);
+    const g = new ChessGame(p.startFen, { variant: 'chess960', castle: p.castle });
+    expect(g.fenForEngine().split(' ')[2]).toBe('KQkq');
+  });
+
+  it('an off-centre 960 start (king b1, rooks a1/c1) still yields a valid engine FEN castle field', () => {
+    const p = chess960PositionById(959); // rkrnnqbb: king b, rooks a/c — outermost rooks
+    const g = new ChessGame(p.startFen, { variant: 'chess960', castle: p.castle });
+    const field = g.fenForEngine().split(' ')[2];
+    // both rooks are the outermost on their side → X-FEN collapses to KQkq
+    expect(field).toBe('KQkq');
+  });
+});
