@@ -8,6 +8,7 @@
   import Board from './Board.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { AdaptiveOpponent, initOpponentState } from '../engine/AdaptiveOpponent';
+  import { poolOpponent } from '../store/playerModel';
   import { loadAllAnalyses } from '../analysis/runAnalysis';
   import { comebackPositions, type ComebackPosition } from '../analysis/comeback';
 
@@ -49,7 +50,8 @@
     fen = game.fen;
     lastMove = null;
     // Adaptive Elo (your ZPD), NOT full strength — the drill must be holdable.
-    opponent = new AdaptiveOpponent(app.engine, initOpponentState(model.opponentTargetElo));
+    // Comeback drills are untimed → classical pool (spec §4.4 / Q-F).
+    opponent = new AdaptiveOpponent(app.engine, initOpponentState(poolOpponent(model, 'classical').targetElo));
     status = 'thinking';
     try {
       await opponent.applyStrength();

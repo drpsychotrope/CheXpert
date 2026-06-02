@@ -7,6 +7,7 @@
   import { buildWeaknessProfile, type Dimension } from '../analysis/weakness';
   import { buildFingerprint, weaknessTrend, type Leak, type TrendPoint } from '../analysis/fingerprint';
   import { buildStudyPlan } from '../analysis/studyPlan';
+  import { poolRating } from '../store/playerModel';
 
   let loading = $state(true);
   let leaks = $state<Leak[]>([]);
@@ -27,7 +28,7 @@
     if (analyses.length) {
       leaks = buildFingerprint(analyses).leaks;
       trend = weaknessTrend(analyses, { window: 5 });
-      weakest = buildWeaknessProfile(analyses, model?.gameRating.rating ?? 1200).weakest;
+      weakest = buildWeaknessProfile(analyses, model ? poolRating(model, 'classical').rating : 1200).weakest;
     }
     loading = false;
   });

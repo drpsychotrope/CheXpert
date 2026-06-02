@@ -1,7 +1,9 @@
 <script lang="ts">
   import { app } from '../state/app.svelte';
+  import { poolRating } from '../store/playerModel';
 
   const model = $derived(app.model);
+  const classical = $derived(model ? poolRating(model, 'classical') : null);
 </script>
 
 <section class="home">
@@ -12,8 +14,8 @@
     <div class="ratings">
       <div class="rating-card">
         <span class="label">Game rating</span>
-        <span class="val">{Math.round(model.gameRating.rating)}</span>
-        <span class="rd">±{Math.round(model.gameRating.rd)}</span>
+        <span class="val">{classical ? Math.round(classical.rating) : '—'}</span>
+        <span class="rd">±{classical ? Math.round(classical.rd) : '—'}</span>
       </div>
       <div class="rating-card">
         <span class="label">Puzzle rating</span>

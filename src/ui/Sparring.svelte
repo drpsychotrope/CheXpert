@@ -6,6 +6,7 @@
   import Board from './Board.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { AdaptiveOpponent, initOpponentState } from '../engine/AdaptiveOpponent';
+  import { poolOpponent } from '../store/playerModel';
   import { loadAllAnalyses } from '../analysis/runAnalysis';
   import { IMBALANCE_LIBRARY, scenariosFromWeakness, type Scenario } from '../analysis/scenarios';
 
@@ -40,7 +41,8 @@
     game = new ChessGame(s.fen);
     fen = game.fen;
     lastMove = null;
-    opponent = new AdaptiveOpponent(app.engine, initOpponentState(model.opponentTargetElo));
+    // Sparring scenarios are untimed → classical pool (spec §4.4 / Q-F).
+    opponent = new AdaptiveOpponent(app.engine, initOpponentState(poolOpponent(model, 'classical').targetElo));
     status = 'thinking';
     try {
       await opponent.applyStrength();

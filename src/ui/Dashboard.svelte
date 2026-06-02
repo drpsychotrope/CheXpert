@@ -3,6 +3,7 @@
   import Radar from './Radar.svelte';
   import { loadAllAnalyses } from '../analysis/runAnalysis';
   import { buildWeaknessProfile, drillTarget, type WeaknessProfile, type Dimension } from '../analysis/weakness';
+  import { poolRating } from '../store/playerModel';
 
   let profile = $state<WeaknessProfile | null>(null);
   let loading = $state(true);
@@ -24,7 +25,7 @@
   async function load() {
     loading = true;
     const analyses = await loadAllAnalyses();
-    const rating = model ? model.gameRating.rating : 1200;
+    const rating = model ? poolRating(model, 'classical').rating : 1200;
     profile = analyses.length ? buildWeaknessProfile(analyses, rating) : null;
     loading = false;
   }
