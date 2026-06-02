@@ -79,7 +79,12 @@
             <span class="muted" style="font-size:0.85rem">{d.detail}</span>
             {#if d.sampleSize < 3}<span class="muted" style="font-size:0.75rem"> · low data</span>{/if}
           </div>
-          <button onclick={() => drill(d.dimension)}>{d.dimension === 'resilience' ? 'Defend' : 'Drill'}</button>
+          <div class="row" style="gap:0.4rem;align-items:center">
+            <button onclick={() => drill(d.dimension)}>{d.dimension === 'resilience' ? 'Defend' : 'Drill'}</button>
+            {#if d.dimension === 'timeManagement'}
+              <button class="link" onclick={() => app.go('when-to-think')}>Train when to think →</button>
+            {/if}
+          </div>
         </div>
       {/each}
     </div>
