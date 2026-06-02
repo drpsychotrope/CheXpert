@@ -8,6 +8,7 @@
   import { openTrainerDB } from '../store/db';
   import { reviewItem } from '../srs/SrsStore';
   import { resultToGrade } from '../srs/fsrs';
+  import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
 
   let trainer = $state<TacticalTrainer | null>(null);
   let puzzle = $state<Puzzle | null>(null);
@@ -30,6 +31,11 @@
   let timeLeft = $state(0);
   let locked = $state(false);
   let timer: ReturnType<typeof setInterval> | null = null;
+
+  // Metacognition (ADR-0037): opt-in, skippable, never gates the move flow.
+  let confidence = $state<Confidence | undefined>(undefined);
+  let selfTag = $state<SelfTag | undefined>(undefined);
+  const metacog = $derived(app.settings?.metacogEnabled ?? false);
 
   const model = $derived(app.model);
   // Theme filter handed over by the dashboard's "Drill" buttons (loop closure).
@@ -68,6 +74,8 @@
     if (!model) return;
     feedback = '';
     feedbackKind = '';
+    confidence = undefined;
+    selfTag = undefined;
 
     // Selection priority closes the loop: a dashboard drill filter wins; else
     // prefer the player's own personal puzzles (from their real mistakes); else
@@ -183,6 +191,9 @@
       ratingAfter: model.puzzleRating.rating,
       playedAt: now,
       source: p.source,
+      // metacognition: whichever were set (undefined drops cleanly on structured clone).
+      confidence,
+      selfTag: !solved ? selfTag : undefined,
     });
     // Persist the updated puzzle rating into the puzzle row too (it drifts down).
     await db.put('puzzles', { ...p, rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) });
@@ -216,6 +227,8 @@
     lastMove = null;
     feedback = 'Retry — find the move.';
     feedbackKind = '';
+    confidence = undefined;
+    selfTag = undefined;
     startTimer();
   }
 </script>
@@ -242,6 +255,15 @@
     </p>
   {/if}
 
+  {#if metacog && trainer?.state.status === 'solving'}
+    <div class="row center metacog" role="group" aria-label="How confident are you?">
+      <span class="muted metacog-label">Confidence:</span>
+      <button type="button" class="chip {confidence === 'sure' ? 'on' : ''}" onclick={() => (confidence = confidence === 'sure' ? undefined : 'sure')}>Sure</button>
+      <button type="button" class="chip {confidence === 'unsure' ? 'on' : ''}" onclick={() => (confidence = confidence === 'unsure' ? undefined : 'unsure')}>Unsure</button>
+      <button type="button" class="chip {confidence === 'guess' ? 'on' : ''}" onclick={() => (confidence = confidence === 'guess' ? undefined : 'guess')}>Guess</button>
+    </div>
+  {/if}
+
   <div class="board-wrap">
     <Board
       {fen}
@@ -256,6 +278,17 @@
   </div>
 
   <p class="feedback {feedbackKind}">{feedback}</p>
+
+  {#if metacog && trainer?.state.status === 'failed'}
+    <div class="col center metacog" role="group" aria-label="Why did you miss?">
+      <span class="muted metacog-label">Why did you miss? (optional)</span>
+      <div class="row center" style="flex-wrap:wrap">
+        {#each SELF_TAGS as tag}
+          <button type="button" class="chip {selfTag === tag ? 'on' : ''}" onclick={() => (selfTag = selfTag === tag ? undefined : tag)}>{SELF_TAG_LABELS[tag]}</button>
+        {/each}
+      </div>
+    </div>
+  {/if}
 
   <div class="row center">
     <button onclick={hint} disabled={trainer?.state.status !== 'solving' || locked}>Hint</button>
@@ -272,4 +305,8 @@
 
 <style>
   button.link { background: none; border: none; color: var(--accent); padding: 0 0 0 0.4rem; text-decoration: underline; cursor: pointer; }
+  .metacog { gap: 0.4rem; flex-wrap: wrap; margin: 0.3rem 0; }
+  .metacog-label { font-size: 0.82rem; align-self: center; }
+  .chip { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 0.15rem 0.7rem; font-size: 0.82rem; cursor: pointer; }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 </style>
