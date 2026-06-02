@@ -26,6 +26,7 @@
   let confidence = $state<Confidence | undefined>(undefined);
   let selfTag = $state<SelfTag | undefined>(undefined);
   let logged = $state(false); // guard: exactly one attempt per position (AP-META-5)
+  let lastAttemptId = $state<string | undefined>(undefined); // id of the most-recently written attempt row
   const metacog = $derived(app.settings?.metacogEnabled ?? false);
 
   function load() {
@@ -44,6 +45,7 @@
     confidence = undefined;
     selfTag = undefined;
     logged = false;
+    lastAttemptId = undefined;
     feedback = 'Calculate the whole line in your head, then play it. No hints.';
     feedbackKind = '';
   }
@@ -55,9 +57,10 @@
     const ms = trainer ? trainer.elapsedMs(now) : 0;
     const p = $state.snapshot(puzzle); // IndexedDB cannot clone a $state proxy
     const r = model.puzzleRating.rating; // Calculate is not a Glicko writer (rating unchanged)
+    const attemptId = `${p.id}:${now}`;
     const db = await openTrainerDB();
     await db.put('puzzleAttempts', {
-      id: `${p.id}:${now}`,
+      id: attemptId,
       puzzleId: p.id,
       solved,
       ms,
@@ -69,6 +72,19 @@
       confidence,
       selfTag: !solved ? selfTag : undefined,
     });
+    // Remember the row id so self-tag clicks can UPDATE the same row (not insert a new one).
+    if (!solved) lastAttemptId = attemptId;
+  }
+
+  /** UPDATE the existing attempt row's selfTag after the chips render post-miss.
+   * This is NOT a new insert — it re-puts the same id so AP-META-5 is preserved. */
+  async function updateSelfTag(tag: SelfTag) {
+    selfTag = selfTag === tag ? undefined : tag;
+    if (!lastAttemptId) return;
+    const db = await openTrainerDB();
+    const row = await db.get('puzzleAttempts', lastAttemptId);
+    if (!row) return;
+    await db.put('puzzleAttempts', { ...row, selfTag });
   }
 
   function sideToMove(): 'white' | 'black' {
@@ -139,7 +155,7 @@
       <span class="muted metacog-label">Why did you miss? (optional)</span>
       <div class="row center" style="flex-wrap:wrap">
         {#each SELF_TAGS as tag}
-          <button type="button" class="chip {selfTag === tag ? 'on' : ''}" onclick={() => (selfTag = selfTag === tag ? undefined : tag)}>{SELF_TAG_LABELS[tag]}</button>
+          <button type="button" class="chip {selfTag === tag ? 'on' : ''}" onclick={() => updateSelfTag(tag)}>{SELF_TAG_LABELS[tag]}</button>
         {/each}
       </div>
     </div>

@@ -35,6 +35,7 @@
   // Metacognition (ADR-0037): opt-in, skippable, never gates the move flow.
   let confidence = $state<Confidence | undefined>(undefined);
   let selfTag = $state<SelfTag | undefined>(undefined);
+  let lastAttemptId = $state<string | undefined>(undefined); // id of the most-recently written attempt row
   const metacog = $derived(app.settings?.metacogEnabled ?? false);
 
   const model = $derived(app.model);
@@ -76,6 +77,7 @@
     feedbackKind = '';
     confidence = undefined;
     selfTag = undefined;
+    lastAttemptId = undefined;
 
     // Selection priority closes the loop: a dashboard drill filter wins; else
     // prefer the player's own personal puzzles (from their real mistakes); else
@@ -180,9 +182,10 @@
     // throw, silently aborting finish() so NOTHING persists (no attempt, no SRS card → empty
     // Review, no "misses"). Snapshot to a plain, cloneable object first (cf. woodpecker.saveSet).
     const p = $state.snapshot(puzzle);
+    const attemptId = `${p.id}:${now}`;
     const db = await openTrainerDB();
     await db.put('puzzleAttempts', {
-      id: `${p.id}:${now}`,
+      id: attemptId,
       puzzleId: p.id,
       solved,
       ms,
@@ -195,11 +198,24 @@
       confidence,
       selfTag: !solved ? selfTag : undefined,
     });
+    // Remember the row id so self-tag clicks can UPDATE the same row (not insert a new one).
+    if (!solved) lastAttemptId = attemptId;
     // Persist the updated puzzle rating into the puzzle row too (it drifts down).
     await db.put('puzzles', { ...p, rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) });
     // Schedule this puzzle for spaced repetition (FSRS) so it resurfaces in Review.
     await reviewItem('puzzle', puzzle.id, resultToGrade(solved, ms), now);
     await app.persistModel(now);
+  }
+
+  /** UPDATE the existing attempt row's selfTag after the chips render post-miss.
+   * This is NOT a new insert — it re-puts the same id so AP-META-5 is preserved. */
+  async function updateSelfTag(tag: SelfTag) {
+    selfTag = selfTag === tag ? undefined : tag;
+    if (!lastAttemptId) return;
+    const db = await openTrainerDB();
+    const row = await db.get('puzzleAttempts', lastAttemptId);
+    if (!row) return;
+    await db.put('puzzleAttempts', { ...row, selfTag });
   }
 
   // Load the first puzzle once the model is ready.
@@ -229,6 +245,7 @@
     feedbackKind = '';
     confidence = undefined;
     selfTag = undefined;
+    lastAttemptId = undefined;
     startTimer();
   }
 </script>
@@ -284,7 +301,7 @@
       <span class="muted metacog-label">Why did you miss? (optional)</span>
       <div class="row center" style="flex-wrap:wrap">
         {#each SELF_TAGS as tag}
-          <button type="button" class="chip {selfTag === tag ? 'on' : ''}" onclick={() => (selfTag = selfTag === tag ? undefined : tag)}>{SELF_TAG_LABELS[tag]}</button>
+          <button type="button" class="chip {selfTag === tag ? 'on' : ''}" onclick={() => updateSelfTag(tag)}>{SELF_TAG_LABELS[tag]}</button>
         {/each}
       </div>
     </div>
