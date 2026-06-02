@@ -651,3 +651,31 @@ Q-F `time-controls` owns the union, fallback if 960 ships first. Anti-patterns A
 becomes relevant if 960 games are ever analyzed/imported); a unit test pinning `resetVariant`/
 `UCI_Chess960`; a clarifying comment on `coachCheck`'s engine-variant ownership; the
 currently-unreachable Shredder branch in `fenForEngine`; timed 960; 960 auto-analysis.
+
+## ADR-0042 — Concept-card board sizing: shrink via `--board-size`, never ancestor `transform: scale`
+**Date:** 2026-06-03 · **Status:** accepted
+
+The "Learn the pattern" card (ADR-0040) rendered a visibly wrong board — pieces bunched toward the
+top-left, off their squares — even though the FEN and key move were correct. Root cause is the shrink
+mechanism, not the data. `ConceptCard.svelte`'s `.mini-board` wrapped the chessground host in
+`transform: scale(0.62)`. chessground places every piece with an absolute pixel offset
+`pos * bounds.width / 8`, where `bounds = elements.board.getBoundingClientRect()` (chessground 9.2.1,
+`util.posToTranslate` + the memoised bounds in `chessground.js`). `getBoundingClientRect()` reports the
+transform-scaled rect, but the board element's own coordinate space stays full-size — so pieces landed
+at 0.62× their correct local offset and clustered at the origin. Only `ConceptCard` wrapped a board in
+a CSS transform; `Play`/`Tactics` render at natural size and were never affected.
+
+**Decision.** Shrink a board by its **real CSS size**, never by an ancestor transform. `Board.svelte`'s
+`--board` now reads an overridable `var(--board-size, min(82vw, 68vh, 540px))` — default unchanged, so
+every existing consumer is byte-for-byte identical — and `ConceptCard` sets `--board-size:
+min(51vw, 42vh, 336px)` (≈ the old 0.62× visual size), dropping the `transform`/`--scale`/`--mini`/
+`overflow` machinery. The multiple-of-8 flooring (`round(down, …, 8px)`) is preserved so the rank/file
+gutters stay aligned. Verified in-browser: all three back-rank examples place every piece on its exact
+FEN square at a 336px board.
+
+**Anti-patterns.** AP-CC-8 wrapping a chessground host in `transform: scale()` (or any ancestor
+transform) — it desyncs pieces from squares because placement is `getBoundingClientRect`-based; size the
+board with `--board-size` instead. The guard `src/ui/concept-card-board-size.test.ts` pins this at the
+source level (jsdom does no layout, so the visual desync cannot be unit-reproduced).
+
+Cross-links: ADR-0040 (concept cards), ADR-0001 (chessground 9.2.1 board). Fix commit `a8ebc7d`.
