@@ -11,6 +11,7 @@
   } from '../calibration/Calibration';
   import { TacticalTrainer } from '../trainer/TacticalTrainer';
   import { AdaptiveOpponent, initOpponentState, type GameOutcome } from '../engine/AdaptiveOpponent';
+  import { STANDARD_POOLS } from '../rating/pools';
 
   type Step = 'declare' | 'ladder' | 'offer-game' | 'game' | 'done';
   let step = $state<Step>('declare');
@@ -199,8 +200,13 @@
   async function commit(puzzleR: { rating: number; rd: number; vol: number }, gameR: { rating: number; rd: number; vol: number }) {
     if (!app.model) return;
     app.model.puzzleRating = puzzleR;
-    app.model.gameRating = gameR;
-    app.model.opponentTargetElo = Math.round(gameR.rating);
+    // Calibration seeds ALL 4 standard pools from the single measured game rating
+    // (spec §4.4 contract). chess960 stays lazy. Each pool starts the bot at gameR.
+    const targetElo = Math.round(gameR.rating);
+    for (const pool of STANDARD_POOLS) {
+      app.model.gameRatings[pool] = { ...gameR };
+      app.model.opponentByPool[pool] = { targetElo, recent: [] };
+    }
     app.model.onboarded = true;
     await app.persistModel(Date.now());
     step = 'done';
