@@ -79,6 +79,7 @@
       <button onclick={() => app.go('play')}>Play a game →</button>
     </div>
   {:else}
+    <button onclick={() => app.go('session')} style="align-self:flex-start">▶ Start session</button>
     <h3>Your top leaks</h3>
     {#if leaks.length}
       <div class="col" style="gap:0.3rem">
