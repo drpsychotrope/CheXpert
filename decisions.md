@@ -492,49 +492,6 @@ Cross-links: ADR-0006 (one eval per position — why no only-move margin), ADR-0
 no accuracy grade), ADR-0024 (time-management drill routing), ADR-0025 (comeback: Dashboard-reached,
 derive-on-the-fly precedent). Anti-patterns AP-CMD-1…8 (spec §9). Append-only; supersedes nothing.
 
-## ADR-0038 — Critical-moment ("when to think") drill: recognition over stored win-prob swings; no engine at drill time
-**Date:** 2026-06-02 · **Status:** accepted
-
-Time trouble is a decision-allocation problem, not a clock-speed one. New recognition drill: show a
-player-to-move position from the user's own analysed games on a READ-ONLY board, ask **CRITICAL**
-(invest time) vs **ROUTINE** (play fast), then reveal the REAL win-probability swing that hung on the
-move plus the existing `explainPly` text. No clock — the trained skill is *recognising* the critical
-moment, upstream of managing the clock.
-
-Pure selector `src/analysis/criticalMomentDrill.ts`: `labelPly` tags a player ply from its **realised**
-`winProbLoss` — CRITICAL `>= 15`, ROUTINE `<= 3`, the band `(3,15)` is **ambiguous and excluded**
-(Q-A). `buildDrillSet(analyses, rand, opts)` collects PLAYER-to-move plies only (`ply.color ===
-playerColor`), excludes **trivial recaptures** from ROUTINE (a ply that recaptures on the previous
-ply's destination square; never a CRITICAL one — a recapture can itself blunder, Q-C), dedups by
-`fenBefore`, balances CRITICAL/ROUTINE *best-effort* (tops up from the larger side; never
-empty-on-imbalance) and **Fisher–Yates shuffles via an INJECTED `rand`** — no `Math.random`/`Date.now`
-in the core (AP-CMD-4). `scoreCall` is **binary** (Q-D): correct iff the call matches the truth; the
-UI shows the **raw swing**, never an accuracy % (AP-CMD-1, honesty doctrine).
-
-**Honesty (AP-CMD-2):** the CRITICAL label is the *realised* swing, NOT a proven "only-move" margin.
-Stored analysis has ONE eval per position and no second-best line (ADR-0006), so `bestCp − secondBestCp`
-is not available. Recovering a true uniqueness margin would need MultiPV at drill time (violates the
-no-engine-at-drill-time doctrine, comeback/eval-graph precedent) or persisting a margin during analysis
-(a `BatchAnalyzer` change) — **deferred (Q-B, §11)**. Copy says "a moment where a wrong move proved
-expensive", never "the only move".
-
-**Fallback (Q-E):** a curated static FEN set (`src/analysis/criticalMomentFallback.ts`) keeps the drill
-non-empty before any game is analysed; legality + label-agreement asserted by a test (MASTER_GAMES
-precedent). It feeds the SAME `scoreCall`/reveal path.
-
-**Access (Q-F/Q-G):** Dashboard-reached, **no top-nav button**. The `timeManagement` row keeps its
-existing Drill button (timed Tactics, ADR-0024) and gains an **additive** companion link "Train when to
-think →" → `app.go('when-to-think')`. **No `weakness.ts` change** (`drillTarget` unchanged). New
-`'when-to-think'` member on the `View` union + one route arm in `App.svelte`.
-
-**No schema change** (AP-CMD-6): positions derive on the fly from the stored `gameAnalyses`; no
-`DB_VERSION` bump, no object store, no `PlyAnalysis` field. **No new dependency** (AP-CMD-3); chess.js
-appears only in the fallback legality TEST, never at drill time.
-
-Cross-links: ADR-0006 (one eval per position — why no only-move margin), ADR-0021 (criticalMoments /
-no accuracy grade), ADR-0024 (time-management drill routing), ADR-0025 (comeback: Dashboard-reached,
-derive-on-the-fly precedent). Anti-patterns AP-CMD-1…8 (spec §9). Append-only; supersedes nothing.
-
 ## ADR-0039 — Deliberate-practice session runner + descriptive efficacy readout
 **Date:** 2026-06-02 · **Status:** accepted
 
