@@ -6,7 +6,7 @@ import {
   type DrillItem,
   type DrillLabel,
 } from './criticalMomentDrill';
-import type { GameAnalysis, GamePhase, PhaseStat, PlyAnalysis, Severity } from './types';
+import type { GameAnalysis, GamePhase, PhaseStat, PlyAnalysis } from './types';
 // Vite `?raw` import: the module's source text, for the purity guard (no fs, no new dep).
 import drillSource from './criticalMomentDrill.ts?raw';
 
