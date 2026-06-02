@@ -10,6 +10,12 @@
     await app.persistSettings();
   }
 
+  async function toggleMetacog() {
+    if (!settings) return;
+    settings.metacogEnabled = !(settings.metacogEnabled ?? false);
+    await app.persistSettings();
+  }
+
   async function toggleNetwork(e: Event) {
     if (!settings) return;
     const wantOn = (e.currentTarget as HTMLInputElement).checked;
@@ -50,6 +56,20 @@
     <p class="muted" style="font-size:0.85rem">
       Best-effort in Phase 1 (a quick engine check). Full pre-move gaffe alerts + mandatory post-game
       review come with Phase 2.
+    </p>
+  </div>
+
+  <div class="panel col">
+    <h3>Metacognition</h3>
+    <label class="row" style="flex-direction:row;align-items:center;gap:0.6rem">
+      <input type="checkbox" checked={settings?.metacogEnabled ?? false} onchange={toggleMetacog} />
+      Track confidence & error cause on puzzles
+    </label>
+    <p class="muted" style="font-size:0.85rem">
+      When on, Tactics and Calculation show optional chips: how sure you were (before the reveal) and,
+      after a miss, why you think you missed. Insights then shows a descriptive calibration readout —
+      how your confidence lines up with your results. Off by default; the chips are always skippable and
+      never block solving.
     </p>
   </div>
 
