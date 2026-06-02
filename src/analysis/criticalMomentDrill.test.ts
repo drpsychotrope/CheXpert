@@ -3,6 +3,7 @@ import {
   labelPly,
   buildDrillSet,
   scoreCall,
+  shuffled,
   type DrillItem,
   type DrillLabel,
 } from './criticalMomentDrill';
@@ -206,6 +207,19 @@ describe('scoreCall', () => {
     expect(r.correct).toBe(false);
     expect(r.truth).toBe('critical');
     expect(r.call).toBe('routine');
+  });
+});
+
+// --- shuffled ----------------------------------------------------------------
+
+describe('shuffled', () => {
+  it('returns a reordered copy without mutating the input (deterministic per seed)', () => {
+    const input = [1, 2, 3, 4, 5, 6, 7, 8];
+    const out = shuffled(input, seeded(5));
+    expect(out).toHaveLength(input.length);
+    expect([...out].sort((a, b) => a - b)).toEqual(input); // same multiset
+    expect(input).toEqual([1, 2, 3, 4, 5, 6, 7, 8]); // input untouched
+    expect(shuffled(input, seeded(5))).toEqual(out); // same seed → same order
   });
 });
 

@@ -15,6 +15,7 @@
   import GuessMove from './GuessMove.svelte';
   import Vision from './Vision.svelte';
   import Comeback from './Comeback.svelte';
+  import WhenToThink from './WhenToThink.svelte';
   import Insights from './Insights.svelte';
   import Explorer from './Explorer.svelte';
   import Calculate from './Calculate.svelte';
@@ -82,6 +83,8 @@
     <Vision />
   {:else if app.view === 'comeback'}
     <Comeback />
+  {:else if app.view === 'when-to-think'}
+    <WhenToThink />
   {:else if app.view === 'insights'}
     <Insights />
   {:else if app.view === 'explorer'}

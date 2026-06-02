@@ -25,6 +25,7 @@ export type View =
   | 'calculate'
   | 'sparring'
   | 'analysis-board'
+  | 'when-to-think'
   | 'settings';
 
 class AppState {
