@@ -110,3 +110,24 @@ describe('Chess960 castling shim — rights bookkeeping & FEN', () => {
     expect(field).toBe('KQkq');
   });
 });
+
+describe('standard mode unaffected by the 960 shim', () => {
+  it('default ChessGame still does standard castling via chess.js', () => {
+    const g = new ChessGame('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1');
+    expect(g.move('e1', 'g1')).toBe('O-O'); // standard king-two-squares encoding
+    const back = new ChessGame('r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1');
+    expect(back.move('e8', 'c8')).toBe('O-O-O');
+  });
+
+  it('default ChessGame opening position has 20 first moves and no extra castle dests', () => {
+    const g = new ChessGame();
+    let total = 0;
+    for (const arr of g.dests().values()) total += arr.length;
+    expect(total).toBe(20);
+  });
+
+  it('fenForEngine equals fen in standard mode', () => {
+    const g = new ChessGame();
+    expect(g.fenForEngine()).toBe(g.fen);
+  });
+});
