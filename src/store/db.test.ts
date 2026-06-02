@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { openTrainerDB, DB_VERSION, type GameRecord } from './db';
+import { openTrainerDB, DB_VERSION, type GameRecord, type PlayerModel } from './db';
 import {
   loadPlayerModel,
   savePlayerModel,
@@ -46,10 +46,14 @@ describe('IndexedDB store', () => {
     expect(await db.get('games', 'g1')).toEqual(rec);
   });
 
-  it('creates a fresh player model with both ratings separate', async () => {
+  it('creates a fresh player model with the puzzle rating + the 4 standard game-rating pools', async () => {
     const m = await loadPlayerModel(1000);
     expect(m.puzzleRating).toBeDefined();
-    expect(m.gameRating).toBeDefined();
+    expect(m.gameRatings.classical).toBeDefined();
+    expect(m.gameRatings.bullet).toBeDefined();
+    expect(m.gameRatings.blitz).toBeDefined();
+    expect(m.gameRatings.rapid).toBeDefined();
+    expect(m.gameRatings.chess960).toBeUndefined();
     expect(m.onboarded).toBe(false);
   });
 
@@ -118,5 +122,29 @@ describe('IndexedDB store', () => {
     expect(upgraded.objectStoreNames.contains('srsCards')).toBe(true); // v3
     expect(upgraded.objectStoreNames.contains('repertoire')).toBe(true); // v3
     expect(upgraded.objectStoreNames.contains('woodpeckerSets')).toBe(true); // v4
+  });
+
+  it('migrates a legacy single-gameRating record to per-pool ratings on load (no version bump)', async () => {
+    const db = await openTrainerDB();
+    // Write a legacy-shaped record directly (bypassing the typed helper).
+    await db.put('playerModel', {
+      id: 'singleton',
+      puzzleRating: { rating: 1600, rd: 80, vol: 0.06 },
+      gameRating: { rating: 1450, rd: 90, vol: 0.06 },
+      opponentTargetElo: 1480,
+      recentOutcomes: ['win', 'loss'],
+      weaknessCounters: {},
+      onboarded: true,
+      createdAt: 1,
+      updatedAt: 2,
+    } as unknown as PlayerModel);
+
+    const m = await loadPlayerModel(3000);
+    expect(m.gameRatings.classical?.rating).toBe(1450);
+    expect(m.gameRatings.bullet?.rating).toBe(1450);
+    expect(m.gameRatings.classical?.rd).toBeGreaterThanOrEqual(150);
+    expect(m.opponentByPool.rapid).toEqual({ targetElo: 1480, recent: ['win', 'loss'] });
+    expect((m as unknown as { gameRating?: unknown }).gameRating).toBeUndefined();
+    expect(db.version).toBe(4); // NO bump
   });
 });

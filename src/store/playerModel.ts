@@ -40,7 +40,7 @@ export function migratePlayerModel(raw: Record<string, unknown>): PlayerModel {
   };
   if (r.gameRatings && r.opponentByPool) {
     // Already in the new shape — return as a PlayerModel (defensive copy of nested maps).
-    return { ...(raw as PlayerModel) };
+    return { ...(raw as unknown as PlayerModel) };
   }
 
   const legacy = r.gameRating ?? defaultRating();
