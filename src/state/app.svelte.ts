@@ -5,6 +5,7 @@ import { EngineClient } from '../engine/EngineClient';
 import { PuzzleRepo } from '../trainer/PuzzleRepo';
 import { loadPlayerModel, savePlayerModel, loadSettings, saveSettings } from '../store/playerModel';
 import type { PlayerModel, SettingsRecord } from '../store/db';
+import type { SessionPlan } from '../analysis/session';
 
 export type View =
   | 'home'
@@ -40,6 +41,8 @@ class AppState {
   tacticsTimed = $state(false);
   /** Optional start position for the interactive analysis board. */
   analysisFen = $state<string | null>(null);
+  /** Active deliberate-practice session (in-memory, survives view swaps; NOT persisted). */
+  activeSession = $state<{ plan: SessionPlan; current: number; startedAt: number; reflection: string } | null>(null);
 
   readonly engine = new EngineClient();
   readonly puzzles = new PuzzleRepo();
