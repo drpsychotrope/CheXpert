@@ -39,6 +39,9 @@ export interface PuzzleAttemptRecord {
   ratingAfter: number;
   playedAt: number;
   source: 'curated' | 'personal';
+  // metacognition: optional, additive — no migration (ADR-0037).
+  confidence?: 'sure' | 'unsure' | 'guess'; // self-reported before the reveal; absent on legacy records
+  selfTag?: string; // self-diagnosed cause (closed taxonomy key); absent on legacy / when skipped
 }
 
 export interface PlayerModel {
@@ -66,6 +69,8 @@ export interface SettingsRecord {
   opponentStyle?: 'human' | 'engine';
   /** Last time control chosen on the Play screen, restored as the default on mount (spec §4.5). */
   lastTimeControl?: { initialSec: number; incrementSec: number };
+  /** Opt-in: show confidence/error-cause chips on puzzles (default false). ADR-0037. */
+  metacogEnabled?: boolean;
 }
 
 /** A PGN brought in for analysis (Phase 2). Raw source + which side the user was. */
