@@ -9,6 +9,9 @@
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Rating } from '../rating/glicko2';
+import type { RatingPool } from '../rating/pools';
+import type { GameOutcome } from '../engine/AdaptiveOpponent';
+import type { Category } from '../clock/categories';
 import type { Puzzle } from '../trainer/puzzle';
 import type { GameAnalysis } from '../analysis/types';
 import type { SrsCardRecord } from '../srs/types';
@@ -22,6 +25,8 @@ export interface GameRecord {
   botElo: number;
   playedAt: number;
   coached: boolean;
+  /** Time control this game was played under (absent on legacy records = untimed classical). */
+  timeControl?: { initialSec: number; incrementSec: number; category: Category; untimed?: boolean };
 }
 
 export interface PuzzleAttemptRecord {
@@ -39,9 +44,10 @@ export interface PuzzleAttemptRecord {
 export interface PlayerModel {
   id: 'singleton';
   puzzleRating: Rating;
-  gameRating: Rating;
-  opponentTargetElo: number;
-  recentOutcomes: ('win' | 'loss' | 'draw')[];
+  /** Per-time-control game ratings (spec §4.4). chess960 seeded lazily. */
+  gameRatings: Partial<Record<RatingPool, Rating>>;
+  /** Per-pool adaptive-opponent state (target Elo + rolling outcomes). */
+  opponentByPool: Partial<Record<RatingPool, { targetElo: number; recent: GameOutcome[] }>>;
   /** Nascent weakness counters keyed by theme — Phase 2 fleshes this out. */
   weaknessCounters: Record<string, number>;
   onboarded: boolean;
@@ -58,6 +64,8 @@ export interface SettingsRecord {
   /** Play opponent style: 'human' = top moves sampled by temperature (varied);
    *  'engine' = always the best move at the current Elo. */
   opponentStyle?: 'human' | 'engine';
+  /** Last time control chosen on the Play screen, restored as the default on mount (spec §4.5). */
+  lastTimeControl?: { initialSec: number; incrementSec: number };
 }
 
 /** A PGN brought in for analysis (Phase 2). Raw source + which side the user was. */
