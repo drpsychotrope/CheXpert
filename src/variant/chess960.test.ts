@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { Chess } from 'chess.js';
 import { chess960Position, chess960PositionById, type Chess960Position } from './chess960';
 
-const FILE_OF = (c: string) => 'abcdefgh'.indexOf(c);
 const isDark = (file: number) => file % 2 === 0; // a=0 dark, b=1 light, ... (rank 1)
 
 function checkLegal(p: Chess960Position) {
@@ -72,10 +71,13 @@ describe('chess960 generator', () => {
   });
 
   it('has no Math.random / Date.now in the source (pure core)', async () => {
-    const fs = await import('node:fs');
-    const path = await import('node:path');
+    // @ts-ignore — 'fs'/'path' are available in the Vitest/Node runtime but not in the
+    // browser-oriented tsconfig (no @types/node); suppress the module-not-found diagnostic.
+    const { readFileSync } = (await import('fs')) as { readFileSync: (p: string, enc: string) => string };
+    // @ts-ignore
+    const { resolve } = (await import('path')) as { resolve: (...p: string[]) => string };
     // import.meta.url may not be a file: URL in jsdom env; resolve relative to cwd instead.
-    const src = fs.readFileSync(path.resolve(process.cwd(), 'src/variant/chess960.ts'), 'utf8');
+    const src = readFileSync(resolve(process.cwd(), 'src/variant/chess960.ts'), 'utf8');
     expect(src).not.toMatch(/Math\.random/);
     expect(src).not.toMatch(/Date\.now/);
   });
