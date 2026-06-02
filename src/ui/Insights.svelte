@@ -7,6 +7,7 @@
   import { buildWeaknessProfile, type Dimension } from '../analysis/weakness';
   import { buildFingerprint, weaknessTrend, type Leak, type TrendPoint } from '../analysis/fingerprint';
   import { buildStudyPlan } from '../analysis/studyPlan';
+  import { motifEfficacy, type EfficacyReadout } from '../analysis/efficacy';
   import { poolRating } from '../store/playerModel';
   import { openTrainerDB } from '../store/db';
   import { calibration, SELF_TAG_LABELS, type Calibration, type MetacogAttempt } from '../metacog/metacog';
@@ -17,6 +18,12 @@
   let weakest = $state<Dimension | null>(null);
   let minutes = $state(30);
   let cal = $state<Calibration | null>(null);
+  let analysesAll = $state<import('../analysis/types').GameAnalysis[]>([]);
+
+  // Descriptive before/after miss-rate for the top ~3 leaks (Q-D windows + minMoves gate).
+  const efficacy = $derived<EfficacyReadout[]>(
+    analysesAll.length ? leaks.slice(0, 3).map((l) => motifEfficacy(analysesAll, l.key)) : [],
+  );
   const metacog = $derived(app.settings?.metacogEnabled ?? false);
 
   const model = $derived(app.model);
@@ -29,6 +36,7 @@
 
   onMount(async () => {
     const analyses = await loadAllAnalyses();
+    analysesAll = analyses;
     if (analyses.length) {
       leaks = buildFingerprint(analyses).leaks;
       trend = weaknessTrend(analyses, { window: 5 });
@@ -86,6 +94,40 @@
       </div>
     {:else}
       <p class="muted">Not enough flagged mistakes yet.</p>
+    {/if}
+
+    {#if efficacy.length}
+      <h3>Did it move?</h3>
+      <p class="muted" style="font-size:0.75rem">
+        Descriptive, not proof. This shows your before/after miss-rate; it does not prove the training
+        caused the change. "Personalised beats generic" stays plausible, not proven — the data is local so
+        you can watch it for yourself.
+      </p>
+      <div class="col" style="gap:0.3rem">
+        {#each efficacy as e (e.motifKey)}
+          <div class="panel" style="opacity:{e.enoughData ? 1 : 0.5}">
+            <b>{e.label}</b>
+            {#if e.enoughData}
+              <span style="font-size:0.85rem">
+                miss rate {Math.round(e.early.missRate * 100)}% → {Math.round(e.recent.missRate * 100)}%
+                <span style="color:{e.deltaPct <= 0 ? 'var(--good)' : 'var(--bad)'}">
+                  ({e.deltaPct <= 0 ? '' : '+'}{Math.round(e.deltaPct * 100)} pts)
+                </span>
+              </span>
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:80px;height:20px;background:var(--panel-2);border-radius:3px;vertical-align:middle">
+                <polyline
+                  points="0,{100 - Math.round(e.early.missRate * 100)} 100,{100 - Math.round(e.recent.missRate * 100)}"
+                  fill="none" stroke="var(--accent)" stroke-width="3" vector-effect="non-scaling-stroke" />
+              </svg>
+              <br /><span class="muted" style="font-size:0.75rem">
+                {e.early.misses}/{e.early.playerMoves} early · {e.recent.misses}/{e.recent.playerMoves} recent
+              </span>
+            {:else}
+              <span class="muted" style="font-size:0.8rem">too little data to read a trend</span>
+            {/if}
+          </div>
+        {/each}
+      </div>
     {/if}
 
     <h3>
