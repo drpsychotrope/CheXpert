@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildFingerprint, weaknessTrend } from './fingerprint';
+import { buildFingerprint, weaknessTrend, leakKey } from './fingerprint';
 import type { GameAnalysis, GamePhase, PhaseStat, PlyAnalysis, MotifResult } from './types';
 
 function ply(p: Partial<PlyAnalysis>): PlyAnalysis {
@@ -67,5 +67,32 @@ describe('weaknessTrend', () => {
     expect(trend).toHaveLength(2);
     expect(trend[0]).toHaveProperty('dims');
     expect(trend[0].dims).toHaveProperty('tactics');
+  });
+});
+
+describe('leakKey', () => {
+  it('uses the confident motif tag when confidence is high', () => {
+    const p = ply({ motif: { tag: 'fork', tags: ['fork'], confidence: 'high' } });
+    expect(leakKey(p)).toBe('fork');
+  });
+
+  it('falls back to `${phase}:${severity}` for a low-confidence ply', () => {
+    const p = ply({ phase: 'endgame', severity: 'blunder', motif: { tag: 'x', tags: ['x'], confidence: 'low' } });
+    expect(leakKey(p)).toBe('endgame:blunder');
+  });
+
+  it('falls back when there is no motif at all', () => {
+    const p = ply({ phase: 'opening', severity: 'mistake', motif: undefined });
+    expect(leakKey(p)).toBe('opening:mistake');
+  });
+
+  it('agrees with the key buildFingerprint produces on the same fixture', () => {
+    const confident = ply({ severity: 'blunder', winProbLoss: 20, motif: { tag: 'pin', tags: ['pin'], confidence: 'high' }, fenBefore: 'pin1' });
+    const fallback = ply({ phase: 'endgame', severity: 'blunder', winProbLoss: 20, motif: undefined, fenBefore: 'eg1' });
+    const { leaks } = buildFingerprint([game([confident, fallback])]);
+    const keys = leaks.map((l) => l.key).sort();
+    expect(keys).toEqual(['endgame:blunder', 'pin'].sort());
+    expect(keys).toContain(leakKey(confident));
+    expect(keys).toContain(leakKey(fallback));
   });
 });

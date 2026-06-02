@@ -6,6 +6,13 @@
 import type { GameAnalysis, GamePhase, PlyAnalysis } from './types';
 import { buildWeaknessProfile, type Dimension } from './weakness';
 
+/** Stable cluster key for a player mistake ply: a confident motif tag, else
+ *  `${phase}:${severity}`. SINGLE source of truth shared by buildFingerprint and
+ *  the efficacy readout so they never disagree about what "fork" means (AP-ES-1). */
+export function leakKey(p: PlyAnalysis): string {
+  return p.motif && p.motif.confidence === 'high' ? p.motif.tag : `${p.phase}:${p.severity}`;
+}
+
 export interface Leak {
   /** Stable cluster key (motif tag, or `${phase}:${severity}`). */
   key: string;
@@ -31,7 +38,7 @@ export function buildFingerprint(analyses: GameAnalysis[]): { leaks: Leak[] } {
       if (p.color !== a.playerColor) continue;
       if (p.severity !== 'mistake' && p.severity !== 'blunder') continue;
       const confident = p.motif && p.motif.confidence === 'high';
-      const key = confident ? p.motif!.tag : `${p.phase}:${p.severity}`;
+      const key = leakKey(p);
       const label = confident ? p.motif!.tag : `${p.phase} ${p.severity}`;
       let acc = map.get(key);
       if (!acc) {
