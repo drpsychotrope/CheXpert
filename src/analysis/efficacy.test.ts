@@ -65,15 +65,32 @@ describe('motifEfficacy', () => {
   });
 
   it('uses a phase-scoped denominator: unrelated-phase moves do not move the rate', () => {
-    const base = [mg(1, 4, 6), mg(2, 4, 6)];
+    // 4 distinct timestamps so both windows are non-empty (t1,t2 → early; t3,t4 → recent).
+    // Fork misses are all in middlegame; endgame moves will be added to t1 only.
+    const base = [mg(1, 4, 6), mg(2, 4, 6), mg(3, 2, 8), mg(4, 2, 8)];
     const r1 = motifEfficacy(base, 'fork', { minMoves: 1 });
-    // Add many clean ENDGAME player moves — different phase than the fork misses.
+    // Sanity: both windows populated (guards Issue 1).
+    expect(r1.early.playerMoves).toBeGreaterThan(0);
+    expect(r1.recent.playerMoves).toBeGreaterThan(0);
+    // Add many clean ENDGAME player moves to game at t1 — different phase than the fork misses.
     const withEndgame = [
       game(1, [...base[0].plies, ...Array.from({ length: 50 }, () => ply({ phase: 'endgame', severity: 'good' }))]),
-      base[1],
+      base[1], base[2], base[3],
     ];
     const r2 = motifEfficacy(withEndgame, 'fork', { minMoves: 1 });
+    // Endgame moves must not affect either window's missRate.
     expect(r2.early.missRate).toBeCloseTo(r1.early.missRate, 5);
+    expect(r2.recent.missRate).toBeCloseTo(r1.recent.missRate, 5);
+    // Both windows still non-empty after adding endgame noise.
+    expect(r2.early.playerMoves).toBeGreaterThan(0);
+  });
+
+  it('2-distinct-timestamp split yields non-empty early window (regression for Issue 1)', () => {
+    // Exactly 2 distinct timestamps: the corrected split puts t1→early, t2→recent.
+    const analyses = [mg(1, 4, 6), mg(2, 2, 8)];
+    const r = motifEfficacy(analyses, 'fork', { minMoves: 1 });
+    expect(r.early.playerMoves).toBeGreaterThan(0);
+    expect(r.recent.playerMoves).toBeGreaterThan(0);
   });
 
   it('ignores opponent plies (player-moves only)', () => {

@@ -77,10 +77,11 @@ export function motifEfficacy(
   }
 
   // 3) Split by analyzedAt at the median (default) or the caller-pinned boundary.
-  const times = scoped.map((s) => s.at).sort((x, y) => x - y);
-  const splitAt = opts.splitAt ?? times[Math.floor((times.length - 1) / 2)];
+  // Split on distinct analysis timestamps so each window holds whole games and
+  // both sides are non-empty whenever ≥2 distinct timestamps exist (spec §4.2 "halves, ≥1 game each").
+  const distinct = [...new Set(scoped.map((s) => s.at))].sort((a, b) => a - b);
+  const splitAt = opts.splitAt ?? distinct[Math.floor(distinct.length / 2)];
   // Plies strictly before the boundary are "early"; the boundary and later are "recent".
-  // Median-of-sorted guarantees ≥1 ply each side whenever ≥2 distinct timestamps exist.
   const early = aggregate(scoped.filter((s) => s.at < splitAt));
   const recent = aggregate(scoped.filter((s) => s.at >= splitAt));
 
