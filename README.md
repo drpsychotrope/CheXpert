@@ -254,8 +254,10 @@ tablebase) is CC0. Full credits in [`ATTRIBUTION.md`](ATTRIBUTION.md).
 The brief this was built from asked for intellectual honesty in the product, so:
 
 - **"Personalised beats generic" is plausible, not proven.** The loop is built because the mechanism
-  is sound (you train your actual weaknesses), not because a controlled study proves it. The model
-  stays local so the effect could one day be measured for real.
+  is sound (you train your actual weaknesses), not because a controlled study proves it. Insights now
+  shows a **descriptive** local before/after miss-rate per leak ("did drilling forks move my fork-miss
+  rate?") so you can watch the effect for yourself — but it is **not** a controlled study and makes no
+  causal claim. The model stays local.
 - **Puzzle rating ≠ playing strength.** They're tracked as separate numbers and the UI says so.
 - **Weakness benchmarks are directional.** The radar uses rough community ACPL anchors, presented as
   "where to focus", never as a precise grade.
@@ -274,6 +276,7 @@ every non-obvious choice):
 2. **The loop** — PGN import → analysis → personal puzzles → weakness dashboard.
 3. **Retention** — FSRS review, Syzygy endgames, opening repertoire.
 4. **Closing the loop** — weakness-steering opponent, NL explanations, Woodpecker, guess-the-move,
-   calculation/vision drills.
+   calculation/vision drills, and a guided practice-**session** runner that walks the study plan
+   end-to-end through the real trainers, ending in a reflection.
 
 Status: **135 tests passing**, type-clean (`svelte-check` 0 errors), production build green.

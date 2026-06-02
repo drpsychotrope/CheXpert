@@ -534,3 +534,59 @@ appears only in the fallback legality TEST, never at drill time.
 Cross-links: ADR-0006 (one eval per position — why no only-move margin), ADR-0021 (criticalMoments /
 no accuracy grade), ADR-0024 (time-management drill routing), ADR-0025 (comeback: Dashboard-reached,
 derive-on-the-fly precedent). Anti-patterns AP-CMD-1…8 (spec §9). Append-only; supersedes nothing.
+
+## ADR-0039 — Deliberate-practice session runner + descriptive efficacy readout
+**Date:** 2026-06-02 · **Status:** accepted
+
+Adds two related pieces, **shipped split** (Q-A): a **descriptive efficacy readout** first, then a
+**guided session runner** — behind one ADR, each independently revertable.
+
+**Efficacy readout (shipped first).** `src/analysis/efficacy.ts` `motifEfficacy(analyses, motifKey, opts?)`
+reports a **two-window** (early vs recent) per-motif **miss-rate** with a **phase-scoped denominator**
+(misses ÷ player plies in the motif's phase(s) in that window, not ÷ all moves — AP-ES-3) and a
+`minMoves` gate (default 20; below it, `enoughData=false` and the UI greys the row + drops the Δ).
+The split is a **balanced split on distinct `analyzedAt` timestamps** — each window holds whole games,
+and both sides are non-empty whenever ≥ 2 distinct timestamps exist (boundary = `distinct[⌊n/2⌋]`; plies
+strictly before it are "early", boundary and later are "recent"). It shares fingerprint's cluster rule via
+an extracted `leakKey(ply)` helper so a leak and its efficacy number can never disagree (AP-ES-1). The
+Insights "Did it move?" panel renders before→after + signed Δ for the top ~3 leaks, carrying the **verbatim**
+honesty caveat (Q-C): *descriptive, not proof; does not prove training caused the change; "personalised beats
+generic" stays plausible, not proven.* The core is **pure** (no `Date`/random), returns numbers only —
+**never a verdict string** (AP-ES-4/8).
+
+**Session runner (shipped second).** `src/analysis/session.ts` `buildSession(plan, opts?)` wraps the
+existing `buildStudyPlan` output into ordered `SessionStep[]`, inserts a spaced-**Review** slot **only when
+`dueCount(now) > 0`** (Q-F), and appends a terminal **reflection** step. It reuses the Insights/`drillTarget`
+leak→trainer routing rather than re-deriving it (AP-ES-2) and is **pure** (no `Date`/random; the UI stamps
+elapsed time). `Session.svelte` (new `'session'` View) steps through it, **launching the existing trainers
+via signal flags + `app.go`** (Q-E) — no trainer is reimplemented (AP-ES-5). Entry is an Insights "Start
+session" button (Q-G); a "Session" nav arm is the return path after a trainer launch.
+
+**Q-B — derive, NO schema change.** The `sessions` object store and `sessionStore.ts` are **NOT built**;
+**`DB_VERSION` stays 4** (no v4→v5 bump; `db.ts`/`db.test.ts` untouched). Session **reflection is
+display-only and NOT persisted** — a documented limitation; persisting session history + notes (and pinning
+the efficacy split to "when you started drilling motif X") is a **§11 follow-up**. The bump would be
+justified ONLY by storing reflection notes + explicit session boundaries (AP-ES-9); since we derive, we do
+not bump.
+
+**Runner resume mechanism.** Session state lives in **`app.activeSession`** — an in-memory field on the
+`AppState` singleton (transient, like `tacticsFilterThemes` / `analysisFen` / `analysisPgn`), NOT
+IndexedDB. When a trainer is launched via `app.go()` the Session view unmounts but `app.activeSession`
+survives; returning via the "Session" nav arm re-mounts it and resumes at the current step index. The
+singleton is cleared (`null`) when the session finishes.
+
+**Known follow-up — tactics theme filter.** For tactics steps the runner currently passes the study-plan
+`focus` string (the leak's display label, e.g. `"fork"`) as `app.tacticsFilterThemes`, rather than the raw
+`leakKey` Insights uses internally. For confident single-motif leaks the values coincide; for phase-based
+leaks (e.g. `"endgame blunder"`) the filter may pass through unmatched. Limited practical impact — the
+drill still lands on the right weakness category; exact key alignment is noted as a §11 cleanup.
+
+**Honesty / doctrine.** Descriptive only — **no causal claim** ("training improved you"), no precise grade,
+no LLM/NLP over the reflection free-text (display-only here — not even stored — AP-ES-6), no network, no
+engine in either core. Mirrors AP-CHESS-13/43 and the README Honesty note; cross-links **ADR-0027**
+(weakness fingerprint + study plan + progress, which these extend) and **ADR-0007/0009** (honest tagging /
+directional-not-a-grade). New anti-patterns **AP-ES-1…9** map to the next free **AP-CHESS** range (≥ 68).
+
+Cross-links: ADR-0027 (fingerprint / study plan / progress baseline), ADR-0007/0009 (honesty doctrine),
+ADR-0033 (SRS Review, `dueCount` gate), ADR-0034/0035 (drillTarget routing reused by session steps).
+Append-only; supersedes nothing.
