@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
   import { ChessGame } from '../game/ChessGame';
@@ -185,6 +186,7 @@
       rafId = null;
     }
   }
+  onDestroy(stopClockLoop);
 
   /** Clock-aware bot movetime (spec §4.3, Q-D): scale with the bot's remaining time,
    *  using a phase-aware moves-left estimate, clamped per category. */
@@ -253,6 +255,7 @@
           uci = budget != null ? await opponent.pickHumanMove(game.fen, budget) : await opponent.pickHumanMove(game.fen);
         }
       }
+      if ((status as string) === 'over') { thinking = false; return; }
       if (uci) {
         game.moveUci(uci);
         playedUci.push(uci);
