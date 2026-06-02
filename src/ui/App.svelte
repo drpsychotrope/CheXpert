@@ -21,6 +21,7 @@
   import Calculate from './Calculate.svelte';
   import AnalysisBoard from './AnalysisBoard.svelte';
   import Sparring from './Sparring.svelte';
+  import Session from './Session.svelte';
 
   let booted = $state(false);
 
@@ -46,6 +47,7 @@
     <button onclick={() => app.go('analysis-board')}>Board</button>
     <button onclick={() => app.go('dashboard')}>Dashboard</button>
     <button onclick={() => app.go('insights')}>Insights</button>
+    <button onclick={() => app.go('session')}>Session</button>
     <button onclick={() => app.go('endgames')}>Endgames</button>
     <button onclick={() => app.go('repertoire')}>Repertoire</button>
     <button onclick={() => app.go('explorer')}>Explorer</button>
@@ -93,6 +95,8 @@
     <Calculate />
   {:else if app.view === 'sparring'}
     <Sparring />
+  {:else if app.view === 'session'}
+    <Session />
   {:else if app.view === 'analysis-board'}
     <AnalysisBoard />
   {:else if app.view === 'settings'}

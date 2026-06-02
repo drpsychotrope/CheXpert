@@ -26,6 +26,7 @@ export type View =
   | 'sparring'
   | 'analysis-board'
   | 'when-to-think'
+  | 'session'
   | 'settings';
 
 class AppState {
