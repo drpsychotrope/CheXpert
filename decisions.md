@@ -547,3 +547,48 @@ directional-not-a-grade). New anti-patterns **AP-ES-1…9** map to the next free
 Cross-links: ADR-0027 (fingerprint / study plan / progress baseline), ADR-0007/0009 (honesty doctrine),
 ADR-0033 (SRS Review, `dueCount` gate), ADR-0034/0035 (drillTarget routing reused by session steps).
 Append-only; supersedes nothing.
+
+## ADR-0040 — Concept cards: teach-before-test via curated worked examples
+**Date:** 2026-06-02 · **Status:** accepted
+
+The app was all assessment, no teaching: detectors name a motif (`motif.ts`), `buildLapseSet`
+(`schedule.ts`) finds the puzzles you fail most, the SRS resurfaces them — but nothing ever *showed
+the pattern*. Concept cards add that one missing arrow.
+
+**What ships.** A committed seed asset `public/concepts/concepts.json` holds **7 cards**, one per
+high-confidence motif **family** the detector emits — `mate`, `hangingPiece`, `fork`, `pin`, `skewer`,
+`discoveredAttack`, `doubleCheck` — each with 2-3 worked examples (`{fen, keyMove, why}`). Sub-tags
+alias to the family card (`mateInN`/`backRankMate`→`mate`; `knightFork`→`fork`; `absolutePin`/
+`relativePin`→`pin`; `discoveredCheck`→`discoveredAttack`). Pure `src/concepts/concepts.ts`
+(`cardForMotif`/`cardForThemes` + `MOTIF_ALIASES` + `CARD_PRECEDENCE`) mirrors `eco.ts`: pure lookup
+unit-tested against an in-memory table; `loadConcepts()` fetches the bundled JSON and degrades to `[]`
+on any failure (a missing asset never breaks Tactics). `ConceptCard.svelte` renders each example on a
+read-only board with the key move highlighted; `Concepts.svelte` is the nav library.
+
+**Two honest, independent triggers.** (a) **First exposure** — the first time a motif's resolved card
+is unseen on a Tactics puzzle, offer it; recorded in the additive `PlayerModel.conceptSeen?: string[]`
+the moment the card is opened (one-shot per motif; keyed off the **resolved card motif**, not raw
+themes, so a no-card puzzle never burns an entry and `knightFork`/`fork` share one entry). (b)
+**Leech** — a puzzle failed **≥ 3** times (`isLeech`, threshold N=3) offers its motif card before the
+next attempt; this branch does **not** consult or mutate `conceptSeen`, so a re-failed leech keeps
+offering its card. The fail count reuses `failCountByPuzzle`, extracted from `buildLapseSet` (output
+byte-identical) so the leech trigger and the "Your misses" set share one definition.
+
+**Doctrine.** Cards are **CURATED static content — no LLM** (ADR-0015). They exist **only for motifs we
+confidently detect** — the seed test asserts coverage == the detector family set (extends the
+ADR-0007/0020 honesty doctrine to *teaching*; no fabricated patterns). Teaching is **optional and
+non-blocking** — a "Learn the pattern" link, never a forced modal; loading the next puzzle is never
+gated on a card (AP-CHESS-15). Every example FEN + key move is **chess.js-verified legal** in tests
+(ADR-0017 / AP-CHESS-53 precedent). `conceptSeen` is an **additive field — NO `DB_VERSION` bump**
+(stays v4; migrated in the load path with `?? []`; wiped on data-reset via `clearAllData`).
+
+**Anti-patterns.** AP-CC-1 generated card text/examples (reject; curated only). AP-CC-2 a card for a
+motif we don't confidently detect. AP-CC-3 a blocking modal that interrupts the recall loop. AP-CC-4
+an illegal example FEN / key move (tests verify). AP-CC-5 re-offering the same motif's card every
+exposure, or losing "seen" state. AP-CC-6 bumping `DB_VERSION` / adding a store for `conceptSeen`.
+AP-CC-7 re-implementing the fail-count tally separately from `buildLapseSet`.
+
+Cross-links: ADR-0007 (high-confidence motifs only), ADR-0020 (geometric motifs + precedence),
+ADR-0015 (no LLM), ADR-0017 (legal-content-in-tests), ADR-0029 (`buildLapseSet`/lapse logic).
+Deferred (§11): personalised cards from the user's own failed puzzles; an interactive "now you try"
+mini-puzzle; positional-motif cards (ADR-0031); spaced review of cards; localisation.

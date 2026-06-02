@@ -98,6 +98,10 @@ Everything runs in the browser. Nothing leaves your device by default.
 - **Scenario sparring** — play out a targeted position vs the adaptive bot: a curated imbalance
   (IQP, opposite-side castling, bishop pair, rook-up ending) or one of your own recurring leaks.
 - **When to think** — a recognition drill: call positions from your own games CRITICAL (invest time) or ROUTINE (play fast) and see the real win-probability swing that hung on the move. Recognition practice, not a graded method (no clock, no accuracy %).
+- **Concept cards** — curated, offline worked examples for the tactics we detect (fork, pin, skewer,
+  back-rank mate, …). See the pattern the first time it bites you in Tactics, and again when a puzzle
+  keeps beating you — an optional, non-blocking "Learn the pattern" link, plus a browsable Concepts
+  library. Content is hand-authored and CC0, consistent with the puzzle/ECO assets (no LLM).
 
 ### Endgames & vision
 - **Endgame trainer** — fundamental endgames (K+Q vs K, K+R vs K, K+P opposition, Lucena, Philidor)
