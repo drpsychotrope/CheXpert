@@ -379,3 +379,42 @@ The human-like opponent (ADR-0034) is now a **choice**, not forced. New persiste
 A selector on the Play screen — "Human-like (varied moves)" vs "Engine (best moves)" — sets it and
 persists. `Play.engineMove` branches: `engine` → `pickMove` (best), `human` → `pickHumanMove` (sampled).
 Strength is still the adaptive Elo; this is a *style* knob on top. UI wiring only (no new logic/tests).
+
+## ADR-0036 — Time controls: clocks + per-time-control ratings (batch 3, spec 1)
+**Date:** 2026-06-02 · **Status:** accepted
+
+Play now has chess **clocks** and Lichess-style time-control **categories**, and the single game
+rating / single adaptive bot are split into **per-time-control pools** (`RatingPool`).
+
+- **Pure `Clock` core** (`src/clock/Clock.ts`): state `{ whiteMs, blackMs, incMs, side, running }`;
+  `tick(elapsedMs)` decrements only the running side (clamped ≥ 0); `press(mover)` adds the Fischer
+  **increment-on-press** to the mover then flips the side; `flagged()` reports the out-of-time side.
+  **No `Date.now()` / `Math.random()` / `performance.now()` inside** (AP-TC-1) — the Play loop measures
+  elapsed via `performance.now()` deltas and injects them. Immutable transitions, fully unit-tested.
+- **`categoryFor(initialSec, incrementSec)`** (`src/clock/categories.ts`) bands on the estimate
+  `initialSec + 40·incrementSec` (bullet < 179 ≤ blitz < 479 ≤ rapid < 1499 ≤ classical). `TIME_CONTROL_PRESETS`
+  seeds Bullet 1+0/2+1, Blitz 3+2/5+0, Rapid 10+0/15+10, Classical 30+0, **No clock**, Custom (Q-A).
+- **`RatingPool` union owned here** (`src/rating/pools.ts`): `'bullet'|'blitz'|'rapid'|'classical'|'chess960'`
+  (the `chess960` member is populated lazily by the chess960 spec). `PlayerModel` reshaped to
+  `gameRatings: Partial<Record<RatingPool, Rating>>` + `opponentByPool: Partial<Record<RatingPool, {
+  targetElo; recent }>>` with a **load-path migration and NO `DB_VERSION` bump** (field reshape only,
+  per the shared contract — AP-TC-2): a legacy single `gameRating` seeds the 4 standard pools (RD widened
+  to ≥ 150); onboarding now seeds all 4 standard pools too.
+- **Per-pool Glicko + per-pool adaptive bot:** a finished game rates into *exactly* the selected pool and
+  nudges *that* pool's bot (`recordGame` mirrored per pool) — never the old single rating, never every
+  pool (AP-TC-3). The bot's clock **runs while it thinks** and is `press()`ed when it moves, so it can flag
+  (AP-TC-4); its movetime budget scales with its own remaining time, phase-aware
+  (`movesLeft = max(8, 40−⌊ply/2⌋)`), clamped per category (Q-D).
+- **"No clock"** = classical pool + `GameRecord.timeControl.untimed:true`, no clock UI, today's loop verbatim
+  (Q-B=a, AP-TC-8). **Flag vs insufficient mating material = draw** (FIDE Art. 6.9, Q-C=a): a conservative
+  pure `insufficientMatingMaterial(fen, side)` helper (bare K / K+B / K+N / same-colour bishops only).
+  `SettingsRecord.lastTimeControl` is persisted and restored on mount; per-pool Elo is kept on TC switch (Q-E).
+- **UI (Q-F):** the Play header shows the **selected pool's** rating; Dashboard/Home/Insights keep one
+  headline number = the **classical** pool (multi-rating Dashboard → §11). Comeback/Sparring drills remain
+  untimed = classical pool.
+
+Cross-link: **supersedes the single-`gameRating` model** of ADR-0005 / ADR-0026 (onboarding now seeds all
+standard pools). The chess960 spec/ADR **consumes** this `RatingPool` union (adds `variant`/`startFen`,
+populates the `chess960` pool) — no migration conflict by construction. Deferred (§11): per-pool rating
+history + multi-rating Dashboard; delay/Bronstein increments; low-time warnings; timed onboarding/drills;
+PGN `TimeControl` header on export.
