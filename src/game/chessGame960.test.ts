@@ -111,6 +111,46 @@ describe('Chess960 castling shim — rights bookkeeping & FEN', () => {
   });
 });
 
+describe('Chess960 — no phantom standard castles (ADR-0041 regression)', () => {
+  // King g1 (file 6), rooks a1/h1 (files 0/7), open back rank.
+  // chess.js would generate e1 as a castle target (O-O-O ±2 path) when the castling
+  // field is KQkq — the bug. After the fix the field is '-', so e1 must NOT appear.
+  const KING_FILE = 6;
+  const ROOK_FILES: [number, number] = [0, 7];
+  const FEN = '4k3/8/8/8/8/8/8/R5KR w KQkq - 0 1';
+
+  it('dests for g1 does NOT include e1 (no phantom O-O-O)', () => {
+    const g = game(FEN, KING_FILE, ROOK_FILES);
+    expect(g.dests().get('g1') ?? []).not.toContain('e1');
+  });
+
+  it('move g1→e1 returns null (phantom castle rejected)', () => {
+    const g = game(FEN, KING_FILE, ROOK_FILES);
+    expect(g.move('g1', 'e1')).toBeNull();
+  });
+
+  it('legit short castle g1→h1 still works (dest present, king/rook relocated)', () => {
+    const g = game(FEN, KING_FILE, ROOK_FILES);
+    // h1 is the kingside rook → short castle
+    expect(g.dests().get('g1') ?? []).toContain('h1');
+    expect(g.move('g1', 'h1')).toBe('O-O');
+    // King must land on g1 (SHORT_KING_FILE=6) and rook on f1 (SHORT_ROOK_FILE=5)
+    const after = new Chess(g.fen);
+    expect(after.get('g1' as never)).toMatchObject({ type: 'k', color: 'w' });
+    expect(after.get('f1' as never)).toMatchObject({ type: 'r', color: 'w' });
+  });
+
+  it('legit long castle g1→a1 still works (dest present, king/rook relocated)', () => {
+    const g = game(FEN, KING_FILE, ROOK_FILES);
+    // a1 is the queenside rook → long castle
+    expect(g.dests().get('g1') ?? []).toContain('a1');
+    expect(g.move('g1', 'a1')).toBe('O-O-O');
+    const after = new Chess(g.fen);
+    expect(after.get('c1' as never)).toMatchObject({ type: 'k', color: 'w' });
+    expect(after.get('d1' as never)).toMatchObject({ type: 'r', color: 'w' });
+  });
+});
+
 describe('standard mode unaffected by the 960 shim', () => {
   it('default ChessGame still does standard castling via chess.js', () => {
     const g = new ChessGame('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1');

@@ -59,9 +59,12 @@ export class ChessGame {
   private san960: string[] = [];
 
   constructor(fen?: string, opts?: ChessGameOpts) {
-    this.chess = new Chess(fen);
     this.variant = opts?.variant ?? 'standard';
     this.castleFiles = this.variant === 'chess960' ? (opts?.castle ?? null) : null;
+    // In 960 mode neutralize chess.js's castling field to '-' so it generates zero phantom
+    // standard castles (chess.js uses KQkq to produce ±2 king moves; the shim owns castling).
+    const loadFen = this.variant === 'chess960' && fen ? neutralizeCastling(fen) : fen;
+    this.chess = new Chess(loadFen);
     if (this.variant === 'chess960') {
       this.rights = { w: { short: true, long: true }, b: { short: true, long: true } };
       // If the start FEN lacks a rook on a castle file (already moved), drop that right.
@@ -80,7 +83,9 @@ export class ChessGame {
   }
 
   load(fen: string): void {
-    this.chess.load(fen);
+    // In 960 mode neutralize chess.js's castling field to '-' (same reason as constructor).
+    const loadFen = this.variant === 'chess960' ? neutralizeCastling(fen) : fen;
+    this.chess.load(loadFen);
     if (this.variant === 'chess960') this.syncRightsToBoard();
   }
 
@@ -323,22 +328,20 @@ export class ChessGame {
     parts[1] = justMoved === 'w' ? 'b' : 'w';
     parts[2] = this.decorativeKQkq();
     parts[3] = '-'; // castling clears any ep
-    // Reset halfmove clock conservatively (castle is not a capture/pawn move → +1),
+    // Increment halfmove clock (castle is not a capture/pawn move → +1),
     // and bump fullmove when black just moved.
     parts[4] = String(Number(parts[4] || '0') + 1);
     if (justMoved === 'b') parts[5] = String(Number(parts[5] || '1') + 1);
     this.chess.load(parts.join(' '));
   }
 
-  /** Decorative KQkq reflecting the shim's live rights (chess.js needs *some* valid field). */
+  /**
+   * Returns '-' so that chess.js generates zero phantom standard castles after a manual
+   * board reload in 960 mode. The shim owns all castling rights; chess.js must not see
+   * any castling indicator in the FEN it loads.
+   */
   private decorativeKQkq(): string {
-    const r = this.rights!;
-    let s = '';
-    if (r.w.short) s += 'K';
-    if (r.w.long) s += 'Q';
-    if (r.b.short) s += 'k';
-    if (r.b.long) s += 'q';
-    return s || '-';
+    return '-';
   }
 
   /** A normal king move clears both that side's rights; a rook leaving home clears its side;
@@ -395,6 +398,17 @@ export class ChessGame {
       if (long < kingFile && !hasRook(long)) this.rights[color].long = false;
     }
   }
+}
+
+/**
+ * Replace field index 2 (castling) of a FEN string with '-'.
+ * Used in Chess960 mode so chess.js never sees a live castling indicator and therefore
+ * never generates phantom standard ±2 king moves; the shim owns all 960 castling logic.
+ */
+function neutralizeCastling(fen: string): string {
+  const parts = fen.split(' ');
+  if (parts.length >= 3) parts[2] = '-';
+  return parts.join(' ');
 }
 
 /** Inclusive integer range between a and b in either direction. */
