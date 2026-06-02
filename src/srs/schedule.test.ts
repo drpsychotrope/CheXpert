@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { interleave, buildLapseSet } from './schedule';
+import { interleave, buildLapseSet, failCountByPuzzle, isLeech, type AttemptLike } from './schedule';
 
 function adjacentSame<T>(arr: T[], key: (t: T) => string): number {
   let n = 0;
@@ -32,5 +32,60 @@ describe('buildLapseSet', () => {
     expect(ids).toContain('c1'); // a failed CURATED puzzle is a "miss" too
     expect(ids).not.toContain('p3'); // solved excluded
     expect(buildLapseSet(attempts, 1)).toEqual(['p1']); // capped
+  });
+});
+
+// --- new focused coverage for the failCountByPuzzle extraction + isLeech ---
+
+const failAttempts: AttemptLike[] = [
+  { puzzleId: 'a', solved: false },
+  { puzzleId: 'a', solved: false },
+  { puzzleId: 'a', solved: false }, // a: 3 fails
+  { puzzleId: 'b', solved: false },
+  { puzzleId: 'b', solved: true }, // solved attempt does NOT count
+  { puzzleId: 'c', solved: true }, // c never fails → absent
+];
+
+describe('failCountByPuzzle', () => {
+  it('counts only failures, keyed by puzzleId', () => {
+    const m = failCountByPuzzle(failAttempts);
+    expect(m.get('a')).toBe(3);
+    expect(m.get('b')).toBe(1);
+    expect(m.has('c')).toBe(false); // no failures → not present
+    expect(m.size).toBe(2);
+  });
+
+  it('matches the tallies buildLapseSet ranks by', () => {
+    const m = failCountByPuzzle(failAttempts);
+    // a (3) ranks above b (1).
+    expect([...m.entries()].sort((x, y) => y[1] - x[1]).map(([id]) => id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('buildLapseSet (output unchanged after extraction — regression)', () => {
+  it('ranks puzzles by failure count, ties broken by id, sliced to k', () => {
+    expect(buildLapseSet(failAttempts, 2)).toEqual(['a', 'b']);
+    expect(buildLapseSet(failAttempts, 1)).toEqual(['a']);
+  });
+
+  it('breaks ties deterministically by ascending id', () => {
+    const tied: AttemptLike[] = [
+      { puzzleId: 'z', solved: false },
+      { puzzleId: 'y', solved: false },
+    ];
+    expect(buildLapseSet(tied, 2)).toEqual(['y', 'z']);
+  });
+
+  it('returns an empty set when there are no failures', () => {
+    expect(buildLapseSet([{ puzzleId: 'c', solved: true }], 5)).toEqual([]);
+  });
+});
+
+describe('isLeech', () => {
+  it('is true at or above the threshold, false below', () => {
+    expect(isLeech(3, 3)).toBe(true);
+    expect(isLeech(4, 3)).toBe(true);
+    expect(isLeech(2, 3)).toBe(false);
+    expect(isLeech(0, 3)).toBe(false);
   });
 });

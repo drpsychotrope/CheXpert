@@ -22,15 +22,26 @@ export interface AttemptLike {
   solved: boolean;
 }
 
-/** The `k` puzzles you fail most (any source), ranked by failure count (a "your misses" set). */
-export function buildLapseSet(attempts: AttemptLike[], k: number): string[] {
+/** Failure tally per puzzle id (the single source of truth for "most-failed"). Pure. */
+export function failCountByPuzzle(attempts: AttemptLike[]): Map<string, number> {
   const fails = new Map<string, number>();
   for (const a of attempts) {
     if (a.solved) continue;
     fails.set(a.puzzleId, (fails.get(a.puzzleId) ?? 0) + 1);
   }
+  return fails;
+}
+
+/** The `k` puzzles you fail most (any source), ranked by failure count (a "your misses" set). */
+export function buildLapseSet(attempts: AttemptLike[], k: number): string[] {
+  const fails = failCountByPuzzle(attempts);
   return [...fails.entries()]
     .sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1))
     .slice(0, k)
     .map(([id]) => id);
+}
+
+/** A puzzle is a "leech" once it's been failed at least `threshold` times (Q-B: N=3). Pure. */
+export function isLeech(failCount: number, threshold: number): boolean {
+  return failCount >= threshold;
 }
