@@ -33,6 +33,7 @@
     thinking = true;
     lines = [];
     try {
+      await app.engine.resetVariant();
       const res = await app.engine.analyzeLines(game.fen, { multipv: 3, movetime: 600 });
       if (my !== seq) return;
       lines = res.filter((l) => l.uci).map((l) => ({ uci: l.uci as string, san: sanOf(l.uci as string), cp: l.whiteCp, mate: l.mate }));

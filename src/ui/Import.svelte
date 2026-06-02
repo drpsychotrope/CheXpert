@@ -53,6 +53,7 @@
         analyzed: false,
       });
 
+      await app.engine.resetVariant();
       const res = await runAnalysis(app.engine, app.puzzles, {
         gameId,
         pgn,

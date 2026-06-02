@@ -299,7 +299,7 @@
   /** Coached mode (Phase 1, best-effort): quick shallow eval; warn on a big drop. */
   async function coachCheck() {
     try {
-      const evalRes = await app.engine.evaluate(game.fen, { depth: 8 });
+      const evalRes = await app.engine.evaluate(variant === 'chess960' ? game.fenForEngine() : game.fen, { depth: 8 });
       // After the player's move it is the opponent's turn; a very negative
       // White-POV score (for a white player) means the move likely blundered.
       const cp = evalRes.whiteCp;
@@ -413,8 +413,7 @@
       // Also reset UCI_Chess960 so analysis never runs in 960 mode (AP-960-4).
       await app.engine.init();
       app.engine.setOption('UCI_LimitStrength', false);
-      app.engine.setOption('UCI_Chess960', false);
-      await app.engine.isready();
+      await app.engine.resetVariant();
 
       const res = await runAnalysis(app.engine, app.puzzles, {
         gameId: lastGame.id,

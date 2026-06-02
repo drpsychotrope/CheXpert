@@ -120,6 +120,9 @@
   async function onGameMove(from: string, to: string) {
     if (!opponent || game.turn !== 'w' || gameThinking) return;
 
+    // Ensure standard mode (onboarding is never 960; guard against leaked state).
+    await app.engine.resetVariant();
+
     // Best-move eval BEFORE the user moves, to compute centipawn loss.
     let bestCp = 0;
     try {

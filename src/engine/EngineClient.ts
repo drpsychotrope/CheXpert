@@ -177,6 +177,13 @@ export class EngineClient {
     return lines;
   }
 
+  /** Ensure the engine is in STANDARD (non-960) mode. Idempotent; call before evaluating standard positions. */
+  async resetVariant(): Promise<void> {
+    await this.init();
+    this.setOption('UCI_Chess960', false);
+    await this.isready();
+  }
+
   /** Hard interrupt: kill the worker and respawn (lite single-thread cannot soft-stop). */
   async interrupt(): Promise<void> {
     this.terminate();
