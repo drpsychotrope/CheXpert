@@ -55,14 +55,13 @@
     return squareFrom(rnd());
   }
 
-  // --- coordinate↔square drill ---
-  let coordMode = $state<'find' | 'name'>('find'); // find = name→click, name = click→name
+  // --- coordinate→square drill: show a coordinate, click the square on a blank board.
+  // The reverse "name the lit square" mode was dropped — naming a square on an empty,
+  // unlabeled board is orientation-ambiguous, so a correct read could be typed/counted as a
+  // different square and wrongly marked incorrect (ADR-0043). Clicking is unambiguous.
   let coordTarget = $state('');
-  let coordGuess = $state('');
   function newCoordinate() {
-    coordMode = rnd() < 0.5 ? 'find' : 'name';
     coordTarget = nextSquare();
-    coordGuess = '';
     feedback = ''; feedbackKind = '';
     promptAt = Date.now();
   }
@@ -71,8 +70,7 @@
     await reviewItem('vision-square', coordTarget, resultToGrade(ok, elapsed(), VISION_GRADE_THRESHOLDS), Date.now());
     setTimeout(newCoordinate, 750);
   }
-  function onCoordClick(sq: string) { if (coordMode === 'find' && !feedback) void gradeCoordinate(sq === coordTarget); }
-  function onCoordName() { if (coordMode === 'name') void gradeCoordinate(coordGuess.trim().toLowerCase() === coordTarget); }
+  function onCoordClick(sq: string) { if (!feedback) void gradeCoordinate(sq === coordTarget); }
 
   // --- blindfold drill ---
   const FALLBACK_FENS = [
@@ -194,8 +192,8 @@
     <p class="muted">Board mastery: <b>{Math.round(mastery * 100)}%</b></p>
     <div class="drills">
       <button class="drill-card" onclick={() => startDrill('coordinate')}>
-        <b>Coordinate ↔ square</b>
-        <span class="muted">Click the named square on a blank board — or name the lit one.</span>
+        <b>Coordinate → square</b>
+        <span class="muted">A coordinate is named — click it on a blank board, as fast as you can.</span>
       </button>
       <button class="drill-card" onclick={() => startDrill('blindfold')}>
         <b>Blindfold</b>
@@ -217,23 +215,11 @@
 
   {:else if drill === 'coordinate'}
     <p class="muted">Score {correct}/{asked} · streak {streak}</p>
-    {#if coordMode === 'find'}
-      <div class="prompt">{coordTarget}</div>
-      <p class="muted">Click this square.</p>
-      <div class="board-wrap" style="max-width:300px">
-        <Board fen={EMPTY_FEN} coords={false} onSelect={onCoordClick} />
-      </div>
-    {:else}
-      <p class="muted">Name the highlighted square.</p>
-      <div class="board-wrap" style="max-width:300px">
-        <Board fen={EMPTY_FEN} coords={false} viewOnly={true} marker={coordTarget} />
-      </div>
-      <div class="row center">
-        <input bind:value={coordGuess} placeholder="e.g. e4" style="width:6rem"
-          onkeydown={(e) => e.key === 'Enter' && onCoordName()} />
-        <button onclick={onCoordName} disabled={coordGuess === ''}>Check</button>
-      </div>
-    {/if}
+    <div class="prompt">{coordTarget}</div>
+    <p class="muted">Click this square.</p>
+    <div class="board-wrap" style="max-width:300px">
+      <Board fen={EMPTY_FEN} coords={false} onSelect={onCoordClick} />
+    </div>
     <p class="feedback {feedbackKind}">{feedback}</p>
     <button class="ghost" onclick={backToMenu}>← Drills</button>
 
