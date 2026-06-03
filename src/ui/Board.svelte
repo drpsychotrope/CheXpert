@@ -23,6 +23,9 @@
     coords?: boolean;
     /** Single-square click handler (chessground `events.select`). Enables `selectable`. ADR-0042. */
     onSelect?: (square: string) => void;
+    /** Draw a clear marker (green circle) on this square — used to point at the target square
+     *  in the coordinate "name the lit square" drill, where a faint lastMove tint reads poorly. ADR-0042. */
+    marker?: string;
   }
 
   let {
@@ -37,6 +40,7 @@
     onMove,
     coords = true,
     onSelect,
+    marker,
   }: Props = $props();
 
   let el: HTMLDivElement;
@@ -75,7 +79,10 @@
       },
       animation: { enabled: true, duration: 200 },
       highlight: { lastMove: true, check: true },
-      drawable: { enabled: true },
+      drawable: {
+        enabled: true,
+        autoShapes: marker ? [{ orig: marker as Key, brush: 'green' }] : [],
+      },
     };
   }
 

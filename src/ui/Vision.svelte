@@ -226,7 +226,7 @@
     {:else}
       <p class="muted">Name the highlighted square.</p>
       <div class="board-wrap" style="max-width:300px">
-        <Board fen={EMPTY_FEN} coords={false} viewOnly={true} lastMove={[coordTarget, coordTarget]} />
+        <Board fen={EMPTY_FEN} coords={false} viewOnly={true} marker={coordTarget} />
       </div>
       <div class="row center">
         <input bind:value={coordGuess} placeholder="e.g. e4" style="width:6rem"
