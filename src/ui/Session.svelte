@@ -17,7 +17,8 @@
   import { buildWeaknessProfile } from '../analysis/weakness';
   import { buildStudyPlan } from '../analysis/studyPlan';
   import { buildSession, type SessionStep } from '../analysis/session';
-  import { dueCount } from '../srs/SrsStore';
+  import { dueCount, dueCards } from '../srs/SrsStore';
+  import { weakSquares } from '../vision/weakSquares';
   import { poolRating } from '../store/playerModel';
 
   let loading = $state(true);
@@ -63,8 +64,15 @@
         const weakest = analyses.length
           ? buildWeaknessProfile(analyses, model ? poolRating(model, 'classical').rating : 1200).weakest
           : null;
-        const plan = buildStudyPlan(leaks, weakest, minutes);
-        const includeReview = (await dueCount(Date.now())) > 0; // Q-F: reserve a Review slot only when due
+        const nowMs = Date.now();
+        // ADR-0042: surface due vision squares for the warm-up, and seed the trainer with them.
+        const visionCards = await dueCards(nowMs, 'vision-square', 200);
+        const weak = weakSquares(visionCards, nowMs, 12);
+        app.visionWeakSquares = weak.length ? weak : null;
+        const plan = buildStudyPlan(leaks, weakest, minutes, { visionWeakSquares: weak });
+        // Scope the Review gate to the kinds the Review path actually covers (puzzle + repertoire),
+        // so due vision-square cards never reserve a Review slot. (Q-A = exclude-vision-only.)
+        const includeReview = ((await dueCount(nowMs, 'puzzle')) + (await dueCount(nowMs, 'repertoire'))) > 0;
         const session = buildSession(plan, { includeReview });
         app.activeSession = { plan: session, current: 0, startedAt: Date.now(), reflection: '' };
         loading = false;

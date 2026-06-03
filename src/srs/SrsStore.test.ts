@@ -41,4 +41,18 @@ describe('SrsStore', () => {
     // After a lapse it should be due again within a day.
     expect(await dueCount(due + 86400000)).toBe(1);
   });
+
+  // ADR-0042: per-square vision cards must not leak into the puzzle Review gate.
+  it('vision-square cards round-trip and do not inflate the puzzle due-count', async () => {
+    await ensureCard('vision-square', 'e4', T0);
+    await ensureCard('puzzle', 'p1', T0);
+
+    const vision = await dueCards(T0, 'vision-square');
+    expect(vision).toHaveLength(1);
+    expect(vision[0].id).toBe('vision-square:e4');
+
+    // The session Review gate scopes to 'puzzle' — the due vision card is invisible to it.
+    expect(await dueCount(T0, 'puzzle')).toBe(1);
+    expect(await dueCount(T0, 'vision-square')).toBe(1);
+  });
 });

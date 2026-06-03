@@ -651,3 +651,30 @@ Q-F `time-controls` owns the union, fallback if 960 ships first. Anti-patterns A
 becomes relevant if 960 games are ever analyzed/imported); a unit test pinning `resetVariant`/
 `UCI_Chess960`; a clarifying comment on `coachCheck`'s engine-variant ownership; the
 currently-unreachable Shredder branch in `fenForEngine`; timed 960; 960 auto-analysis.
+
+## ADR-0042 — Board-vision drills refonte
+**Date:** 2026-06-03 · **Status:** accepted
+
+Supersedes the vision-drill roster of ADR-0018. **The closed-form test:** a vision drill whose answer
+follows from a position-independent formula trains arithmetic, not vision. The old `Square colours`
+drill failed it (colour = `(file+rank)` parity), so it is **cut as an isolated drill** — the
+`squareColor` function stays, surfacing only as a by-product of the new Lines & diagonals drill.
+
+**New roster (5):** coordinate↔square + blindfold (single-square), lines/diagonals/reach, and the kept
+knight-distance + find-them-all. **Hybrid persistence (Q-A/Q-B/Q-C accepted at default):**
+- Per-square retention reuses FSRS via a new `SrsItemKind` `'vision-square'` (`refId` = the square),
+  graded by coordinate (speed, `VISION_GRADE_THRESHOLDS` 1500/5000 ms) and blindfold (**correctness
+  only** — memory, not speed). Reuses ADR-0010/ADR-0011 scheduling; no new scheduler.
+- Per-drill skill (diagonal/knight/find-all) on the additive `PlayerModel.visionStats` field — **no
+  `DB_VERSION` bump** (precedent `conceptSeen`).
+- Blindfold answers are colour-sensitive (case-sensitive FEN char).
+
+Weak squares (`weakSquares` over due `vision-square` cards) retarget the studyPlan warm-up ("targeted
+recall") and seed the coordinate/blindfold prompts via `app.visionWeakSquares`. The session Review
+gate is scoped to `puzzle`+`repertoire` so due vision cards never reserve a Review slot
+(exclude-vision-only); `Review.svelte` was already puzzle-scoped. Pure cores in `src/vision/`
+(`geometry`, `blindfold`, `visionStats`, `weakSquares`, `grading`), one `*.test.ts` each. Spec:
+`specs/vision-refonte-spec.md`; design: `docs/superpowers/specs/2026-06-02-vision-refonte-design.md`.
+
+**Follow-ups.** Dedicated dashboard/insights vision tile; full blindfold reconstruction (multi-square);
+the pre-existing repertoire Review-gate over-count (only excluded here, not fixed).

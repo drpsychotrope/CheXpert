@@ -1,15 +1,24 @@
 <script lang="ts">
-  // Calculation / visualisation drills (no board needed — pure mental vision).
-  //   1) Square colour: name a random square's colour, fast.
-  //   2) Knight distance: how many knight moves from A to B (shortest)?
+  // Calculation / board-vision drills (ADR-0042). Drills that force locating/relating REAL
+  // squares — no closed-form shortcut. Single-square drills (coordinate, blindfold) persist
+  // per-square retention as FSRS 'vision-square' cards; relational/calc drills (relation,
+  // knight, find-all) persist per-drill stats on PlayerModel.visionStats.
   import {
-    squareColor, squareFrom, allSquares, knightShortestPath, knightDistance,
+    squareFrom, knightShortestPath, knightDistance,
   } from '../vision/vision';
+  import { genRelation } from '../vision/geometry';
+  import { pieceAt, genBlindfold } from '../vision/blindfold';
+  import { VISION_GRADE_THRESHOLDS, blindfoldGrade } from '../vision/grading';
+  import { recordDrill } from '../vision/visionStats';
+  import { visionMastery } from '../vision/weakSquares';
+  import { allChecks, allCaptures, hangingPieces } from '../vision/tacticsVision';
+  import { reviewItem, allCards } from '../srs/SrsStore';
+  import { resultToGrade } from '../srs/fsrs';
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
-  import { allChecks, allCaptures, hangingPieces } from '../vision/tacticsVision';
 
-  let drill = $state<'menu' | 'color' | 'knight' | 'findall'>('menu');
+  type Drill = 'menu' | 'coordinate' | 'blindfold' | 'relation' | 'knight' | 'findall';
+  let drill = $state<Drill>('menu');
 
   // --- shared scoring ---
   let asked = $state(0);
@@ -17,34 +26,102 @@
   let streak = $state(0);
   let feedback = $state('');
   let feedbackKind = $state<'good' | 'bad' | ''>('');
+  let promptAt = 0; // ms when the current answerable prompt was shown (UI owns time)
+  let mastery = $state(0);
 
-  // We can't use Math.random in the pure core, but the UI may — seed each prompt.
-  function rnd(): number {
-    return Math.random();
-  }
+  const EMPTY_FEN = '8/8/8/8/8/8/8/8';
+  function rnd(): number { return Math.random(); }
+  function elapsed(): number { return Date.now() - promptAt; }
 
-  // --- square-colour drill ---
-  let colorSquare = $state('');
+  async function loadMastery() { mastery = visionMastery(await allCards()); }
+  loadMastery();
 
-  function newColor() {
-    colorSquare = squareFrom(rnd());
-    feedback = '';
-    feedbackKind = '';
-  }
-
-  function answerColor(guess: 'light' | 'dark') {
+  function score(ok: boolean, msg: string) {
     asked += 1;
-    if (squareColor(colorSquare) === guess) {
-      correct += 1;
-      streak += 1;
-      feedback = `✔ ${colorSquare} is ${guess}.`;
-      feedbackKind = 'good';
-    } else {
-      streak = 0;
-      feedback = `✗ ${colorSquare} is ${squareColor(colorSquare)}.`;
-      feedbackKind = 'bad';
-    }
-    setTimeout(newColor, 700);
+    if (ok) { correct += 1; streak += 1; feedback = `✔ ${msg}`; feedbackKind = 'good'; }
+    else { streak = 0; feedback = `✗ ${msg}`; feedbackKind = 'bad'; }
+  }
+  function persistDrill(key: 'diagonal' | 'knight' | 'findall', ok: boolean, ms: number) {
+    if (!app.model) return;
+    app.model.visionStats = recordDrill(app.model.visionStats ?? {}, key, ok, ms, Date.now());
+    void app.persistModel(Date.now());
+  }
+
+  // Seed coordinate/blindfold onto due weak squares when a session set them; else uniform random.
+  let weakIdx = 0;
+  function nextSquare(): string {
+    const weak = app.visionWeakSquares;
+    if (weak && weak.length) return weak[weakIdx++ % weak.length];
+    return squareFrom(rnd());
+  }
+
+  // --- coordinate↔square drill ---
+  let coordMode = $state<'find' | 'name'>('find'); // find = name→click, name = click→name
+  let coordTarget = $state('');
+  let coordGuess = $state('');
+  function newCoordinate() {
+    coordMode = rnd() < 0.5 ? 'find' : 'name';
+    coordTarget = nextSquare();
+    coordGuess = '';
+    feedback = ''; feedbackKind = '';
+    promptAt = Date.now();
+  }
+  async function gradeCoordinate(ok: boolean) {
+    score(ok, ok ? `${coordTarget}.` : `it was ${coordTarget}.`);
+    await reviewItem('vision-square', coordTarget, resultToGrade(ok, elapsed(), VISION_GRADE_THRESHOLDS), Date.now());
+    setTimeout(newCoordinate, 750);
+  }
+  function onCoordClick(sq: string) { if (coordMode === 'find' && !feedback) void gradeCoordinate(sq === coordTarget); }
+  function onCoordName() { if (coordMode === 'name') void gradeCoordinate(coordGuess.trim().toLowerCase() === coordTarget); }
+
+  // --- blindfold drill ---
+  const FALLBACK_FENS = [
+    'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1',
+    '2kr3r/ppp2ppp/2n5/2bqp3/8/2N2N2/PPPP1PPP/R1BQ1RK1 w - - 0 1',
+    'r3k2r/pp1n1ppp/2p1pn2/q7/2BP4/2N1PN2/PP3PPP/R2Q1RK1 w kq - 0 1',
+  ];
+  const WHITE_PIECES: Array<[string, string]> = [['K', '♔'], ['Q', '♕'], ['R', '♖'], ['B', '♗'], ['N', '♘'], ['P', '♙']];
+  const BLACK_PIECES: Array<[string, string]> = [['k', '♚'], ['q', '♛'], ['r', '♜'], ['b', '♝'], ['n', '♞'], ['p', '♟']];
+  let blindFen = $state('');
+  let blindSquare = $state('');
+  let blindAnswer: string | null = null;
+  let blindPhase = $state<'show' | 'ask'>('show');
+  let blindTimer: ReturnType<typeof setTimeout> | null = null;
+  function newBlindfold() {
+    const p = app.model ? app.puzzles.next({ rating: app.model.puzzleRating.rating, window: 600, exclude: new Set() }) : null;
+    blindFen = p?.fen ?? FALLBACK_FENS[Math.floor(rnd() * FALLBACK_FENS.length)];
+    const weak = app.visionWeakSquares;
+    blindSquare = weak && weak.length ? nextSquare() : genBlindfold(blindFen, rnd()).square;
+    blindAnswer = pieceAt(blindFen, blindSquare);
+    blindPhase = 'show';
+    feedback = ''; feedbackKind = '';
+    if (blindTimer) clearTimeout(blindTimer);
+    blindTimer = setTimeout(() => { blindPhase = 'ask'; promptAt = Date.now(); }, 3000);
+  }
+  async function answerBlindfold(pick: string | null) {
+    if (blindPhase !== 'ask' || feedback) return;
+    const ok = pick === blindAnswer;
+    const truth = blindAnswer ? `${blindSquare} = ${blindAnswer}` : `${blindSquare} is empty`;
+    score(ok, ok ? `${truth}.` : `${truth}.`);
+    await reviewItem('vision-square', blindSquare, blindfoldGrade(ok), Date.now());
+    setTimeout(newBlindfold, 900);
+  }
+
+  // --- relation drill (diagonal / line / colour) ---
+  let rel = $state<ReturnType<typeof genRelation> | null>(null);
+  let relGuess = $state('');
+  function newRelation() {
+    rel = genRelation(rnd());
+    relGuess = '';
+    feedback = ''; feedbackKind = '';
+    promptAt = Date.now();
+  }
+  function answerRelation(guess: boolean | number) {
+    if (!rel || feedback) return;
+    const ok = guess === rel.answer;
+    score(ok, `answer: ${typeof rel.answer === 'boolean' ? (rel.answer ? 'yes' : 'no') : rel.answer}.`);
+    persistDrill('diagonal', ok, elapsed());
+    setTimeout(newRelation, 800);
   }
 
   // --- knight-distance drill ---
@@ -52,48 +129,27 @@
   let kTo = $state('');
   let kAnswer = $state('');
   let kRevealed = $state<string[] | null>(null);
-
   function newKnight() {
-    const all = allSquares();
-    kFrom = all[Math.floor(rnd() * 64)];
-    do {
-      kTo = all[Math.floor(rnd() * 64)];
-    } while (kTo === kFrom);
-    kAnswer = '';
-    kRevealed = null;
-    feedback = '';
-    feedbackKind = '';
+    kFrom = squareFrom(rnd());
+    do { kTo = squareFrom(rnd()); } while (kTo === kFrom);
+    kAnswer = ''; kRevealed = null;
+    feedback = ''; feedbackKind = '';
+    promptAt = Date.now();
   }
-
   function answerKnight() {
-    const guess = Number(kAnswer);
     const truth = knightDistance(kFrom, kTo);
-    asked += 1;
-    if (guess === truth) {
-      correct += 1;
-      streak += 1;
-      feedback = `✔ ${truth} move${truth === 1 ? '' : 's'}.`;
-      feedbackKind = 'good';
-    } else {
-      streak = 0;
-      feedback = `✗ shortest is ${truth} move${truth === 1 ? '' : 's'}.`;
-      feedbackKind = 'bad';
-      kRevealed = knightShortestPath(kFrom, kTo);
-    }
+    const ok = Number(kAnswer) === truth;
+    score(ok, `${truth} move${truth === 1 ? '' : 's'}.`);
+    if (!ok) kRevealed = knightShortestPath(kFrom, kTo);
+    persistDrill('knight', ok, elapsed());
   }
 
-  // --- find-all drill (checks / captures / hanging pieces) ---
-  const FALLBACK_FENS = [
-    'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1',
-    '2kr3r/ppp2ppp/2n5/2bqp3/8/2N2N2/PPPP1PPP/R1BQ1RK1 w - - 0 1',
-    'r3k2r/pp1n1ppp/2p1pn2/q7/2BP4/2N1PN2/PP3PPP/R2Q1RK1 w kq - 0 1',
-  ];
+  // --- find-all drill ---
   let faFen = $state('');
   let faTask = $state<'checks' | 'captures' | 'hanging'>('checks');
   let faTargets: string[] = [];
   let faAnswer = $state('');
   const faLabel = { checks: 'checking moves', captures: 'captures', hanging: 'pieces you can win' };
-
   function newFindAll() {
     const p = app.model ? app.puzzles.next({ rating: app.model.puzzleRating.rating, window: 600, exclude: new Set() }) : null;
     faFen = p?.fen ?? FALLBACK_FENS[Math.floor(rnd() * FALLBACK_FENS.length)];
@@ -101,33 +157,29 @@
     faTask = tasks[Math.floor(rnd() * 3)];
     faTargets = faTask === 'checks' ? allChecks(faFen) : faTask === 'captures' ? allCaptures(faFen) : hangingPieces(faFen);
     faAnswer = '';
-    feedback = '';
-    feedbackKind = '';
+    feedback = ''; feedbackKind = '';
+    promptAt = Date.now();
   }
-
   function answerFindAll() {
-    asked += 1;
     const truth = faTargets.length;
-    if (Number(faAnswer) === truth) {
-      correct += 1;
-      streak += 1;
-      feedback = `✔ ${truth} ${faLabel[faTask]}.`;
-      feedbackKind = 'good';
-    } else {
-      streak = 0;
-      feedback = `✗ there ${truth === 1 ? 'is' : 'are'} ${truth} ${faLabel[faTask]}.`;
-      feedbackKind = 'bad';
-    }
+    const ok = Number(faAnswer) === truth;
+    score(ok, `there ${truth === 1 ? 'is' : 'are'} ${truth} ${faLabel[faTask]}.`);
+    persistDrill('findall', ok, elapsed());
   }
 
-  function startDrill(which: 'color' | 'knight' | 'findall') {
-    asked = 0;
-    correct = 0;
-    streak = 0;
+  function startDrill(which: Drill) {
+    asked = 0; correct = 0; streak = 0; weakIdx = 0;
     drill = which;
-    if (which === 'color') newColor();
+    if (which === 'coordinate') newCoordinate();
+    else if (which === 'blindfold') newBlindfold();
+    else if (which === 'relation') newRelation();
     else if (which === 'knight') newKnight();
-    else newFindAll();
+    else if (which === 'findall') newFindAll();
+  }
+  function backToMenu() {
+    if (blindTimer) clearTimeout(blindTimer);
+    drill = 'menu';
+    void loadMastery();
   }
 </script>
 
@@ -135,14 +187,23 @@
   <h2>Calculation & vision</h2>
 
   {#if drill === 'menu'}
-    <p class="muted" style="max-width:560px">
-      Pure visualisation — no board to lean on. Train the board vision and calculation that make
-      tactics faster: instant square colours, and knight geometry.
+    <p class="muted" style="max-width:580px">
+      Board vision you can't fake — every drill needs you to locate or relate real squares, not
+      compute a formula. Per-square recall is spaced-repeated so weak squares come back.
     </p>
+    <p class="muted">Board mastery: <b>{Math.round(mastery * 100)}%</b></p>
     <div class="drills">
-      <button class="drill-card" onclick={() => startDrill('color')}>
-        <b>Square colours</b>
-        <span class="muted">Name a square's colour from memory, as fast as you can.</span>
+      <button class="drill-card" onclick={() => startDrill('coordinate')}>
+        <b>Coordinate ↔ square</b>
+        <span class="muted">Click the named square on a blank board — or name the lit one.</span>
+      </button>
+      <button class="drill-card" onclick={() => startDrill('blindfold')}>
+        <b>Blindfold</b>
+        <span class="muted">Study a position, then recall what stands on a square from memory.</span>
+      </button>
+      <button class="drill-card" onclick={() => startDrill('relation')}>
+        <b>Lines & diagonals</b>
+        <span class="muted">Same diagonal? Same colour? How many squares between?</span>
       </button>
       <button class="drill-card" onclick={() => startDrill('knight')}>
         <b>Knight distance</b>
@@ -154,23 +215,73 @@
       </button>
     </div>
 
-  {:else if drill === 'color'}
+  {:else if drill === 'coordinate'}
     <p class="muted">Score {correct}/{asked} · streak {streak}</p>
-    <div class="prompt">{colorSquare}</div>
-    <p class="muted">What colour is this square?</p>
-    <div class="row center">
-      <button onclick={() => answerColor('light')} style="background:#e8d5b0;color:#333">Light</button>
-      <button onclick={() => answerColor('dark')} style="background:#7a5a3a">Dark</button>
-    </div>
+    {#if coordMode === 'find'}
+      <div class="prompt">{coordTarget}</div>
+      <p class="muted">Click this square.</p>
+      <div class="board-wrap" style="max-width:300px">
+        <Board fen={EMPTY_FEN} coords={false} onSelect={onCoordClick} />
+      </div>
+    {:else}
+      <p class="muted">Name the highlighted square.</p>
+      <div class="board-wrap" style="max-width:300px">
+        <Board fen={EMPTY_FEN} coords={false} viewOnly={true} lastMove={[coordTarget, coordTarget]} />
+      </div>
+      <div class="row center">
+        <input bind:value={coordGuess} placeholder="e.g. e4" style="width:6rem"
+          onkeydown={(e) => e.key === 'Enter' && onCoordName()} />
+        <button onclick={onCoordName} disabled={coordGuess === ''}>Check</button>
+      </div>
+    {/if}
     <p class="feedback {feedbackKind}">{feedback}</p>
-    <button class="ghost" onclick={() => (drill = 'menu')}>← Drills</button>
+    <button class="ghost" onclick={backToMenu}>← Drills</button>
+
+  {:else if drill === 'blindfold'}
+    <p class="muted">Score {correct}/{asked} · streak {streak}</p>
+    {#if blindPhase === 'show'}
+      <p class="muted">Memorise — board hides in a moment…</p>
+      <div class="board-wrap" style="max-width:300px">
+        <Board fen={blindFen} viewOnly={true} />
+      </div>
+    {:else}
+      <p class="muted">What piece is on <b>{blindSquare}</b>?</p>
+      <div class="piece-pick">
+        {#each WHITE_PIECES as [ch, sym]}<button class="pc" onclick={() => answerBlindfold(ch)}>{sym}</button>{/each}
+      </div>
+      <div class="piece-pick">
+        {#each BLACK_PIECES as [ch, sym]}<button class="pc" onclick={() => answerBlindfold(ch)}>{sym}</button>{/each}
+      </div>
+      <button onclick={() => answerBlindfold(null)}>Empty</button>
+    {/if}
+    <p class="feedback {feedbackKind}">{feedback}</p>
+    <button class="ghost" onclick={backToMenu}>← Drills</button>
+
+  {:else if drill === 'relation'}
+    <p class="muted">Score {correct}/{asked} · streak {streak}</p>
+    <div class="prompt small">{rel?.prompt}</div>
+    {#if rel && rel.kind === 'between'}
+      <div class="row center">
+        <input type="number" min="0" max="6" bind:value={relGuess} style="width:5rem"
+          onkeydown={(e) => e.key === 'Enter' && answerRelation(Number(relGuess))} />
+        <button onclick={() => answerRelation(Number(relGuess))} disabled={relGuess === ''}>Check</button>
+      </div>
+    {:else}
+      <div class="row center">
+        <button onclick={() => answerRelation(true)}>Yes</button>
+        <button onclick={() => answerRelation(false)}>No</button>
+      </div>
+    {/if}
+    <p class="feedback {feedbackKind}">{feedback}</p>
+    <button class="ghost" onclick={backToMenu}>← Drills</button>
 
   {:else if drill === 'knight'}
     <p class="muted">Score {correct}/{asked} · streak {streak}</p>
     <div class="prompt small">{kFrom} → {kTo}</div>
     <p class="muted">Fewest knight moves?</p>
     <div class="row center">
-      <input type="number" min="1" max="8" bind:value={kAnswer} style="width:5rem" onkeydown={(e) => e.key === 'Enter' && answerKnight()} />
+      <input type="number" min="1" max="8" bind:value={kAnswer} style="width:5rem"
+        onkeydown={(e) => e.key === 'Enter' && answerKnight()} />
       <button onclick={answerKnight} disabled={kAnswer === ''}>Check</button>
       <button class="ghost" onclick={newKnight}>Next →</button>
     </div>
@@ -178,7 +289,7 @@
     {#if kRevealed}
       <p class="muted" style="font-size:0.85rem">Path: {kRevealed.join(' → ')}</p>
     {/if}
-    <button class="ghost" onclick={() => (drill = 'menu')}>← Drills</button>
+    <button class="ghost" onclick={backToMenu}>← Drills</button>
 
   {:else if drill === 'findall'}
     <p class="muted">Score {correct}/{asked} · streak {streak}</p>
@@ -187,12 +298,13 @@
     </div>
     <p class="muted">How many <b>{faLabel[faTask]}</b> for the side to move?</p>
     <div class="row center">
-      <input type="number" min="0" max="40" bind:value={faAnswer} style="width:5rem" onkeydown={(e) => e.key === 'Enter' && answerFindAll()} />
+      <input type="number" min="0" max="40" bind:value={faAnswer} style="width:5rem"
+        onkeydown={(e) => e.key === 'Enter' && answerFindAll()} />
       <button onclick={answerFindAll} disabled={faAnswer === ''}>Check</button>
       <button class="ghost" onclick={newFindAll}>Next →</button>
     </div>
     <p class="feedback {feedbackKind}">{feedback}</p>
-    <button class="ghost" onclick={() => (drill = 'menu')}>← Drills</button>
+    <button class="ghost" onclick={backToMenu}>← Drills</button>
   {/if}
 </section>
 
@@ -201,6 +313,8 @@
   .drill-card { display: flex; flex-direction: column; gap: 0.3rem; text-align: left; align-items: flex-start; background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 0.8rem 1rem; border-radius: 10px; cursor: pointer; }
   .drill-card .muted { font-size: 0.8rem; }
   .prompt { font-size: 3rem; font-weight: 700; letter-spacing: 0.1em; padding: 1rem 0; }
-  .prompt.small { font-size: 2rem; }
+  .prompt.small { font-size: 1.6rem; }
+  .piece-pick { display: flex; gap: 0.3rem; }
+  .pc { font-size: 1.6rem; line-height: 1; padding: 0.3rem 0.5rem; }
   button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
 </style>

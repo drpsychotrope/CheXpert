@@ -60,6 +60,8 @@ export interface PlayerModel {
   /** Resolved motif keys whose concept card has already been offered at first-exposure
    *  (ADR-0040). Additive; old records lack it and read `?? []`. NO DB_VERSION bump. */
   conceptSeen?: string[];
+  /** Per-drill board-vision stats (ADR-0042). Additive; old records read `?? {}`. NO DB_VERSION bump. */
+  visionStats?: import('../vision/visionStats').VisionStats;
   onboarded: boolean;
   createdAt: number;
   updatedAt: number;

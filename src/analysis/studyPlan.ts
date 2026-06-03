@@ -20,14 +20,29 @@ function activityForLeak(leak: Leak): { activity: PlanItem['activity']; focus: s
   return { activity: 'tactics', focus: leak.motif };
 }
 
+export interface StudyPlanOpts {
+  /** Due vision squares (ADR-0042). When present, the warm-up becomes targeted recall. */
+  visionWeakSquares?: string[];
+}
+
 /** Build a single day's plan (≤ minutesPerDay), worst-impact leaks first. */
-export function buildStudyPlan(leaks: Leak[], weakest: Dimension | null, minutesPerDay: number): PlanItem[] {
+export function buildStudyPlan(
+  leaks: Leak[],
+  weakest: Dimension | null,
+  minutesPerDay: number,
+  opts: StudyPlanOpts = {},
+): PlanItem[] {
   const plan: PlanItem[] = [];
   let used = 0;
 
   const warmup = Math.min(3, minutesPerDay);
   if (warmup > 0) {
-    plan.push({ activity: 'vision', focus: 'board vision', minutes: warmup, reason: 'Warm-up: spot all checks, captures, and hanging pieces.' });
+    const weak = opts.visionWeakSquares ?? [];
+    plan.push(
+      weak.length
+        ? { activity: 'vision', focus: 'targeted recall', minutes: warmup, reason: `${weak.length} squares due — targeted recall.` }
+        : { activity: 'vision', focus: 'board vision', minutes: warmup, reason: 'Warm-up: spot all checks, captures, and hanging pieces.' },
+    );
     used += warmup;
   }
 

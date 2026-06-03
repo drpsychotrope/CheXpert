@@ -37,4 +37,17 @@ describe('buildStudyPlan', () => {
     const leaks = [leak('fork', 'middlegame', 5, 30)];
     expect(buildStudyPlan(leaks, 'tactics', 30)).toEqual(buildStudyPlan(leaks, 'tactics', 30));
   });
+
+  // ADR-0042: due vision squares retarget the warm-up.
+  it('targets weak squares in the vision step when provided', () => {
+    const plan = buildStudyPlan([], null, 30, { visionWeakSquares: ['a8', 'h1', 'e4'] });
+    const vision = plan.find((i) => i.activity === 'vision')!;
+    expect(vision.focus).toBe('targeted recall');
+    expect(vision.reason).toContain('3 squares');
+  });
+
+  it('keeps the generic vision warm-up when no weak squares are given', () => {
+    const vision = buildStudyPlan([], null, 30).find((i) => i.activity === 'vision')!;
+    expect(vision.focus).toBe('board vision');
+  });
 });

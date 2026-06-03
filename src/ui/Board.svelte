@@ -19,6 +19,10 @@
     lastMove?: [string, string] | null;
     check?: boolean;
     onMove?: (from: string, to: string) => void;
+    /** Hide the rank/file gutter labels (unlabeled board for the coordinate drill). ADR-0042. */
+    coords?: boolean;
+    /** Single-square click handler (chessground `events.select`). Enables `selectable`. ADR-0042. */
+    onSelect?: (square: string) => void;
   }
 
   let {
@@ -31,6 +35,8 @@
     lastMove = null,
     check = false,
     onMove,
+    coords = true,
+    onSelect,
   }: Props = $props();
 
   let el: HTMLDivElement;
@@ -52,6 +58,9 @@
       // in the gutters below, so they cannot desync from the squares.
       coordinates: false,
       lastMove: lastMove ? (lastMove as Key[]) : undefined,
+      // ADR-0042: when onSelect is set, enable square selection so an empty-square tap fires
+      // `events.select` (chessground does not emit it otherwise).
+      selectable: { enabled: !!onSelect },
       movable: {
         free: false,
         color: movableColor,
@@ -60,6 +69,9 @@
         events: {
           after: (from: Key, to: Key) => onMove?.(from as string, to as string),
         },
+      },
+      events: {
+        select: (key: Key) => onSelect?.(key as string),
       },
       animation: { enabled: true, duration: 200 },
       highlight: { lastMove: true, check: true },
@@ -88,14 +100,18 @@
 
 <div class="board-frame">
   <!-- rank labels (left gutter), one flex cell per row, aligned to the board grid -->
-  <div class="ranks">
-    {#each ranks as r}<span>{r}</span>{/each}
-  </div>
+  {#if coords}
+    <div class="ranks">
+      {#each ranks as r}<span>{r}</span>{/each}
+    </div>
+  {/if}
   <div class="cg-board-host" bind:this={el}></div>
   <!-- file labels (bottom gutter), one flex cell per column -->
-  <div class="files">
-    {#each files as f}<span>{f}</span>{/each}
-  </div>
+  {#if coords}
+    <div class="files">
+      {#each files as f}<span>{f}</span>{/each}
+    </div>
+  {/if}
 </div>
 
 <style>
