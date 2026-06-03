@@ -1,4 +1,4 @@
-// Weak-square selection + board-mastery, over a list of FSRS cards (ADR-0042). Pure — the caller
+// Weak-square selection + board-mastery, over a list of FSRS cards (ADR-0043). Pure — the caller
 // fetches the cards (e.g. dueCards(now,'vision-square')); no DB access here.
 
 import type { SrsCardRecord } from '../srs/types';

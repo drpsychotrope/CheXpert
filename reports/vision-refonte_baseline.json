@@ -23,7 +23,7 @@
   },
   "convention_constraints": {
     "decision_log": "decisions.md — append-only ADR-NNNN entries, supersede + cross-link, never amend in place",
-    "next_adr": "ADR-0042 (highest accepted = ADR-0041 Chess960)",
+    "next_adr": "ADR-0043 (highest accepted = ADR-0041 Chess960)",
     "adr_storage": "inline code comments + decisions.md + README catalogue (no adr/ dir)",
     "phase_order": "code first, docs last",
     "db_migrations": "additive fallthrough ladder; optional PlayerModel fields need no DB_VERSION bump",

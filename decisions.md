@@ -652,7 +652,7 @@ becomes relevant if 960 games are ever analyzed/imported); a unit test pinning `
 `UCI_Chess960`; a clarifying comment on `coachCheck`'s engine-variant ownership; the
 currently-unreachable Shredder branch in `fenForEngine`; timed 960; 960 auto-analysis.
 
-## ADR-0042 — Board-vision drills refonte
+## ADR-0043 — Board-vision drills refonte
 **Date:** 2026-06-03 · **Status:** accepted
 
 Supersedes the vision-drill roster of ADR-0018. **The closed-form test:** a vision drill whose answer

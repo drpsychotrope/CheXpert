@@ -1,4 +1,4 @@
-// Blindfold drill primitives (ADR-0042). Pure: read a piece off a FEN, and generate a
+// Blindfold drill primitives (ADR-0043). Pure: read a piece off a FEN, and generate a
 // single-square query deterministically. Colour is part of the answer (case-sensitive FEN char).
 
 import { allSquares } from './vision';

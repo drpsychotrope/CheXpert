@@ -38,7 +38,7 @@ describe('buildStudyPlan', () => {
     expect(buildStudyPlan(leaks, 'tactics', 30)).toEqual(buildStudyPlan(leaks, 'tactics', 30));
   });
 
-  // ADR-0042: due vision squares retarget the warm-up.
+  // ADR-0043: due vision squares retarget the warm-up.
   it('targets weak squares in the vision step when provided', () => {
     const plan = buildStudyPlan([], null, 30, { visionWeakSquares: ['a8', 'h1', 'e4'] });
     const vision = plan.find((i) => i.activity === 'vision')!;

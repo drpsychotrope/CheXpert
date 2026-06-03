@@ -21,7 +21,7 @@ function activityForLeak(leak: Leak): { activity: PlanItem['activity']; focus: s
 }
 
 export interface StudyPlanOpts {
-  /** Due vision squares (ADR-0042). When present, the warm-up becomes targeted recall. */
+  /** Due vision squares (ADR-0043). When present, the warm-up becomes targeted recall. */
   visionWeakSquares?: string[];
 }
 

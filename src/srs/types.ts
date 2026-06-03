@@ -4,7 +4,7 @@
 // ms so IndexedDB storage and unit tests are deterministic and structured-clone
 // edge cases never bite. Conversion happens at the boundary in srs/fsrs.ts.
 
-// 'vision-square' (ADR-0042): per-square board-vision retention. refId = the algebraic
+// 'vision-square' (ADR-0043): per-square board-vision retention. refId = the algebraic
 // square ("e4"); id = `vision-square:e4`. Graded by the coordinate↔square and blindfold drills.
 export type SrsItemKind = 'puzzle' | 'repertoire' | 'vision-square';
 

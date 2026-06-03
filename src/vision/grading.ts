@@ -1,4 +1,4 @@
-// Vision-drill FSRS grade tuning (ADR-0042).
+// Vision-drill FSRS grade tuning (ADR-0043).
 
 import { Grade, type GradeThresholds } from '../srs/fsrs';
 

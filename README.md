@@ -117,7 +117,7 @@ Everything runs in the browser. Nothing leaves your device by default.
   (click the named square on a blank board, or name the lit one), **blindfold** (recall a piece from
   memory), **lines & diagonals**, shortest **knight-path** distance, and a timed **find-them-all**
   (count every check, capture, or hanging piece). Per-square recall is spaced-repeated (FSRS) and weak
-  squares feed the practice session (ADR-0042).
+  squares feed the practice session (ADR-0043).
 
 *Maia (the human-like sparring engine) is **deliberately not shipped**: it needs a backend, and this
 build is local-only with no backend in scope. See `decisions.md` ADR-0019.*

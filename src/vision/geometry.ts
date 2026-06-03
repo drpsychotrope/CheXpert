@@ -1,4 +1,4 @@
-// Square-relation geometry for the board-vision "diagonal / line / reach" drill (ADR-0042).
+// Square-relation geometry for the board-vision "diagonal / line / reach" drill (ADR-0043).
 // Pure + deterministic. Colour is a by-product (same-color), never the drill's sole end.
 
 import { allSquares, squareColor } from './vision';

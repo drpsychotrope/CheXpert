@@ -65,7 +65,7 @@
           ? buildWeaknessProfile(analyses, model ? poolRating(model, 'classical').rating : 1200).weakest
           : null;
         const nowMs = Date.now();
-        // ADR-0042: surface due vision squares for the warm-up, and seed the trainer with them.
+        // ADR-0043: surface due vision squares for the warm-up, and seed the trainer with them.
         const visionCards = await dueCards(nowMs, 'vision-square', 200);
         const weak = weakSquares(visionCards, nowMs, 12);
         app.visionWeakSquares = weak.length ? weak : null;

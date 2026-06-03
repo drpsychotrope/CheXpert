@@ -1,4 +1,4 @@
-// Per-drill vision stats reducer (ADR-0042). Pure — the UI persists the result to PlayerModel.
+// Per-drill vision stats reducer (ADR-0043). Pure — the UI persists the result to PlayerModel.
 // Covers the relational/calculation drills (diagonal, knight, find-all). The single-square drills
 // (coordinate, blindfold) are tracked via FSRS 'vision-square' cards instead.
 

@@ -4,7 +4,7 @@
 - **Date:** 2026-06-02
 - **Related:** ADR-0018 (original vision drills), ADR-0010 / ADR-0011 (FSRS), ADR-0033
   (first-exposure grade cap), ADR-0040 / `conceptSeen` (additive PlayerModel field precedent),
-  proposed **ADR-0042** (this refonte)
+  proposed **ADR-0043** (this refonte)
 
 ## 1. Motivation
 
@@ -194,7 +194,7 @@ lean on"* copy corrected). Flows:
   `src/state/app.svelte.ts` (`visionWeakSquares`), `src/ui/Board.svelte` (`coords`/`onSelect`),
   `src/ui/Vision.svelte` (refonte + persistence wiring), `src/analysis/studyPlan.ts`,
   `src/ui/Session.svelte` (Review-gate fix + seed weak squares).
-- **Docs:** ADR-0042 (vision refonte: the closed-form test + hybrid per-square FSRS), README
+- **Docs:** ADR-0043 (vision refonte: the closed-form test + hybrid per-square FSRS), README
   feature catalogue, `decisions.md`.
 
 ## 11. Migration & risk

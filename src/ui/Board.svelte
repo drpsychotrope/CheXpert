@@ -19,12 +19,12 @@
     lastMove?: [string, string] | null;
     check?: boolean;
     onMove?: (from: string, to: string) => void;
-    /** Hide the rank/file gutter labels (unlabeled board for the coordinate drill). ADR-0042. */
+    /** Hide the rank/file gutter labels (unlabeled board for the coordinate drill). ADR-0043. */
     coords?: boolean;
-    /** Single-square click handler (chessground `events.select`). Enables `selectable`. ADR-0042. */
+    /** Single-square click handler (chessground `events.select`). Enables `selectable`. ADR-0043. */
     onSelect?: (square: string) => void;
     /** Draw a clear marker (green circle) on this square — used to point at the target square
-     *  in the coordinate "name the lit square" drill, where a faint lastMove tint reads poorly. ADR-0042. */
+     *  in the coordinate "name the lit square" drill, where a faint lastMove tint reads poorly. ADR-0043. */
     marker?: string;
   }
 
@@ -62,7 +62,7 @@
       // in the gutters below, so they cannot desync from the squares.
       coordinates: false,
       lastMove: lastMove ? (lastMove as Key[]) : undefined,
-      // ADR-0042: when onSelect is set, enable square selection so an empty-square tap fires
+      // ADR-0043: when onSelect is set, enable square selection so an empty-square tap fires
       // `events.select` (chessground does not emit it otherwise).
       selectable: { enabled: !!onSelect },
       movable: {

@@ -1,7 +1,7 @@
 # Spec: vision-refonte — board-vision drills refonte
 
 > Source of truth: `docs/superpowers/specs/2026-06-02-vision-refonte-design.md` (approved via brainstorming).
-> Pre-V0 scan: `reports/vision-refonte_*.json`. Scope = **feature**. Proposed **ADR-0042**.
+> Pre-V0 scan: `reports/vision-refonte_*.json`. Scope = **feature**. Proposed **ADR-0043**.
 > Version: V1 (V0 → 4 refiner cycles → V1).
 
 ## §0 Context
@@ -47,7 +47,7 @@ Captured 2026-06-02 (`reports/vision-refonte_baseline.json`):
   `'repertoire'` cards on its own screen.
 - Test runner `vitest run`. Deps `chess.js`, `chessground`, `ts-fsrs` present — **no new external dep**.
 - Decision log `decisions.md`: append-only ADR-NNNN, supersede + cross-link; highest accepted
-  ADR-0041 → next **ADR-0042**.
+  ADR-0041 → next **ADR-0043**.
 
 ## §2 Scope
 
@@ -58,7 +58,7 @@ Captured 2026-06-02 (`reports/vision-refonte_baseline.json`):
 - Per-square mastery via FSRS kind `'vision-square'`; per-drill stats via additive
   `PlayerModel.visionStats`.
 - Weak squares feed the studyPlan vision step; exclude vision cards from the session Review gate.
-- Pure modules + tests; ADR-0042 + README + decisions.md.
+- Pure modules + tests; ADR-0043 + README + decisions.md.
 
 **Deferred (§11):** dedicated dashboard/insights vision tile; full blindfold *reconstruction*
 (multi-square); the pre-existing repertoire Review-gate over-count (only excluded, not fixed, unless
@@ -84,7 +84,7 @@ Comment: refId for `vision-square` is the algebraic square (`"e4"`); id = `visio
 **A2 — `src/vision/grading.ts` (new).**
 ```ts
 import { Grade, type GradeThresholds, type Grade as GradeT } from '../srs/fsrs';
-/** Coordinate↔square is a sub-second recall task → speed-graded, vs the puzzle default (8000/25000). ADR-0042. */
+/** Coordinate↔square is a sub-second recall task → speed-graded, vs the puzzle default (8000/25000). ADR-0043. */
 export const VISION_GRADE_THRESHOLDS: GradeThresholds = { fastMs: 1500, slowMs: 5000 };
 /** Blindfold is a MEMORY task, not a speed task (F1). Grade on correctness only — a correct-but-slow
  *  recall after a 3 s flash must not be penalised as "slow". Speed is ignored. */
@@ -144,7 +144,7 @@ random selection in the coordinate/blindfold drills (F3) — they correctly coun
 
 **A7 — `src/store/db.ts`.** Add to `PlayerModel`:
 ```ts
-/** Per-drill vision stats (ADR-0042). Additive; old records read `?? {}`. NO DB_VERSION bump. */
+/** Per-drill vision stats (ADR-0043). Additive; old records read `?? {}`. NO DB_VERSION bump. */
 visionStats?: import('../vision/visionStats').VisionStats;
 ```
 No migration; `createDB` untouched; `DB_VERSION` stays 4.
@@ -237,12 +237,12 @@ generic find-all warm-up.
 
 ## §7 Phase Z — docs (LAST)
 
-- **`decisions.md`**: append `## ADR-0042 — Board-vision drills refonte` (date 2026-06-02, accepted).
+- **`decisions.md`**: append `## ADR-0043 — Board-vision drills refonte` (date 2026-06-02, accepted).
   Record the closed-form test, the cut of square-colour, hybrid per-square FSRS (`vision-square`) +
   per-drill `visionStats`, and the Review-gate scoping. Cross-link ADR-0018 (superseded vision
   drills), ADR-0010/0011 (FSRS reuse). Never amend prior entries.
 - **`README.md`**: update the feature/training catalogue (vision drills list).
-- Inline `// ADR-0042` comments in the new vision modules.
+- Inline `// ADR-0043` comments in the new vision modules.
 
 ## §8 Acceptance criteria
 
@@ -253,7 +253,7 @@ generic find-all warm-up.
 - [ ] diagonal/knight/findall update `PlayerModel.visionStats` and persist.
 - [ ] A due `vision-square` card does not inflate the session Review gate.
 - [ ] square-colour drill card removed; `squareColor` function retained and still tested.
-- [ ] ADR-0042 appended; README updated; docs committed AFTER code.
+- [ ] ADR-0043 appended; README updated; docs committed AFTER code.
 
 ## §9 Anti-patterns
 
@@ -269,7 +269,7 @@ generic find-all warm-up.
   owns time and randomness; cores take `now`/`pick`.
 - **AP-VISION-6** — DB reads inside `weakSquares`/`visionMastery`. They are pure over a passed card
   list; the caller fetches.
-- **AP-VISION-7** — docs before code (ADR-0042 / README claiming a shipped feature before Phase A is green).
+- **AP-VISION-7** — docs before code (ADR-0043 / README claiming a shipped feature before Phase A is green).
 
 ## §10 Rollback
 

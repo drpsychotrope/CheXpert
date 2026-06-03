@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Calculation / board-vision drills (ADR-0042). Drills that force locating/relating REAL
+  // Calculation / board-vision drills (ADR-0043). Drills that force locating/relating REAL
   // squares — no closed-form shortcut. Single-square drills (coordinate, blindfold) persist
   // per-square retention as FSRS 'vision-square' cards; relational/calc drills (relation,
   // knight, find-all) persist per-drill stats on PlayerModel.visionStats.

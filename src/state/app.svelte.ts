@@ -44,7 +44,7 @@ class AppState {
   analysisFen = $state<string | null>(null);
   /** Optional motif to focus the Concepts library on (set by a "Learn the pattern" link). */
   conceptFocusMotif = $state<string | null>(null);
-  /** Due vision squares (ADR-0042); set by the session builder, consumed by Vision.svelte to
+  /** Due vision squares (ADR-0043); set by the session builder, consumed by Vision.svelte to
    *  seed coordinate/blindfold prompts onto weak squares. NOT persisted. */
   visionWeakSquares = $state<string[] | null>(null);
   /** Active deliberate-practice session (in-memory, survives view swaps; NOT persisted). */

@@ -42,7 +42,7 @@ describe('SrsStore', () => {
     expect(await dueCount(due + 86400000)).toBe(1);
   });
 
-  // ADR-0042: per-square vision cards must not leak into the puzzle Review gate.
+  // ADR-0043: per-square vision cards must not leak into the puzzle Review gate.
   it('vision-square cards round-trip and do not inflate the puzzle due-count', async () => {
     await ensureCard('vision-square', 'e4', T0);
     await ensureCard('puzzle', 'p1', T0);
