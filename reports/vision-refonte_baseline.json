@@ -1,0 +1,37 @@
+{
+  "pr_name": "vision-refonte",
+  "scope": "feature",
+  "date": "2026-06-02",
+  "current_state": {
+    "vision_drills": ["square-colour", "knight-distance", "find-them-all"],
+    "vision_ui_lines": 207,
+    "vision_persistence": "NONE — local $state (asked/correct/streak), never written to app.model",
+    "SrsItemKind": ["puzzle", "repertoire"],
+    "srs_cards_store": "srsCards (DB v3), indexes: due, kind",
+    "fsrs_default_thresholds": { "fastMs": 8000, "slowMs": 25000 },
+    "playerModel_additive_fields": ["conceptSeen"],
+    "db_version": 4,
+    "review_screen_kind_filter": "puzzle",
+    "session_review_gate": "dueCount(Date.now()) — UNSCOPED (counts puzzle + repertoire)",
+    "repertoire_review_path": "Repertoire.svelte:96 (separate screen, not the session Review step)"
+  },
+  "tooling": {
+    "test_runner": "vitest run",
+    "deps_present": ["chess.js", "chessground", "ts-fsrs", "vitest"],
+    "new_external_deps_required": [],
+    "dep_check": "N/A — feature reuses existing deps only"
+  },
+  "convention_constraints": {
+    "decision_log": "decisions.md — append-only ADR-NNNN entries, supersede + cross-link, never amend in place",
+    "next_adr": "ADR-0042 (highest accepted = ADR-0041 Chess960)",
+    "adr_storage": "inline code comments + decisions.md + README catalogue (no adr/ dir)",
+    "phase_order": "code first, docs last",
+    "db_migrations": "additive fallthrough ladder; optional PlayerModel fields need no DB_VERSION bump",
+    "core_purity": "pure deterministic functions, no Math.random in core, one *.test.ts per module"
+  },
+  "feature_targets": {
+    "new_pure_modules": ["geometry.ts", "blindfold.ts", "visionStats.ts", "weakSquares.ts", "grading.ts"],
+    "VISION_GRADE_THRESHOLDS": { "fastMs": 1500, "slowMs": 5000 },
+    "vision_square_card_id_format": "vision-square:<square>"
+  }
+}

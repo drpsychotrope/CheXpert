@@ -1,0 +1,14 @@
+{
+  "pr_name": "vision-refonte",
+  "date": "2026-06-02",
+  "tracker": "github",
+  "gh_pr_list": "no git remotes found — single local repo, no PRs to collide with",
+  "manual_recent_commit_scan": [
+    "bc24313 docs: README batch-3 features",
+    "c71eae6 docs: ADR-0041 Chess960",
+    "fe97171 fix: reset UCI_Chess960",
+    "ca117ca feat: Chess960 play path",
+    "9f06a60 test: concept seed"
+  ],
+  "verdict": "PASS — recent work is Chess960 / time-controls / concepts; none touch src/vision/* or the vision drills. No parallel work on this scope."
+}

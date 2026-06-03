@@ -1,0 +1,18 @@
+{
+  "pr_name": "vision-refonte",
+  "date": "2026-06-02",
+  "source": "docs/superpowers/specs/2026-06-02-vision-refonte-design.md",
+  "divergences": [
+    {
+      "id": "DIV-1",
+      "severity": "minor",
+      "design_claim": "§5.4/§8/§11: Review-gate fix -> dueCount(now,'puzzle') (plus repertoire if the Review step covers it)",
+      "empirical_reality": "Review.svelte covers ONLY kind==='puzzle' (lines 38,44). The session 'review' step routes to Review.svelte. Repertoire is reviewed on its own screen (Repertoire.svelte:96), NOT via the session Review step.",
+      "consequence": "The unscoped dueCount(Date.now()) at Session.svelte:67 ALREADY over-counts repertoire today (reserves a Review slot for repertoire-due that the puzzle-only Review step ignores). This is a pre-existing latent bug, independent of vision.",
+      "resolution": "Spec narrows the fix to EXCLUDE vision-square only, preserving the existing puzzle+repertoire gate semantics exactly (no repertoire behavior change). Surfaced as arbitrage Q-A (exclude-vision-only vs narrow-to-puzzle).",
+      "status": "auto-resolved + flagged for arbitrage"
+    }
+  ],
+  "structural_divergence": false,
+  "proceed": true
+}

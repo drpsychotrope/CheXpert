@@ -1,0 +1,25 @@
+{
+  "pr_name": "vision-refonte",
+  "scope": "feature",
+  "date": "2026-06-02",
+  "verdict": "PASS",
+  "source_of_truth": "docs/superpowers/specs/2026-06-02-vision-refonte-design.md",
+  "edit_targets_exist": {
+    "src/srs/types.ts": { "exists": true, "symbol": "SrsItemKind", "line": 7, "value": "'puzzle' | 'repertoire'", "exhaustive_switch_on_kind": false, "safe_to_extend": true },
+    "src/srs/fsrs.ts": { "exists": true, "symbols": ["newCard", "gradeCard", "resultToGrade", "isDue", "DEFAULT_GRADE_THRESHOLDS"], "verified": true },
+    "src/srs/SrsStore.ts": { "exists": true, "symbols": ["ensureCard", "reviewItem", "dueCards", "dueCount"], "kind_param_optional": true, "verified": true },
+    "src/store/db.ts": { "exists": true, "symbol": "PlayerModel", "line": 51, "additive_field_precedent": "conceptSeen (line 62)" },
+    "src/state/app.svelte.ts": { "exists": true, "plumbing_precedent": "tacticsFilterThemes (line 40)" },
+    "src/ui/Board.svelte": { "exists": true, "props_interface_line": 12, "renders_own_gutter_labels": true, "chessground_coordinates": false },
+    "src/ui/Vision.svelte": { "exists": true, "lines": 207, "drills": ["color", "knight", "findall"] },
+    "src/analysis/studyPlan.ts": { "exists": true, "vision_warmup_line": 30, "activity_union_has_vision": true },
+    "src/ui/Session.svelte": { "exists": true, "unscoped_dueCount_line": 67 },
+    "src/vision/vision.ts": { "exists": true, "reused": ["squareFrom", "isSquare", "allSquares", "squareColor", "knight*"] },
+    "src/vision/tacticsVision.ts": { "exists": true, "reused": ["allChecks", "allCaptures", "hangingPieces"] }
+  },
+  "new_files_absent_as_expected": [
+    "src/vision/geometry.ts", "src/vision/blindfold.ts", "src/vision/visionStats.ts",
+    "src/vision/weakSquares.ts", "src/vision/grading.ts"
+  ],
+  "review_scoping_finding": "src/ui/Review.svelte already filters kind==='puzzle' (lines 38,44); vision cards will NOT surface in the Review screen. Only the unscoped session gate (Session.svelte:67) over-counts."
+}
