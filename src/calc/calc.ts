@@ -21,3 +21,21 @@ export function gradeCalcLine(solutionMoves: string[], userMoves: string[]): { c
   }
   return { correct: true, solvedPlies: solutionMoves.length };
 }
+
+/** 1-based index of the user's first wrong move, derived from gradeCalcLine's
+ *  solvedPlies. solvedPlies is the solution index of the first wrong USER ply
+ *  (always even, because user plies sit at solution indices 0,2,4,…). */
+export function firstWrongUserMove(solvedPlies: number): number {
+  return Math.floor(solvedPlies / 2) + 1;
+}
+
+/** Number a SAN ply list into a readable line:
+ *  ['Nf3','e5','Bc4'] -> "1.Nf3 e5 2.Bc4". White-first numbering. */
+export function formatSanLine(san: string[]): string {
+  const out: string[] = [];
+  for (let i = 0; i < san.length; i += 2) {
+    const n = i / 2 + 1;
+    out.push(san[i + 1] ? `${n}.${san[i]} ${san[i + 1]}` : `${n}.${san[i]}`);
+  }
+  return out.join(' ');
+}
