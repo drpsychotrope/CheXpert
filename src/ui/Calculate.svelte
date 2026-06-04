@@ -1,60 +1,82 @@
 <script lang="ts">
-  // Calculation trainer (spec C / 3a): solve a tactic with NO hints — you must see the
-  // whole line before you move. The line is validated against the puzzle's stored
-  // solution (gradeCalcLine); a final verdict reports how far you calculated.
+  // Calculation trainer (read-only line entry — ADR-0044, AP-CHESS-54/55). The board is FROZEN at the
+  // start position; the user taps their FULL forcing line (arrows + a "My line" list), then Submit grades
+  // the whole line via gradeCalcLine and animates the real solution. No board feedback during input.
+  import { onDestroy } from 'svelte';
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
   import { ChessGame } from '../game/ChessGame';
-  import { TacticalTrainer } from '../trainer/TacticalTrainer';
-  import { gradeCalcLine } from '../calc/calc';
+  import { gradeCalcLine, firstWrongUserMove, formatSanLine } from '../calc/calc';
   import type { Puzzle } from '../trainer/puzzle';
   import { openTrainerDB } from '../store/db';
   import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
 
   let puzzle = $state<Puzzle | null>(null);
-  let trainer = $state<TacticalTrainer | null>(null);
   let display = $state(new ChessGame());
   let fen = $state('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
   let orientation = $state<'white' | 'black'>('white');
+  let lastMove = $state<[string, string] | null>(null);
   let feedback = $state('');
   let feedbackKind = $state<'good' | 'bad' | ''>('');
-  let userMoves: string[] = [];
+
+  // Read-only line-entry state.
+  let phase = $state<'input' | 'revealed'>('input');
+  let userMoves = $state<string[]>([]);            // UCI, user turns only
+  let arrows = $state<Array<[string, string]>>([]); // one per committed user move
+  let pendingFrom = $state<string | null>(null);
+  let solved = $state(false);
+  let solutionSan = $state('');
+  let startedAt = 0;
+  let revealTimer: ReturnType<typeof setTimeout> | null = null;
+
   const seen = new Set<string>();
   const model = $derived(app.model);
 
-  // Metacognition (ADR-0037): opt-in, skippable, never gates the move flow.
+  // Metacognition (ADR-0037): opt-in, skippable, never gates the flow.
   let confidence = $state<Confidence | undefined>(undefined);
   let selfTag = $state<SelfTag | undefined>(undefined);
-  let logged = $state(false); // guard: exactly one attempt per position (AP-META-5)
-  let lastAttemptId = $state<string | undefined>(undefined); // id of the most-recently written attempt row
+  let logged = $state(false);                       // AP-META-5: one attempt per position
+  let lastAttemptId = $state<string | undefined>(undefined);
   const metacog = $derived(app.settings?.metacogEnabled ?? false);
+
+  function clearRevealTimer() {
+    if (revealTimer) { clearTimeout(revealTimer); revealTimer = null; }
+  }
+  onDestroy(clearRevealTimer);
 
   function load() {
     if (!model) return;
+    clearRevealTimer();
     const p =
       app.puzzles.next({ rating: model.puzzleRating.rating, window: 400, exclude: seen, source: 'personal' }) ??
       app.puzzles.next({ rating: model.puzzleRating.rating, window: 300, exclude: seen });
     if (!p) { feedback = 'No puzzles in range.'; return; }
     seen.add(p.id);
     puzzle = p;
-    trainer = new TacticalTrainer(p, Date.now());
     display = new ChessGame(p.fen);
     fen = display.fen;
     orientation = display.turn === 'w' ? 'white' : 'black';
+    lastMove = null;
+    phase = 'input';
     userMoves = [];
+    arrows = [];
+    pendingFrom = null;
+    solved = false;
+    solutionSan = '';
+    startedAt = Date.now();
     confidence = undefined;
     selfTag = undefined;
     logged = false;
     lastAttemptId = undefined;
-    feedback = 'Calculate the whole line in your head, then play it. No hints.';
+    feedback = 'Calculate the full line. Tap your moves onto the board — the pieces won’t move — then Submit. No hints.';
     feedbackKind = '';
   }
 
-  async function logAttempt(solved: boolean) {
+  async function logAttempt(didSolve: boolean) {
     if (!model || !puzzle || logged) return; // one attempt per position
     logged = true;
     const now = Date.now();
-    const ms = trainer ? trainer.elapsedMs(now) : 0;
+    const ms = now - startedAt;
     const p = $state.snapshot(puzzle); // IndexedDB cannot clone a $state proxy
     const r = model.puzzleRating.rating; // Calculate is not a Glicko writer (rating unchanged)
     const attemptId = `${p.id}:${now}`;
@@ -62,7 +84,7 @@
     await db.put('puzzleAttempts', {
       id: attemptId,
       puzzleId: p.id,
-      solved,
+      solved: didSolve,
       ms,
       themes: p.themes,
       ratingBefore: r,
@@ -70,14 +92,12 @@
       playedAt: now,
       source: p.source,
       confidence,
-      selfTag: !solved ? selfTag : undefined,
+      selfTag: !didSolve ? selfTag : undefined,
     });
-    // Remember the row id so self-tag clicks can UPDATE the same row (not insert a new one).
-    if (!solved) lastAttemptId = attemptId;
+    if (!didSolve) lastAttemptId = attemptId;
   }
 
-  /** UPDATE the existing attempt row's selfTag after the chips render post-miss.
-   * This is NOT a new insert — it re-puts the same id so AP-META-5 is preserved. */
+  /** UPDATE the existing attempt row's selfTag (re-puts the same id — AP-META-5 preserved). */
   async function updateSelfTag(tag: SelfTag) {
     selfTag = selfTag === tag ? undefined : tag;
     if (!lastAttemptId) return;
@@ -87,48 +107,92 @@
     await db.put('puzzleAttempts', { ...row, selfTag });
   }
 
+  function fmtUci(uci: string): string {
+    return `${uci.slice(0, 2)}→${uci.slice(2, 4)}`;
+  }
+
   function sideToMove(): 'white' | 'black' {
     return display.turn === 'w' ? 'white' : 'black';
   }
 
-  async function onMove(from: string, to: string) {
-    if (!trainer || !puzzle || trainer.state.status !== 'solving') return;
-    const uci = from + to + (display.isPromotion(from, to) ? 'q' : '');
-    const res = trainer.playUserMove(uci);
-    userMoves.push(uci);
-    if (res === 'wrong') {
-      const g = gradeCalcLine(puzzle.moves, userMoves);
-      feedback = `Miss — you calculated ${g.solvedPlies} correct ${g.solvedPlies === 1 ? 'ply' : 'plies'}. Solution: ${puzzle.moves.join(' ')}`;
-      feedbackKind = 'bad';
-      display = new ChessGame(puzzle.fen);
-      fen = display.fen;
-      await logAttempt(false);
-      return;
-    }
-    display = new ChessGame(trainer.getFen());
-    fen = display.fen;
-    if (res === 'solved') {
-      const g = gradeCalcLine(puzzle.moves, userMoves);
-      feedback = `Calculated the full line (${g.solvedPlies} plies)! ✔`;
+  // Two taps = one user move. The board never applies it; we only record UCI + an arrow.
+  function onSelect(sq: string) {
+    if (phase !== 'input') return;
+    if (pendingFrom == null) { pendingFrom = sq; return; }   // pick from-square (chessground highlights it)
+    if (sq === pendingFrom) { pendingFrom = null; return; }  // tap again to cancel
+    userMoves = [...userMoves, pendingFrom + sq];
+    arrows = [...arrows, [pendingFrom, sq]];
+    pendingFrom = null;
+  }
+
+  function undo() {
+    if (!userMoves.length) return;
+    userMoves = userMoves.slice(0, -1);
+    arrows = arrows.slice(0, -1);
+    pendingFrom = null;
+  }
+
+  async function submit() {
+    if (!puzzle || phase !== 'input' || userMoves.length === 0) return;
+    pendingFrom = null;
+    const g = gradeCalcLine(puzzle.moves, userMoves);
+    solved = g.correct;
+    if (g.correct) {
+      feedback = `Full line ✓ — ${userMoves.length} ${userMoves.length === 1 ? 'move' : 'moves'}, all correct.`;
       feedbackKind = 'good';
-      await logAttempt(true);
     } else {
-      feedback = 'Keep going — play the rest of your line.';
-      feedbackKind = '';
+      const k = firstWrongUserMove(g.solvedPlies);
+      const played = userMoves[k - 1];
+      const want = puzzle.moves[g.solvedPlies];
+      feedback = played == null
+        ? `You stopped early — the line continues past your move ${k - 1}.`
+        : `Diverged at your move ${k} — you played ${fmtUci(played)}, the line was ${fmtUci(want)}. You calculated ${k - 1} of your moves.`;
+      feedbackKind = 'bad';
     }
+    await logAttempt(g.correct);
+    revealSolution();
+  }
+
+  // Step the board through the real solution, building a numbered SAN line.
+  function revealSolution() {
+    if (!puzzle) return;
+    phase = 'revealed';
+    arrows = [];
+    const moves = puzzle.moves;
+    const sanGame = new ChessGame(puzzle.fen);
+    const san: string[] = [];
+    for (const m of moves) san.push(sanGame.moveUci(m) ?? m);
+    solutionSan = formatSanLine(san);
+
+    const stepGame = new ChessGame(puzzle.fen);
+    fen = stepGame.fen;
+    lastMove = null;
+    let i = 0;
+    const step = () => {
+      if (i >= moves.length) { revealTimer = null; return; }
+      const m = moves[i];
+      stepGame.moveUci(m);
+      fen = stepGame.fen;
+      lastMove = [m.slice(0, 2), m.slice(2, 4)];
+      i += 1;
+      revealTimer = setTimeout(step, 350);
+    };
+    revealTimer = setTimeout(step, 350);
   }
 
   $effect(() => {
-    if (model && !trainer && app.puzzles.size > 0) load();
+    if (model && !puzzle && app.puzzles.size > 0) load();
   });
 </script>
 
 <section class="col center">
   <h2>Calculation</h2>
-  <p class="muted" style="max-width:420px;font-size:0.85rem">
-    No hints. See the whole forcing line before you touch a piece, then play it out.
+  <p class="muted" style="max-width:440px;font-size:0.85rem">
+    Read-only board. Tap your moves to lay out the whole forcing line, then Submit — no hints, no
+    feedback until you commit.
   </p>
-  {#if metacog && trainer?.state.status === 'solving'}
+
+  {#if metacog && phase === 'input'}
     <div class="row center metacog" role="group" aria-label="How confident are you?">
       <span class="muted metacog-label">Confidence:</span>
       <button type="button" class="chip {confidence === 'sure' ? 'on' : ''}" onclick={() => (confidence = confidence === 'sure' ? undefined : 'sure')}>Sure</button>
@@ -142,15 +206,34 @@
       {fen}
       {orientation}
       turnColor={sideToMove()}
-      movableColor={trainer?.state.status === 'solving' ? sideToMove() : undefined}
-      dests={trainer?.state.status === 'solving' ? display.dests() : new Map()}
-      check={display.inCheck()}
-      {onMove}
+      movableColor={undefined}
+      dests={new Map()}
+      check={phase === 'input' && display.inCheck()}
+      viewOnly={phase === 'revealed'}
+      lastMove={phase === 'revealed' ? lastMove : null}
+      arrows={phase === 'input' ? arrows : []}
+      onSelect={phase === 'input' ? onSelect : undefined}
     />
   </div>
+
+  {#if phase === 'input'}
+    <div class="row center myline">
+      <span class="muted">My line:</span>
+      {#if userMoves.length === 0}
+        <span class="muted">— tap a from-square, then a to-square</span>
+      {:else}
+        {#each userMoves as m, i}<span class="ply">{i + 1}.{fmtUci(m)}</span>{/each}
+      {/if}
+    </div>
+  {/if}
+
   <p class="feedback {feedbackKind}">{feedback}</p>
 
-  {#if metacog && trainer?.state.status === 'failed'}
+  {#if phase === 'revealed' && solutionSan}
+    <p class="muted solution">Solution: {solutionSan}</p>
+  {/if}
+
+  {#if metacog && phase === 'revealed' && !solved}
     <div class="col center metacog" role="group" aria-label="Why did you miss?">
       <span class="muted metacog-label">Why did you miss? (optional)</span>
       <div class="row center" style="flex-wrap:wrap">
@@ -162,6 +245,10 @@
   {/if}
 
   <div class="row center">
+    {#if phase === 'input'}
+      <button class="ghost" onclick={undo} disabled={userMoves.length === 0}>⌫ Undo</button>
+      <button onclick={submit} disabled={userMoves.length === 0}>Submit</button>
+    {/if}
     <button onclick={load}>Next position →</button>
   </div>
 </section>
@@ -171,4 +258,7 @@
   .metacog-label { font-size: 0.82rem; align-self: center; }
   .chip { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 0.15rem 0.7rem; font-size: 0.82rem; cursor: pointer; }
   .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .myline { flex-wrap: wrap; gap: 0.4rem; max-width: 440px; }
+  .ply { font-variant-numeric: tabular-nums; font-size: 0.85rem; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 0.1rem 0.45rem; }
+  .solution { font-size: 0.9rem; max-width: 440px; }
 </style>
