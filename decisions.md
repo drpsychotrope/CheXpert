@@ -769,3 +769,17 @@ consumers that don't pass `showTurn` are byte-unaffected. Also collapses the Cal
 overlapping instruction blocks into one line. No schema, no engine; play/analysis drills (fixed, known
 player side — Play, Endgames, Spar, Comeback, Repertoire which already labels "You play") are untouched.
 Concepts (study illustrations) deferred. Cross-links: ADR-0044 (calc redesign), ADR-0043 (vision drills).
+
+## ADR-0047 — Play either color + consistent played-color display
+**Date:** 2026-06-04 · **Status:** accepted
+
+Games hardcoded the player to White. Add a `ColorChoice` (White/Black/Random) picker — a shared
+`ColorPicker.svelte` over a pure `resolveColor` (rng-injectable) — to **Play** (all standard time
+controls; Chess960 stays White, no theory) and the **coach** + **onboarding** calibration games.
+`Play.svelte` was already fully parameterized by `playerColor`, so the change is reactive state +
+the engine opening when the player is Black + steering the opening for the bot's color. The coach
+game analyses with the side actually played (`runAnalysis({ playerColor })`); the onboarding ACPL is
+measured from the player's POV (sign flips for Black). Every game mode shows a fixed "You play
+{White/Black}" cue (Sparring/Comeback already oriented to the trained side). No schema, no rating-pool
+change (a Black result updates the same per-time-control pool via the existing outcome mapping).
+Cross-links: ADR-0046 (side-to-move badge), ADR-0041 (Chess960 — color out of scope).
