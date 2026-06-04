@@ -12,6 +12,8 @@
   import { TacticalTrainer } from '../trainer/TacticalTrainer';
   import { AdaptiveOpponent, initOpponentState, type GameOutcome } from '../engine/AdaptiveOpponent';
   import { STANDARD_POOLS } from '../rating/pools';
+  import ColorPicker from './ColorPicker.svelte';
+  import { resolveColor, type ColorChoice } from '../game/color';
 
   type Step = 'declare' | 'ladder' | 'offer-game' | 'game' | 'done';
   let step = $state<Step>('declare');
@@ -34,6 +36,8 @@
   let game = $state(new ChessGame());
   let gameFen = $state(START_FEN);
   let opponent: AdaptiveOpponent | null = null;
+  let gameColorChoice = $state<ColorChoice>('white');
+  let gameSide = $state<'w' | 'b'>('w');
   let acplSum = 0;
   let acplCount = 0;
   let gameThinking = $state(false);
@@ -98,6 +102,7 @@
 
   async function startCalibrationGame() {
     step = 'game';
+    gameSide = resolveColor(gameColorChoice) === 'white' ? 'w' : 'b';
     game = new ChessGame();
     gameFen = game.fen;
     acplSum = 0;
@@ -115,10 +120,11 @@
       return;
     }
     gameThinking = false;
+    if (gameSide === 'b') await engineReply(); // engine (White) opens
   }
 
   async function onGameMove(from: string, to: string) {
-    if (!opponent || game.turn !== 'w' || gameThinking) return;
+    if (!opponent || game.turn !== gameSide || gameThinking) return;
 
     // Ensure standard mode (onboarding is never 960; guard against leaked state).
     await app.engine.resetVariant();
@@ -136,8 +142,10 @@
 
     try {
       const after = await app.engine.evaluate(game.fen, { depth: 10 });
-      // White just moved; loss = how much the White-POV eval dropped vs best.
-      const loss = Math.max(0, bestCp - after.whiteCp);
+      // Loss from the PLAYER's POV: White wants whiteCp high, Black wants it low.
+      const loss = gameSide === 'w'
+        ? Math.max(0, bestCp - after.whiteCp)
+        : Math.max(0, after.whiteCp - bestCp);
       acplSum += Math.min(loss, 1000);
       acplCount += 1;
     } catch { /* ignore */ }
@@ -165,7 +173,7 @@
 
   function currentOutcome(): GameOutcome {
     const t = game.terminal();
-    if (t.over && t.reason === 'checkmate') return t.winner === 'w' ? 'win' : 'loss';
+    if (t.over && t.reason === 'checkmate') return t.winner === gameSide ? 'win' : 'loss';
     return 'draw';
   }
 
@@ -268,6 +276,7 @@
         Optional: play a short game vs the engine so we can also estimate your <b>game</b> rating
         (puzzle skill and playing strength differ). About 12 moves.
       </p>
+      <ColorPicker bind:value={gameColorChoice} />
       <div class="row center">
         <button onclick={startCalibrationGame}>Play the calibration game →</button>
         <button style="background:transparent;border:1px solid var(--border)" onclick={skipGame}>Skip</button>
@@ -276,13 +285,14 @@
 
   {:else if step === 'game'}
     <p class="muted">{gameInfo}</p>
+    <p class="muted" style="font-size:0.82rem">You play {gameSide === 'w' ? 'White' : 'Black'}</p>
     <div class="board-wrap">
       <Board
         fen={gameFen}
-        orientation="white"
+        orientation={gameSide === 'w' ? 'white' : 'black'}
         turnColor={game.turn === 'w' ? 'white' : 'black'}
-        movableColor={!gameThinking && game.turn === 'w' ? 'white' : undefined}
-        dests={!gameThinking && game.turn === 'w' ? game.dests() : new Map()}
+        movableColor={!gameThinking && game.turn === gameSide ? (gameSide === 'w' ? 'white' : 'black') : undefined}
+        dests={!gameThinking && game.turn === gameSide ? game.dests() : new Map()}
         check={game.inCheck()}
         onMove={onGameMove}
       />
