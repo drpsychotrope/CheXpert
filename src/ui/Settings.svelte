@@ -94,6 +94,7 @@
   <div class="panel col">
     <h3>Your data</h3>
     <button onclick={() => app.go('onboarding')} style="background:var(--panel-2)">Re-run skill evaluation</button>
+    <button class="ghost" onclick={() => app.go('coach')}>Re-run coaching assessment</button>
     <button onclick={wipe} style="background:var(--bad)">Delete all my data</button>
   </div>
 </section>

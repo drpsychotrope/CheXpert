@@ -107,6 +107,9 @@ Everything runs in the browser. Nothing leaves your device by default.
   back-rank mate, …). See the pattern the first time it bites you in Tactics, and again when a puzzle
   keeps beating you — an optional, non-blocking "Learn the pattern" link, plus a browsable Concepts
   library. Content is hand-authored and CC0, consistent with the puzzle/ECO assets (no LLM).
+- **Personal coaching** — a re-runnable adaptive assessment (the launch-eval method, run across tactical
+  motifs + an optional short game) that maps your strengths and weak spots, then builds a dedicated
+  program of drills **and** game modes targeting them. Directional pointers, not a grade.
 
 ### Endgames & vision
 - **Endgame trainer** — fundamental endgames (K+Q vs K, K+R vs K, K+P opposition, Lucena, Philidor)

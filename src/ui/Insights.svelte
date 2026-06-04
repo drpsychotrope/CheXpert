@@ -80,6 +80,7 @@
     </div>
   {:else}
     <button onclick={() => app.go('session')} style="align-self:flex-start">▶ Start session</button>
+    <button onclick={() => app.go('coach')} style="align-self:flex-start">▶ Coaching assessment</button>
     <h3>Your top leaks</h3>
     {#if leaks.length}
       <div class="col" style="gap:0.3rem">

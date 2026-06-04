@@ -110,4 +110,25 @@ describe('PuzzleLadder', () => {
     }
     expect(up.rating.rating).toBeGreaterThan(down.rating.rating);
   });
+
+  it('PuzzleLadder honors a short min/max via opts', async () => {
+    const repo = new PuzzleRepo(
+      async () => ({ ok: true, json: async () => ({ puzzles: ladderPuzzles() }) }) as unknown as Response,
+    );
+    await repo.init();
+    const ladder = new PuzzleLadder(repo, defaultRating(1200, 300, 0.06), { min: 3, max: 5 });
+
+    // After 2 puzzles (count < min=3), ladder should not yet be done.
+    ladder.next(0); ladder.report(true);
+    ladder.next(0); ladder.report(true);
+    expect(ladder.count).toBe(2);
+    expect(ladder.isDone()).toBe(false);
+
+    // After 5 puzzles (count === max=5), ladder must be done regardless of RD.
+    ladder.next(0); ladder.report(true);
+    ladder.next(0); ladder.report(true);
+    ladder.next(0); ladder.report(true);
+    expect(ladder.count).toBe(5);
+    expect(ladder.isDone()).toBe(true);
+  });
 });

@@ -723,3 +723,35 @@ an additive `Board.arrows` → `drawable.autoShapes` prop (other drills unaffect
 stored solution (no engine, per ADR-0029); metacognition chips (ADR-0037) and the AP-META-5 one-attempt
 write preserved; rating-neutral. True blindfold (hiding pieces) remains deferred. AP-CALC-1…8.
 Spec: `specs/calc-drill-redesign-spec.md`; design: `docs/superpowers/specs/2026-06-04-calculation-drill-redesign-design.md`.
+
+## ADR-0045 — Coach mode: active multi-dimensional diagnostic reusing the calibration method
+
+**Context.** The weakness radar (ADR-0027) and the practice session (ADR-0039) are driven by analysed
+*played* games — blank for a new/returning player. The launch calibration (ADR-0005) is the opposite:
+an adaptive probe needing no history, but it outputs only two scalar ratings.
+
+**Decision.** Add a re-runnable Coach mode that reuses the calibration method — the Glicko `PuzzleLadder`
+run once per geometric motif (fork·pin·skewer·hangingPiece·discoveredAttack·mate) + an endgame-phase
+probe, plus the optional calibration game analysed through `runAnalysis(source:'played')` — to build a
+`CoachProfile` (per-motif deltas vs the puzzle-rating baseline + the 5-dim radar). The profile drives a
+prioritized program of drills AND game modes via the existing `buildSession` runner.
+
+- Profile persists as additive `PlayerModel.coachProfile? + coachProfilePrev?` (delta over re-runs).
+  **No `DB_VERSION` bump** — schema stays v4 (precedent: ADR-0040 `conceptSeen?`, ADR-0043 `visionStats?`).
+- Program routes to game modes via additive `SessionStepKind`/`PlanItem.activity` values `'sparring'`
+  and `'play-steered'`, plus one-shot `app.sparringScenarioId` / `app.steerDimension` signals.
+- `PuzzleLadder` gained an additive `LadderOpts { min, max, themes, phase, window }` ctor argument so it
+  can run short, themed probes; default behaviour (Onboarding) is unchanged.
+- Q-A: the diagnostic game is persisted via `runAnalysis(source:'played')` (feeds the loop, seeds
+  downstream Comeback/Sparring/Play-steer). Q-B: program steps auto-seed the exact scenario/dimension.
+  Q-C: resilience falls back to a defensive Sparring imbalance when no comeback positions exist.
+  Q-D: `COACH_LADDER_MIN/MAX = 3/5` per theme.
+
+**Honesty.** Directional, not a grade (cf. AP-CHESS-13/24): per-motif from 3–5 puzzles and one short game
+are low-n; every score carries a sample-size / data-source label; empty-theme probes are dropped, never
+scored as a weakness.
+
+**Consequences.** `buildStudyPlan` (Insights) is untouched — `buildCoachProgram` is a separate core, the
+union widening is type-only. Deferred: multi-day scheduling, a separate coach rating pool, Chess960 probe.
+
+Cross-links: ADR-0005 (calibration), ADR-0027 (weakness fingerprint/study plan), ADR-0039 (session runner).

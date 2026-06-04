@@ -33,6 +33,7 @@
     <button onclick={() => app.go('woodpecker')}>Woodpecker (speed drills)</button>
     <button onclick={() => app.go('import')}>Analyse a game</button>
     <button onclick={() => app.go('dashboard')}>Weakness dashboard</button>
+    <button onclick={() => app.go('coach')}>Personal coaching</button>
     <button onclick={() => app.go('endgames')}>Endgame trainer</button>
     <button onclick={() => app.go('repertoire')}>Opening repertoire</button>
     <button onclick={() => app.go('guess')}>Guess the move</button>

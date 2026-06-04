@@ -29,6 +29,7 @@ export type View =
   | 'concepts'
   | 'when-to-think'
   | 'session'
+  | 'coach'
   | 'settings';
 
 class AppState {
@@ -49,6 +50,10 @@ class AppState {
   visionWeakSquares = $state<string[] | null>(null);
   /** Active deliberate-practice session (in-memory, survives view swaps; NOT persisted). */
   activeSession = $state<{ plan: SessionPlan; current: number; startedAt: number; reflection: string } | null>(null);
+  /** Set by a coach 'sparring' program step; consumed once by Sparring.svelte to auto-open a scenario. */
+  sparringScenarioId = $state<string | null>(null);
+  /** Set by a coach 'play-steered' program step; consumed once by Play.svelte to override the steer dimension. */
+  steerDimension = $state<import('../analysis/weakness').Dimension | null>(null);
 
   readonly engine = new EngineClient();
   readonly puzzles = new PuzzleRepo();

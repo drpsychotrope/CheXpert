@@ -23,6 +23,7 @@
   import Sparring from './Sparring.svelte';
   import Concepts from './Concepts.svelte';
   import Session from './Session.svelte';
+  import Coach from './Coach.svelte';
 
   let booted = $state(false);
 
@@ -105,6 +106,8 @@
     <AnalysisBoard />
   {:else if app.view === 'settings'}
     <Settings />
+  {:else if app.view === 'coach'}
+    <Coach />
   {:else}
     <Home />
   {/if}

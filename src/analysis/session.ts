@@ -8,7 +8,7 @@
 import type { PlanItem } from './studyPlan';
 
 export type SessionStepKind =
-  | 'vision' | 'tactics' | 'endgames' | 'repertoire' | 'comeback' | 'review' | 'reflection';
+  | 'vision' | 'tactics' | 'endgames' | 'repertoire' | 'comeback' | 'sparring' | 'play-steered' | 'review' | 'reflection';
 
 export interface SessionStep {
   index: number;          // 0-based position in the runner

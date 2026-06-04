@@ -130,6 +130,7 @@
       sp960Input = String(pos.id); // reflect the chosen id back to the field
       game = new ChessGame(startFen960, { variant: 'chess960', castle: castle960 });
       opening = null; // no opening book / steering for 960 (no theory)
+      app.steerDimension = null; // discard any pending steer so it doesn't leak to a later standard game (M-1)
       steerNote = `Chess960 · SP-ID ${pos.id} · drag the king onto its own rook to castle`;
     } else {
       game = new ChessGame();
@@ -141,8 +142,10 @@
       } catch {
         /* no analyses yet → neutral variety */
       }
-      opening = selectOpening('b', weakest, Math.random());
-      steerNote = steeringNote(opening, weakest);
+      let weakestDim = weakest;
+      if (app.steerDimension) { weakestDim = app.steerDimension; app.steerDimension = null; }
+      opening = selectOpening('b', weakestDim, Math.random());
+      steerNote = steeringNote(opening, weakestDim);
     }
 
     fen = game.fen;

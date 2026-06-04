@@ -54,4 +54,14 @@ describe('buildSession', () => {
     const plan = [item('vision', 'board vision', 3), item('tactics', 'fork', 8)];
     expect(buildSession(plan, { includeReview: true })).toEqual(buildSession(plan, { includeReview: true }));
   });
+
+  it('passes new coach game-mode kinds through buildSession unchanged', () => {
+    const plan: PlanItem[] = [
+      { activity: 'sparring', focus: 'iqp', minutes: 8, reason: 'r' },
+      { activity: 'play-steered', focus: 'openingAccuracy', minutes: 8, reason: 'r' },
+    ];
+    const kinds = buildSession(plan, { includeReview: false }).steps.map((s) => s.kind);
+    expect(kinds).toContain('sparring');
+    expect(kinds).toContain('play-steered');
+  });
 });
