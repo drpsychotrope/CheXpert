@@ -141,8 +141,10 @@
       } catch {
         /* no analyses yet → neutral variety */
       }
-      opening = selectOpening('b', weakest, Math.random());
-      steerNote = steeringNote(opening, weakest);
+      let weakestDim = weakest;
+      if (app.steerDimension) { weakestDim = app.steerDimension; app.steerDimension = null; }
+      opening = selectOpening('b', weakestDim, Math.random());
+      steerNote = steeringNote(opening, weakestDim);
     }
 
     fen = game.fen;

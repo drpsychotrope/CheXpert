@@ -12,6 +12,8 @@
   // via the "Session" nav arm re-mounts this component and resumes at the current step.
   import { onMount } from 'svelte';
   import { app } from '../state/app.svelte';
+  import { scenarioForFocus } from '../coach/program';
+  import type { Dimension } from '../analysis/weakness';
   import { loadAllAnalyses } from '../analysis/runAnalysis';
   import { buildFingerprint } from '../analysis/fingerprint';
   import { buildWeaknessProfile } from '../analysis/weakness';
@@ -45,6 +47,7 @@
   const TRAINER_VIEW: Record<string, import('../state/app.svelte').View> = {
     vision: 'vision', tactics: 'tactics', endgames: 'endgames',
     repertoire: 'repertoire', comeback: 'comeback', review: 'review',
+    sparring: 'sparring', 'play-steered': 'play',
   };
 
   onMount(() => {
@@ -93,6 +96,8 @@
       app.tacticsFilterThemes = s.themes ?? null;
       app.tacticsTimed = s.timed ?? false;
     }
+    if (s.kind === 'sparring') app.sparringScenarioId = scenarioForFocus(s.focus);
+    if (s.kind === 'play-steered') app.steerDimension = s.focus as Dimension;
     const view = TRAINER_VIEW[s.kind];
     // The current step index is already recorded in app.activeSession — do NOT auto-advance.
     // Return here via the "Session" nav arm to resume at this step.

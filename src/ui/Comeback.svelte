@@ -126,6 +126,9 @@
         defending and fighting back.
       </p>
       <button onclick={() => app.go('play')}>Play a game →</button>
+      <button onclick={() => { app.sparringScenarioId = 'opp-castle'; app.go('sparring'); }}>
+        Defensive sparring instead →
+      </button>
     </div>
   {:else}
     {#if current}

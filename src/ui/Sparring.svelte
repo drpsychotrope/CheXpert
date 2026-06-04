@@ -31,6 +31,11 @@
     } catch {
       /* library still works */
     }
+    if (app.sparringScenarioId) {
+      const seeded = scenarios.find((s) => s.id === app.sparringScenarioId);
+      app.sparringScenarioId = null; // consume once
+      if (seeded) await start(seeded);
+    }
   });
 
   async function start(s: Scenario) {
