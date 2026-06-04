@@ -13,6 +13,8 @@
   import { buildSession } from '../analysis/session';
   import type { CoachProfile, ThemeProbeResult } from '../coach/types';
   import type { TacticalTrainer } from '../trainer/TacticalTrainer';
+  import ColorPicker from './ColorPicker.svelte';
+  import { resolveColor, type ColorChoice } from '../game/color';
 
   type Step = 'intro' | 'ladders' | 'offer-game' | 'game' | 'analysing' | 'result';
   let step = $state<Step>('intro');
@@ -38,6 +40,8 @@
   let thinking = $state(false);
   let info = $state('');
   const GAME_MOVE_LIMIT = 24;
+  let coachColorChoice = $state<ColorChoice>('random');
+  let coachSide = $state<'w' | 'b'>('w');
 
   let profile = $state<CoachProfile | null>(null);
   let programPreview = $state<ReturnType<typeof buildCoachProgram>>([]);
@@ -103,7 +107,18 @@
     startThemeLadder();
   }
 
+  async function botReply() {
+    if (!opponent) return;
+    thinking = true;
+    try {
+      const uci = await opponent.pickMove(game.fen, 400);
+      if (uci) { game.moveUci(uci); gameFen = game.fen; }
+    } catch { /* ignore */ }
+    thinking = false;
+  }
+
   async function startGame() {
+    coachSide = resolveColor(coachColorChoice) === 'white' ? 'w' : 'b';
     step = 'game';
     game = new ChessGame();
     gameFen = game.fen;
@@ -113,28 +128,21 @@
     try {
       await opponent.applyStrength();
       info = 'Your move — play naturally.';
+      thinking = false;
+      if (coachSide === 'b') await botReply(); // engine (White) opens
     } catch {
       return finishWithoutGame();
     }
-    thinking = false;
   }
 
   async function onGameMove(from: string, to: string) {
-    if (!opponent || game.turn !== 'w' || thinking) return;
+    if (!opponent || game.turn !== coachSide || thinking) return;
     await app.engine.resetVariant();
     const san = game.move(from, to, 'q');
     if (!san) return;
     gameFen = game.fen;
     if (game.terminal().over || game.history().length >= GAME_MOVE_LIMIT) return finishGame();
-    thinking = true;
-    try {
-      const uci = await opponent.pickMove(game.fen, 400);
-      if (uci) {
-        game.moveUci(uci);
-        gameFen = game.fen;
-      }
-    } catch { /* ignore */ }
-    thinking = false;
+    await botReply();
     if (game.terminal().over || game.history().length >= GAME_MOVE_LIMIT) finishGame();
   }
 
@@ -146,7 +154,7 @@
       const { analysis } = await runAnalysis(app.engine, app.puzzles, {
         gameId: `coach-${Date.now()}`,
         pgn: game.pgn(),
-        playerColor: 'w',
+        playerColor: coachSide,
         source: 'played',
         baseRating: baseline(),
         now: Date.now(),
@@ -207,6 +215,7 @@
       <h3>Assessment ladders done</h3>
       <p class="muted">Optional: play a short game (~12 moves) so we can also assess opening accuracy,
         time, and resilience — things puzzles can't measure.</p>
+      <ColorPicker bind:value={coachColorChoice} />
       <div class="row center">
         <button onclick={startGame}>Play the game →</button>
         <button style="background:transparent;border:1px solid var(--border)" onclick={finishWithoutGame}>Skip</button>
@@ -215,11 +224,12 @@
 
   {:else if step === 'game'}
     <p class="muted">{info}</p>
+    <p class="muted" style="font-size:0.82rem">You play {coachSide === 'w' ? 'White' : 'Black'}</p>
     <div class="board-wrap">
-      <Board fen={gameFen} orientation="white"
+      <Board fen={gameFen} orientation={coachSide === 'w' ? 'white' : 'black'}
         turnColor={game.turn === 'w' ? 'white' : 'black'}
-        movableColor={!thinking && game.turn === 'w' ? 'white' : undefined}
-        dests={!thinking && game.turn === 'w' ? game.dests() : new Map()}
+        movableColor={!thinking && game.turn === coachSide ? (coachSide === 'w' ? 'white' : 'black') : undefined}
+        dests={!thinking && game.turn === coachSide ? game.dests() : new Map()}
         check={game.inCheck()} onMove={onGameMove} />
     </div>
     {#if thinking}<p class="feedback">Bot thinking…</p>{/if}
