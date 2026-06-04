@@ -26,6 +26,12 @@
     /** Programmatic arrows drawn over the board (chessground autoShapes). [from, to] UCI-square
      *  pairs. Does not interfere with user-drawn shapes; no effect when empty. ADR-0044. */
     arrows?: Array<[string, string]>;
+    /** Show a side-to-move badge above the board (ADR-0046). Solve drills flip orientation per
+     *  puzzle, so the side you play must be stated. Derived from `turnColor`. */
+    showTurn?: boolean;
+    /** Badge phrasing: 'play' → "You play Black" (drills where you play the side to move);
+     *  'move' → "Black to move" (count/illustration drills). */
+    turnLabel?: 'play' | 'move';
   }
 
   let {
@@ -41,7 +47,12 @@
     coords = true,
     onSelect,
     arrows = [],
+    showTurn = false,
+    turnLabel = 'move',
   }: Props = $props();
+
+  const colorName = $derived(turnColor === 'white' ? 'White' : 'Black');
+  const turnText = $derived(turnLabel === 'play' ? `You play ${colorName}` : `${colorName} to move`);
 
   let el: HTMLDivElement;
   let cg: Api | null = null;
@@ -105,7 +116,11 @@
   const ranks = $derived(orientation === 'white' ? [8, 7, 6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6, 7, 8]);
 </script>
 
-<div class="board-frame">
+<div class="board-shell" class:has-turn={showTurn}>
+  {#if showTurn}
+    <div class="turn-badge"><span class="disc {turnColor}"></span>{turnText}</div>
+  {/if}
+  <div class="board-frame">
   <!-- rank labels (left gutter), one flex cell per row, aligned to the board grid -->
   {#if coords}
     <div class="ranks">
@@ -119,6 +134,7 @@
       {#each files as f}<span>{f}</span>{/each}
     </div>
   {/if}
+  </div>
 </div>
 
 <style>
@@ -181,4 +197,12 @@
     font-size: 11px;
     font-weight: 700;
   }
+  /* Side-to-move badge (ADR-0046). board-shell is display:contents by default — zero layout
+     effect — and becomes a centering column only when the badge is shown. */
+  .board-shell { display: contents; }
+  .board-shell.has-turn { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+  .turn-badge { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.9rem; font-weight: 600; color: var(--text); }
+  .disc { display: inline-block; width: 0.85em; height: 0.85em; border-radius: 50%; border: 1px solid var(--border); }
+  .disc.white { background: #ececec; }
+  .disc.black { background: #2b2b2b; }
 </style>

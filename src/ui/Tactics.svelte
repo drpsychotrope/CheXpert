@@ -340,6 +340,8 @@
       {fen}
       {orientation}
       turnColor={sideToMove()}
+      showTurn={trainer?.state.status === 'solving'}
+      turnLabel="play"
       movableColor={!locked && trainer?.state.status === 'solving' ? sideToMove() : undefined}
       dests={!locked && trainer?.state.status === 'solving' ? display.dests() : new Map()}
       {lastMove}

@@ -213,6 +213,8 @@
           {fen}
           {orientation}
           turnColor={side()}
+          showTurn={trainer?.state.status === 'solving'}
+          turnLabel="play"
           movableColor={trainer?.state.status === 'solving' ? side() : undefined}
           dests={trainer?.state.status === 'solving' ? display.dests() : new Map()}
           check={display.inCheck()}

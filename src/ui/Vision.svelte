@@ -280,7 +280,7 @@
   {:else if drill === 'findall'}
     <p class="muted">Score {correct}/{asked} · streak {streak}</p>
     <div class="board-wrap" style="max-width:300px">
-      <Board fen={faFen} viewOnly={true} orientation="white" />
+      <Board fen={faFen} viewOnly={true} orientation="white" turnColor={faFen.split(' ')[1] === 'w' ? 'white' : 'black'} showTurn turnLabel="move" />
     </div>
     <p class="muted">How many <b>{faLabel[faTask]}</b> for the side to move?</p>
     <div class="row center">

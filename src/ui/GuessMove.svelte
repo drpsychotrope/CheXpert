@@ -93,6 +93,8 @@
         {fen}
         orientation={side()}
         turnColor={display.turn === 'w' ? 'white' : 'black'}
+        showTurn={!guess.done}
+        turnLabel="play"
         movableColor={guess.done ? undefined : side()}
         dests={guess.done ? new Map() : display.dests()}
         {lastMove}

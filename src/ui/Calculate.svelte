@@ -68,7 +68,7 @@
     selfTag = undefined;
     logged = false;
     lastAttemptId = undefined;
-    feedback = 'Calculate the full line. Tap your moves onto the board — the pieces won’t move — then Submit. No hints.';
+    feedback = '';
     feedbackKind = '';
   }
 
@@ -188,8 +188,9 @@
 <section class="col center">
   <h2>Calculation</h2>
   <p class="muted" style="max-width:440px;font-size:0.85rem">
-    Read-only board. Tap your moves to lay out the whole forcing line, then Submit — no hints, no
-    feedback until you commit.
+    See the whole forcing line in your head, then tap it out one move at a time —
+    <b>from-square, then to-square</b>. The pieces won’t move. <b>Submit</b> checks it;
+    <b>Undo</b> takes back the last move.
   </p>
 
   {#if metacog && phase === 'input'}
@@ -213,6 +214,8 @@
       lastMove={phase === 'revealed' ? lastMove : null}
       arrows={phase === 'input' ? arrows : []}
       onSelect={phase === 'input' ? onSelect : undefined}
+      showTurn={phase === 'input'}
+      turnLabel="play"
     />
   </div>
 
