@@ -91,7 +91,8 @@ Everything runs in the browser. Nothing leaves your device by default.
 - **Review (FSRS)** — every puzzle you attempt becomes a spaced-repetition card; the Review queue
   resurfaces your weakest patterns right before you'd forget them, **interleaved** by theme. One click
   builds a *"your misses"* Woodpecker set from the puzzles you fail most.
-- **Calculation** — solve tactics with **no hints**: you must see the whole forcing line before you move.
+- **Calculation** — the board stays **frozen** while you tap out your whole forcing line; Submit grades
+  the full line and replays the real solution. Trains visualization, not reaction.
 - **Woodpecker** — a *fixed* puzzle set, solved again and again, faster each cycle, to automaticity.
   Complements Review (which spreads an expanding pool over time).
 - **Metacognition (opt-in):** optional confidence (before the reveal) and error-cause self-report (after a miss) on puzzles, with a descriptive calibration readout in Insights — how your confidence lines up with your results. Descriptive, not a grade.

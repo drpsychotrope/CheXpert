@@ -1,6 +1,6 @@
 # Calculation drill redesign — read-only line entry
 
-**Date:** 2026-06-04 · **Status:** design (approved, pre-plan) · **Scope:** UI/UX refactor of one drill
+**Date:** 2026-06-04 · **Status:** shipped (ADR-0044) · **Scope:** UI/UX refactor of one drill
 **Touches:** `src/ui/Calculate.svelte`, `src/ui/Board.svelte` · **Reuses:** `src/calc/calc.ts` (`gradeCalcLine`, unchanged)
 
 ## Problem

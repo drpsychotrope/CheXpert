@@ -706,3 +706,20 @@ gate is scoped to `puzzle`+`repertoire` so due vision cards never reserve a Revi
 
 **Follow-ups.** Dedicated dashboard/insights vision tile; full blindfold reconstruction (multi-square);
 the pre-existing repertoire Review-gate over-count (only excluded here, not fixed).
+
+## ADR-0044 — Calculation drill: read-only tap-to-build line entry (fixes ADR-0029 drift)
+**Date:** 2026-06-04 · **Status:** accepted
+
+ADR-0029 shipped `Calculate.svelte` as move-by-move play (`TacticalTrainer.playUserMove`, board applied,
+opponent auto-replied), which violated its own accepted **AP-CHESS-54** (board read-only during input)
+and §8 acceptance — the drill felt like no-hint Tactics, not calculation. `gradeCalcLine` (the intended
+full-line grader) was used only to count plies.
+
+Redesign (cross-links ADR-0029): the board is **frozen** at the start position; the user taps their full
+line (each move = an arrow + a "My line" row; line length never shown), then **Submit** grades the whole
+line via `gradeCalcLine` and **animates the real solution** as a numbered SAN line. Pending-from cue uses
+chessground native selection. Adds pure `firstWrongUserMove`/`formatSanLine` (`calc.ts`, unit-tested) and
+an additive `Board.arrows` → `drawable.autoShapes` prop (other drills unaffected). Still grades vs the
+stored solution (no engine, per ADR-0029); metacognition chips (ADR-0037) and the AP-META-5 one-attempt
+write preserved; rating-neutral. True blindfold (hiding pieces) remains deferred. AP-CALC-1…8.
+Spec: `specs/calc-drill-redesign-spec.md`; design: `docs/superpowers/specs/2026-06-04-calculation-drill-redesign-design.md`.
