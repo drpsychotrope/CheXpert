@@ -125,6 +125,7 @@
     </div>
   {:else if current}
     <p class="muted" style="max-width:480px">{current.name} — {current.goal}</p>
+    <p class="muted" style="font-size:0.82rem">You play {orientation === 'white' ? 'White' : 'Black'}</p>
     <div class="board-wrap">
       <Board
         {fen}

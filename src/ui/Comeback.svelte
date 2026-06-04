@@ -137,6 +137,7 @@
         pawns here. Hold the draw or turn it around against a bot at your level.
       </p>
     {/if}
+    <p class="muted" style="font-size:0.82rem">You play {orientation === 'white' ? 'White' : 'Black'}</p>
     <div class="board-wrap">
       <Board
         {fen}
