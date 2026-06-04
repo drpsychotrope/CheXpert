@@ -23,6 +23,9 @@
     coords?: boolean;
     /** Single-square click handler (chessground `events.select`). Enables `selectable`. ADR-0043. */
     onSelect?: (square: string) => void;
+    /** Programmatic arrows drawn over the board (chessground autoShapes). [from, to] UCI-square
+     *  pairs. Does not interfere with user-drawn shapes; no effect when empty. ADR-0044. */
+    arrows?: Array<[string, string]>;
   }
 
   let {
@@ -37,6 +40,7 @@
     onMove,
     coords = true,
     onSelect,
+    arrows = [],
   }: Props = $props();
 
   let el: HTMLDivElement;
@@ -75,7 +79,10 @@
       },
       animation: { enabled: true, duration: 200 },
       highlight: { lastMove: true, check: true },
-      drawable: { enabled: true },
+      drawable: {
+        enabled: true,
+        autoShapes: arrows.map(([orig, dest]) => ({ orig: orig as Key, dest: dest as Key, brush: 'green' })),
+      },
     };
   }
 
