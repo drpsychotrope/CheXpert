@@ -49,6 +49,7 @@
     <button onclick={() => app.go('analysis-board')}>Board</button>
     <button onclick={() => app.go('dashboard')}>Dashboard</button>
     <button onclick={() => app.go('insights')}>Insights</button>
+    <button onclick={() => app.go('coach')}>Coach</button>
     <button onclick={() => app.go('session')}>Session</button>
     <button onclick={() => app.go('endgames')}>Endgames</button>
     <button onclick={() => app.go('repertoire')}>Repertoire</button>
