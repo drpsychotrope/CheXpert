@@ -62,6 +62,10 @@ export interface PlayerModel {
   conceptSeen?: string[];
   /** Per-drill board-vision stats (ADR-0043). Additive; old records read `?? {}`. NO DB_VERSION bump. */
   visionStats?: import('../vision/visionStats').VisionStats;
+  /** Coach mode (ADR-0044): last assessment + the prior one for a delta. Additive;
+   *  old records lack it and read `undefined`. NO DB_VERSION bump. */
+  coachProfile?: import('../coach/types').CoachProfile;
+  coachProfilePrev?: import('../coach/types').CoachProfile;
   onboarded: boolean;
   createdAt: number;
   updatedAt: number;
