@@ -22,6 +22,8 @@
   import AnalysisResult from './AnalysisResult.svelte';
   import type { GameAnalysis } from '../analysis/types';
   import { chess960Position, chess960PositionById } from '../variant/chess960';
+  import ColorPicker from './ColorPicker.svelte';
+  import { resolveColor, type ColorChoice } from '../game/color';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   let game = $state(new ChessGame());
@@ -32,7 +34,8 @@
   let thinking = $state(false);
   let steerNote = $state('');
   let opponent: AdaptiveOpponent | null = null;
-  const playerColor: 'white' | 'black' = 'white';
+  let colorChoice = $state<ColorChoice>('white');
+  let playerColor = $state<'white' | 'black'>('white');
 
   // Chess960 state (ADR-0041)
   let variant = $state<'standard' | 'chess960'>('standard');
@@ -53,9 +56,9 @@
   let rafId: number | null = null;
   let lastTs = 0;
 
-  // The bot plays Black here; the player is White.
-  const botSide: Side = playerColor === 'white' ? 'b' : 'w';
-  const playerSideClock: Side = playerColor === 'white' ? 'w' : 'b';
+  // The bot plays the side opposite to the player.
+  const botSide = $derived<Side>(playerColor === 'white' ? 'b' : 'w');
+  const playerSideClock = $derived<Side>(playerColor === 'white' ? 'w' : 'b');
 
   function initialSecOf(p: TimeControlPreset): number {
     return p.id === 'custom' ? customInitialSec : p.initialSec;
@@ -112,6 +115,7 @@
 
   async function newGame() {
     if (!model) return;
+    playerColor = resolveColor(colorChoice);
     result = '';
     lastGame = null;
     aResult = null;
@@ -144,7 +148,7 @@
       }
       let weakestDim = weakest;
       if (app.steerDimension) { weakestDim = app.steerDimension; app.steerDimension = null; }
-      opening = selectOpening('b', weakestDim, Math.random());
+      opening = selectOpening(playerColor === 'white' ? 'b' : 'w', weakestDim, Math.random());
       steerNote = steeringNote(opening, weakestDim);
     }
 
@@ -174,6 +178,8 @@
       await opponent.applyStrength(); // sets UCI_Chess960 = (variant==='chess960') on boot
       status = 'playing';
       startClockLoop();
+      // If the player is Black, the engine (White) makes the first move.
+      if (turnColor() !== playerColor) await engineMove();
     } catch (e) {
       result = 'Engine failed to start: ' + String(e);
       status = 'idle';
@@ -478,6 +484,10 @@
       </select>
     </label>
 
+    {#if variant !== 'chess960'}
+      <ColorPicker bind:value={colorChoice} disabled={live} />
+    {/if}
+
     {#if variant === 'chess960'}
       <label class="muted" style="font-size:0.85rem">
         Start (blank = random 960):
@@ -518,6 +528,10 @@
       <div class="clock {clock.side === botSide ? 'active' : ''}">{fmtClock(botSide === 'w' ? clock.whiteMs : clock.blackMs)}</div>
       <div class="clock {clock.side === playerSideClock ? 'active' : ''}">{fmtClock(playerSideClock === 'w' ? clock.whiteMs : clock.blackMs)}</div>
     </div>
+  {/if}
+
+  {#if variant !== 'chess960'}
+    <p class="muted" style="font-size:0.82rem">You play {playerColor === 'white' ? 'White' : 'Black'}</p>
   {/if}
 
   <div class="board-wrap">
