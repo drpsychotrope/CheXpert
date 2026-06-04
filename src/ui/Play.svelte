@@ -115,7 +115,8 @@
 
   async function newGame() {
     if (!model) return;
-    playerColor = resolveColor(colorChoice);
+    // Chess960 stays White (no opening theory / color choice — ADR-0041/0047).
+    playerColor = variant === 'chess960' ? 'white' : resolveColor(colorChoice);
     result = '';
     lastGame = null;
     aResult = null;
