@@ -42,6 +42,14 @@ export function priorFromDeclarative(a: DeclarativeAnswers): Rating {
   return defaultRating(map[a.selfLevel], 300, 0.06);
 }
 
+export interface LadderOpts {
+  min?: number;
+  max?: number;
+  themes?: string[];
+  phase?: 'opening' | 'middlegame' | 'endgame';
+  window?: number;
+}
+
 /**
  * Stateful driver for the Stage-1 puzzle ladder. The UI asks for the next puzzle,
  * runs it through a TacticalTrainer, then reports solved/failed back here.
@@ -51,19 +59,30 @@ export class PuzzleLadder {
   attempted = new Set<string>();
   count = 0;
   private current: { trainer: TacticalTrainer; puzzle: Puzzle } | null = null;
+  private min: number;
+  private max: number;
+  private themes: string[] | undefined;
+  private phase: 'opening' | 'middlegame' | 'endgame' | undefined;
+  private window: number;
 
   constructor(
     private repo: PuzzleRepo,
     prior: Rating,
+    opts: LadderOpts = {},
   ) {
     // Start from the prior but with a wide RD so the ladder moves fast.
     this.rating = { ...prior, rd: Math.max(prior.rd, 250) };
+    this.min = opts.min ?? LADDER_MIN;
+    this.max = opts.max ?? LADDER_MAX;
+    this.themes = opts.themes;
+    this.phase = opts.phase;
+    this.window = opts.window ?? 250;
   }
 
   /** Get the next ladder puzzle near the current rating, or null when done. */
   next(now: number): TacticalTrainer | null {
     if (this.isDone()) return null;
-    const puzzle = this.repo.next({ rating: this.rating.rating, window: 250, exclude: this.attempted });
+    const puzzle = this.repo.next({ rating: this.rating.rating, window: this.window, exclude: this.attempted, themes: this.themes, phase: this.phase });
     if (!puzzle) return null;
     this.attempted.add(puzzle.id);
     this.current = { trainer: new TacticalTrainer(puzzle, now), puzzle };
@@ -81,8 +100,8 @@ export class PuzzleLadder {
 
   /** Done once we have enough signal: min puzzles AND RD tightened, capped at max. */
   isDone(): boolean {
-    if (this.count >= LADDER_MAX) return true;
-    return this.count >= LADDER_MIN && this.rating.rd <= 90;
+    if (this.count >= this.max) return true;
+    return this.count >= this.min && this.rating.rd <= 90;
   }
 }
 

@@ -1,0 +1,247 @@
+<script lang="ts">
+  import { app } from '../state/app.svelte';
+  import Board from './Board.svelte';
+  import Radar from './Radar.svelte';
+  import { ChessGame } from '../game/ChessGame';
+  import { PuzzleLadder } from '../calibration/Calibration';
+  import { AdaptiveOpponent, initOpponentState } from '../engine/AdaptiveOpponent';
+  import { runAnalysis } from '../analysis/runAnalysis';
+  import { buildWeaknessProfile, type DimensionScore } from '../analysis/weakness';
+  import { buildCoachProfile, COACH_MOTIF_PROBES, COACH_LADDER_MIN, COACH_LADDER_MAX } from '../coach/diagnostic';
+  import { buildCoachProgram } from '../coach/program';
+  import { buildSession } from '../analysis/session';
+  import type { CoachProfile, ThemeProbeResult } from '../coach/types';
+  import type { TacticalTrainer } from '../trainer/TacticalTrainer';
+
+  type Step = 'intro' | 'ladders' | 'offer-game' | 'game' | 'analysing' | 'result';
+  let step = $state<Step>('intro');
+
+  const THEMES: Array<{ theme: string; phase?: 'endgame' }> = [
+    ...COACH_MOTIF_PROBES.map((t) => ({ theme: t as string })),
+    { theme: 'endgame', phase: 'endgame' as const },
+  ];
+  let themeIdx = $state(0);
+  const baseline = () => (app.model ? Math.round(app.model.puzzleRating.rating) : 1200);
+
+  let ladder: PuzzleLadder | null = null;
+  let trainer = $state<TacticalTrainer | null>(null);
+  let display = $state(new ChessGame());
+  let fen = $state('');
+  let orientation = $state<'white' | 'black'>('white');
+  let feedback = $state('');
+  const probes: ThemeProbeResult[] = [];
+
+  let game = $state(new ChessGame());
+  let gameFen = $state('');
+  let opponent: AdaptiveOpponent | null = null;
+  let thinking = $state(false);
+  let info = $state('');
+  const GAME_MOVE_LIMIT = 24;
+
+  let profile = $state<CoachProfile | null>(null);
+  let programPreview = $state<ReturnType<typeof buildCoachProgram>>([]);
+
+  function startLadders() {
+    themeIdx = 0;
+    probes.length = 0;
+    step = 'ladders';
+    startThemeLadder();
+  }
+
+  function startThemeLadder() {
+    const t = THEMES[themeIdx];
+    const prior = app.model ? app.model.puzzleRating : { rating: 1200, rd: 250, vol: 0.06 };
+    ladder = new PuzzleLadder(app.puzzles, prior, {
+      min: COACH_LADDER_MIN,
+      max: COACH_LADDER_MAX,
+      window: 300,
+      themes: t.phase ? undefined : [t.theme],
+      phase: t.phase,
+    });
+    nextProbePuzzle();
+  }
+
+  function nextProbePuzzle() {
+    if (!ladder) return;
+    const t = ladder.next(Date.now());
+    if (!t) return finishThemeLadder();
+    trainer = t;
+    display = new ChessGame(t.getFen());
+    fen = display.fen;
+    orientation = display.turn === 'w' ? 'white' : 'black';
+    feedback = '';
+  }
+
+  function onLadderMove(from: string, to: string) {
+    if (!trainer || !ladder) return;
+    const uci = from + to + (display.isPromotion(from, to) ? 'q' : '');
+    const res = trainer.playUserMove(uci);
+    if (res === 'wrong') {
+      ladder.report(false);
+      feedback = 'Missed.';
+      setTimeout(nextProbePuzzle, 450);
+    } else if (res === 'solved') {
+      ladder.report(true);
+      feedback = 'Solved ✔';
+      setTimeout(nextProbePuzzle, 400);
+    } else {
+      display = new ChessGame(trainer.getFen());
+      fen = display.fen;
+    }
+  }
+
+  function finishThemeLadder() {
+    if (!ladder) return;
+    const t = THEMES[themeIdx];
+    probes.push({ theme: t.theme, rating: Math.round(ladder.rating.rating), n: ladder.count });
+    themeIdx += 1;
+    if (themeIdx >= THEMES.length) {
+      step = 'offer-game';
+      return;
+    }
+    startThemeLadder();
+  }
+
+  async function startGame() {
+    step = 'game';
+    game = new ChessGame();
+    gameFen = game.fen;
+    opponent = new AdaptiveOpponent(app.engine, initOpponentState(baseline()));
+    thinking = true;
+    info = 'Starting engine…';
+    try {
+      await opponent.applyStrength();
+      info = 'Your move — play naturally.';
+    } catch {
+      return finishWithoutGame();
+    }
+    thinking = false;
+  }
+
+  async function onGameMove(from: string, to: string) {
+    if (!opponent || game.turn !== 'w' || thinking) return;
+    await app.engine.resetVariant();
+    const san = game.move(from, to, 'q');
+    if (!san) return;
+    gameFen = game.fen;
+    if (game.terminal().over || game.history().length >= GAME_MOVE_LIMIT) return finishGame();
+    thinking = true;
+    try {
+      const uci = await opponent.pickMove(game.fen, 400);
+      if (uci) {
+        game.moveUci(uci);
+        gameFen = game.fen;
+      }
+    } catch { /* ignore */ }
+    thinking = false;
+    if (game.terminal().over || game.history().length >= GAME_MOVE_LIMIT) finishGame();
+  }
+
+  async function finishGame() {
+    step = 'analysing';
+    info = 'Analysing your game…';
+    let gameDimensions: DimensionScore[] | null = null;
+    try {
+      const { analysis } = await runAnalysis(app.engine, app.puzzles, {
+        gameId: `coach-${Date.now()}`,
+        pgn: game.pgn(),
+        playerColor: 'w',
+        source: 'played',
+        baseRating: baseline(),
+        now: Date.now(),
+      });
+      gameDimensions = buildWeaknessProfile([analysis], baseline()).dimensions;
+    } catch { /* fall through with no game dims */ }
+    await commit(gameDimensions);
+  }
+
+  async function finishWithoutGame() {
+    await commit(null);
+  }
+
+  async function commit(gameDimensions: DimensionScore[] | null) {
+    const p = buildCoachProfile({ puzzleRating: baseline(), probes, gameDimensions, assessedAt: Date.now() });
+    profile = p;
+    programPreview = buildCoachProgram(p, 30);
+    if (app.model) {
+      app.model.coachProfilePrev = app.model.coachProfile;
+      app.model.coachProfile = p;
+      await app.persistModel(Date.now());
+    }
+    step = 'result';
+  }
+
+  function startCoaching() {
+    if (!profile) return;
+    const plan = buildCoachProgram(profile, 30);
+    app.activeSession = { plan: buildSession(plan), current: 0, startedAt: Date.now(), reflection: '' };
+    app.go('session');
+  }
+</script>
+
+<section class="col center" style="max-width:680px;margin:0 auto">
+  <h2>Personal coaching</h2>
+
+  {#if step === 'intro'}
+    <p class="muted">A short adaptive assessment across tactical motifs and (optionally) a quick game,
+      then a program of drills and game modes aimed at your weak spots. Directional, not a grade.</p>
+    <button onclick={startLadders} disabled={app.puzzles.size === 0}>Start the assessment →</button>
+    {#if app.puzzles.size === 0}<p class="muted">Loading puzzles…</p>{/if}
+
+  {:else if step === 'ladders'}
+    <p class="muted">Probing <b>{THEMES[themeIdx].theme}</b> ({themeIdx + 1}/{THEMES.length}) — solve it.</p>
+    <div class="board-wrap">
+      <Board {fen} {orientation}
+        turnColor={display.turn === 'w' ? 'white' : 'black'}
+        movableColor={display.turn === 'w' ? 'white' : 'black'}
+        dests={display.dests()} check={display.inCheck()} onMove={onLadderMove} />
+    </div>
+    <p class="feedback">{feedback}</p>
+
+  {:else if step === 'offer-game'}
+    <div class="panel col center">
+      <h3>Assessment ladders done</h3>
+      <p class="muted">Optional: play a short game (~12 moves) so we can also assess opening accuracy,
+        time, and resilience — things puzzles can't measure.</p>
+      <div class="row center">
+        <button onclick={startGame}>Play the game →</button>
+        <button style="background:transparent;border:1px solid var(--border)" onclick={finishWithoutGame}>Skip</button>
+      </div>
+    </div>
+
+  {:else if step === 'game'}
+    <p class="muted">{info}</p>
+    <div class="board-wrap">
+      <Board fen={gameFen} orientation="white"
+        turnColor={game.turn === 'w' ? 'white' : 'black'}
+        movableColor={!thinking && game.turn === 'w' ? 'white' : undefined}
+        dests={!thinking && game.turn === 'w' ? game.dests() : new Map()}
+        check={game.inCheck()} onMove={onGameMove} />
+    </div>
+    {#if thinking}<p class="feedback">Bot thinking…</p>{/if}
+
+  {:else if step === 'analysing'}
+    <p class="muted">{info}</p>
+
+  {:else if step === 'result' && profile}
+    <div class="panel col center" style="gap:0.75rem;width:100%">
+      <h3>Your coaching profile</h3>
+      <Radar dimensions={profile.dimensions} />
+      <p class="muted" style="font-size:0.8rem">Directional — built from {profile.source.ladders ? 'adaptive puzzle probes' : 'no puzzle data'}{profile.source.game ? ' + one short game' : ''}. Small samples; treat as "where to focus".</p>
+      <div class="row" style="gap:1.5rem;align-items:flex-start">
+        <div class="col"><b>Strengths</b>{#each profile.strengths as s}<span>✔ {s}</span>{:else}<span class="muted">—</span>{/each}</div>
+        <div class="col"><b>Focus on</b>{#each profile.weaknesses as w}<span>△ {w}</span>{:else}<span class="muted">—</span>{/each}</div>
+      </div>
+      <h4>Your program</h4>
+      <ol style="text-align:left">
+        {#each programPreview as item}
+          <li><b>{item.activity}</b> — {item.focus} <span class="muted">({item.minutes}m · {item.reason})</span></li>
+        {/each}
+      </ol>
+      <div class="row center">
+        <button onclick={startCoaching}>▶ Start coaching session</button>
+        <button style="background:transparent;border:1px solid var(--border)" onclick={() => app.go('home')}>Later</button>
+      </div>
+    </div>
+  {/if}
+</section>
