@@ -7,7 +7,7 @@ import type { Leak } from './fingerprint';
 import type { Dimension } from './weakness';
 
 export interface PlanItem {
-  activity: 'tactics' | 'endgames' | 'repertoire' | 'comeback' | 'vision';
+  activity: 'tactics' | 'endgames' | 'repertoire' | 'comeback' | 'vision' | 'sparring' | 'play-steered';
   focus: string;
   minutes: number;
   reason: string;
