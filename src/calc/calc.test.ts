@@ -39,6 +39,9 @@ describe('formatSanLine', () => {
   it('numbers plies white-first', () => {
     expect(formatSanLine(['Nf3', 'e5', 'Bc4'])).toBe('1.Nf3 e5 2.Bc4');
   });
+  it('numbers an even-length line (two full moves — the common reveal output)', () => {
+    expect(formatSanLine(['e4', 'e5', 'Nf3', 'Nc6'])).toBe('1.e4 e5 2.Nf3 Nc6');
+  });
   it('handles a single ply (no black move)', () => {
     expect(formatSanLine(['Qxf7#'])).toBe('1.Qxf7#');
   });

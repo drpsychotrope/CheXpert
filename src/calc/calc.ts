@@ -24,7 +24,8 @@ export function gradeCalcLine(solutionMoves: string[], userMoves: string[]): { c
 
 /** 1-based index of the user's first wrong move, derived from gradeCalcLine's
  *  solvedPlies. solvedPlies is the solution index of the first wrong USER ply
- *  (always even, because user plies sit at solution indices 0,2,4,…). */
+ *  (always even, because user plies sit at solution indices 0,2,4,…).
+ *  Only meaningful when gradeCalcLine returned correct === false. */
 export function firstWrongUserMove(solvedPlies: number): number {
   return Math.floor(solvedPlies / 2) + 1;
 }
