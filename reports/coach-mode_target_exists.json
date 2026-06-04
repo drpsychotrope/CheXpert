@@ -1,0 +1,45 @@
+{
+  "pr_name": "coach-mode",
+  "scope": "feature",
+  "scanned_at": "2026-06-04",
+  "verdict": "PASS",
+  "new_modules_absent_as_expected": [
+    "src/coach/diagnostic.ts",
+    "src/coach/program.ts",
+    "src/coach/types.ts",
+    "src/ui/Coach.svelte"
+  ],
+  "extended_symbols_present": {
+    "src/analysis/studyPlan.ts:10": "PlanItem.activity union ('tactics'|'endgames'|'repertoire'|'comeback'|'vision')",
+    "src/analysis/session.ts:10": "SessionStepKind union",
+    "src/state/app.svelte.ts:10": "type View union",
+    "src/store/db.ts:51": "interface PlayerModel",
+    "src/store/db.ts:109": "DB_VERSION = 4 (additive-no-bump pattern confirmed at lines 30/61/63)"
+  },
+  "reused_symbols_present": {
+    "src/calibration/Calibration.ts:49": "class PuzzleLadder (next/report/isDone, themed via PuzzleRepo)",
+    "src/trainer/PuzzleRepo.ts": "next({rating,window,themes,phase,exclude,source}) supports theme+phase filtering",
+    "src/analysis/BatchAnalyzer.ts:58": "analyzeGame(gameId, ParsedGame, evaluator, opts{playerColor,source:'played'}) -> GameAnalysis",
+    "src/analysis/runAnalysis.ts:39": "runAnalysis(engine, repo, {pgn, playerColor, source:'played', baseRating, now}) -> {analysis, puzzles}",
+    "src/analysis/weakness.ts:176": "buildWeaknessProfile(analyses, playerRating) -> WeaknessProfile (5 dims)",
+    "src/analysis/weakness.ts:50": "exported interface DimensionScore (Radar.svelte input)",
+    "src/analysis/fingerprint.ts:30": "buildFingerprint(analyses) -> {leaks: Leak[]}",
+    "src/analysis/session.ts:41": "buildSession(plan, opts) -> SessionPlan",
+    "src/analysis/studyPlan.ts:29": "buildStudyPlan(leaks, weakest, minutes, opts) -> PlanItem[]",
+    "src/engine/AdaptiveOpponent.ts": "initOpponentState, AdaptiveOpponent, GameOutcome",
+    "src/game/ChessGame.ts:96": "pgn() (feeds runAnalysis)",
+    "src/analysis/pgn.ts:28": "parsePgn(pgn) -> ParsedGame",
+    "src/store/playerModel.ts:74": "poolRating / poolOpponent helpers",
+    "src/ui/Radar.svelte:9": "Props { dimensions: DimensionScore[]; size }",
+    "src/ui/Session.svelte:45": "TRAINER_VIEW Record<kind,View> + launch() (extension points for new kinds)",
+    "src/ui/Onboarding.svelte": "calibration ladder+game UI flow (pattern source for Coach wizard)",
+    "src/ui/Sparring.svelte:13": "scenarios=[...IMBALANCE_LIBRARY,...scenariosFromWeakness]; status starts 'pick'",
+    "src/ui/Comeback.svelte:33": "comebackPositions(loadAllAnalyses()) — REQUIRES game history",
+    "src/ui/Play.svelte:144": "selectOpening('b', weakest, rand) — already self-steers from history weakest",
+    "src/opening/openingBook.ts": "selectOpening / nextBookMove / steeringNote (Dimension-keyed)"
+  },
+  "notes": [
+    "No project-level CLAUDE.md/AGENTS.md; conventions live in README.md + decisions.md.",
+    "Latest ADR = ADR-0043; next free = ADR-0044."
+  ]
+}

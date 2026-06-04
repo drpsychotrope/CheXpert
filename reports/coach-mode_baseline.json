@@ -1,0 +1,41 @@
+{
+  "pr_name": "coach-mode",
+  "scope": "feature",
+  "captured_at": "2026-06-04",
+  "files_likely_touched": {
+    "new": [
+      "src/coach/types.ts",
+      "src/coach/diagnostic.ts",
+      "src/coach/diagnostic.test.ts",
+      "src/coach/program.ts",
+      "src/coach/program.test.ts",
+      "src/ui/Coach.svelte"
+    ],
+    "extended_additive": [
+      "src/analysis/studyPlan.ts (PlanItem.activity += 'sparring'|'play-steered')",
+      "src/analysis/session.ts (SessionStepKind += 'sparring'|'play-steered')",
+      "src/ui/Session.svelte (TRAINER_VIEW + launch() signals for new kinds)",
+      "src/state/app.svelte.ts (View += 'coach'; new signals: sparringScenarioId, steerDimension)",
+      "src/store/db.ts (PlayerModel.coachProfile? + coachProfilePrev?)",
+      "src/ui/App.svelte (render Coach.svelte on view==='coach')",
+      "src/ui/Home.svelte (entry button)",
+      "src/ui/Insights.svelte (entry link)",
+      "src/ui/Settings.svelte (re-run entry)",
+      "src/ui/Sparring.svelte (read app.sparringScenarioId to auto-pick)",
+      "src/ui/Play.svelte (optional: app.steerDimension override)",
+      "decisions.md (ADR-0044, append-only)",
+      "README.md (Coach mode feature line)"
+    ]
+  },
+  "existing_pattern_anchors": {
+    "calibration_method": "Onboarding.svelte: PuzzleLadder loop (startLadder/nextLadderPuzzle/onLadderMove) + calibration game (startCalibrationGame/onGameMove ACPL loop). Coach reuses the ladder loop N times (themed) + plays a game then runs runAnalysis.",
+    "session_integration": "Session.svelte onMount: if app.activeSession set -> RESUME branch (no history rebuild). Coach sets activeSession from buildCoachProgram->buildSession, then app.go('session').",
+    "additive_field_precedent": "db.ts conceptSeen?/visionStats? (ADR-0040/0043): additive field, load-path '?? default', NO DB_VERSION bump. coachProfile? follows identical pattern.",
+    "pure_core_test_precedent": "Calibration.test.ts, studyPlan.test.ts, session.test.ts, weakness.test.ts — inject deterministic inputs, assert pure outputs."
+  },
+  "radar_dimensions": ["tactics", "openingAccuracy", "endgameConversion", "timeManagement", "resilience"],
+  "geometric_motifs_probed": ["fork", "pin", "skewer", "hangingPiece", "discoveredAttack", "mate"],
+  "ladder_constants_source": "Calibration.ts LADDER_MIN=6 / LADDER_MAX=10 (per-theme coach ladders use a SHORTER MIN/MAX, e.g. 3/5, to keep total probe time bounded).",
+  "test_baseline": "README: 376 tests passing, svelte-check 0 errors, production build green.",
+  "premise_sanity_check": "PASS — no contradiction. The 5-dim radar + leak/study-plan/session pipeline exists and is game-history-driven; Coach adds an ACTIVE adaptive diagnostic feeding the SAME pipeline. No symbol is already at the proposed end-state; feature is net-new."
+}

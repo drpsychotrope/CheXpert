@@ -1,0 +1,13 @@
+{
+  "pr_name": "coach-mode",
+  "scope": "feature",
+  "checked_at": "2026-06-04",
+  "method": "git branch -a + git log --all -i --grep + git status + ls src/coach",
+  "keywords": ["coach", "diagnostic", "personal", "strength", "weakness program"],
+  "branches_seen": ["main", "claude/agitated-babbage-e01086", "claude/busy-hodgkin-ecde26", "claude/compassionate-liskov-7b54e7", "claude/kind-germain-36aa83"],
+  "matching_open_work": "none",
+  "matching_recent_merges_24h": "none",
+  "src_coach_exists": false,
+  "verdict": "PASS — no parallel work on coach/diagnostic scope. Safe to draft.",
+  "note": "Branch names are codenames, not coach-related; log grep returned only pre-existing ADR-0041/Phase-2 commits, not a coach feature."
+}

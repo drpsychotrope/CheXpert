@@ -1,4 +1,4 @@
-// Coach mode (ADR-0044): the persisted strength/weakness profile shape and the
+// Coach mode (ADR-0045): the persisted strength/weakness profile shape and the
 // raw per-theme probe result the wizard collects. Plain data only (IndexedDB
 // structured-clone safe); no engine/Svelte imports so db.ts can import it freely.
 

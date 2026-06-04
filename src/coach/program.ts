@@ -1,4 +1,4 @@
-// Coach program core (ADR-0044). PURE. Turns a CoachProfile into a worst-first,
+// Coach program core (ADR-0045). PURE. Turns a CoachProfile into a worst-first,
 // budgeted PlanItem[] routed to drills AND game modes. Deliberately does NOT call
 // or mutate buildStudyPlan — Insights stays byte-identical (AP-COACH-1).
 

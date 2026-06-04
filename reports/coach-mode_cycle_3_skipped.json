@@ -1,0 +1,11 @@
+{
+  "pr_name": "coach-mode",
+  "evaluated_at": "2026-06-04",
+  "rule": "skip_cycle_3 = (cycle_2_critical_count == 0) AND (cycle_2_polish_count <= 8)",
+  "cycle_2_critical_count": 0,
+  "cycle_2_polish_count": 6,
+  "decision": "SKIP",
+  "rationale": "Cycle 2 surfaced zero critical defects and 6 polish items (all applied). Residual is wording/consistency territory with decreasing returns; further polish would not change premise or structure. --force-cycle-3 available if exhaustive polish is wanted.",
+  "final_spec_version": "V1 (post cycle-2)",
+  "final_spec_path": "specs/coach-mode-spec.md"
+}

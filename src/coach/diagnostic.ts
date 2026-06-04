@@ -1,4 +1,4 @@
-// Coach diagnostic core (ADR-0044). PURE: no Date, no Math.random, no engine.
+// Coach diagnostic core (ADR-0045). PURE: no Date, no Math.random, no engine.
 // Reuses the calibration PuzzleLadder method across themes; this module only
 // AGGREGATES the collected results into a CoachProfile. The UI (Coach.svelte)
 // owns the engine/ladder/Date side and injects gameDimensions (already computed
