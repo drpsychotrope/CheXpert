@@ -755,3 +755,17 @@ scored as a weakness.
 union widening is type-only. Deferred: multi-day scheduling, a separate coach rating pool, Chess960 probe.
 
 Cross-links: ADR-0005 (calibration), ADR-0027 (weakness fingerprint/study plan), ADR-0039 (session runner).
+
+## ADR-0046 — Side-to-move badge on solve drills (follow-up to ADR-0044)
+**Date:** 2026-06-04 · **Status:** accepted
+
+Solve drills (Calculate, Tactics, Review, Woodpecker, Guess-the-move, Vision find-all) flip the board
+orientation to the side to move **per puzzle**, but never stated which side the player is on — you could
+not tell whether you were calculating for White or Black (the orientation flip alone is ambiguous). Add
+an **additive** `Board` `showTurn` / `turnLabel` prop that renders a side-to-move badge (colored disc +
+"You play Black" for the solve drills where you play that side, "Black to move" for the count-only
+find-all) above the board, derived from `turnColor`. `.board-shell` is `display:contents` by default, so
+consumers that don't pass `showTurn` are byte-unaffected. Also collapses the Calculation drill's two
+overlapping instruction blocks into one line. No schema, no engine; play/analysis drills (fixed, known
+player side — Play, Endgames, Spar, Comeback, Repertoire which already labels "You play") are untouched.
+Concepts (study illustrations) deferred. Cross-links: ADR-0044 (calc redesign), ADR-0043 (vision drills).
