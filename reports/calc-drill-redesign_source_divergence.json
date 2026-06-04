@@ -1,0 +1,12 @@
+{
+  "pr_name": "calc-drill-redesign",
+  "date": "2026-06-04",
+  "sources_checked": [
+    { "ref": "docs/superpowers/specs/2026-06-04-calculation-drill-redesign-design.md", "match": "exact — invocation is a faithful summary of the approved design doc" },
+    { "ref": "ADR-0029 (decisions.md:296-308)", "match": "consistent — keeps gradeCalcLine vs stored solution, no engine; read-only-during-input was accepted in ADR-0029 but never shipped; true blindfold remains deferred" },
+    { "ref": "AP-CHESS-54 / AP-CHESS-55 (practice-mechanics-spec.md:57-58)", "match": "verbatim — the spec honors both" },
+    { "ref": "AP-META-5 (ADR-0037)", "match": "consistent — one puzzleAttempts row per position, preserved" }
+  ],
+  "divergence": "none (structural)",
+  "verdict": "PASS — proceed."
+}

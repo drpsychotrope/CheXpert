@@ -1,0 +1,11 @@
+{
+  "pr_name": "calc-drill-redesign",
+  "date": "2026-06-04",
+  "decision": "skip",
+  "rule": "skip_cycle_3 = (cycle_2_critical_count == 0) AND (cycle_2_open_polish_count <= 8)",
+  "cycle_2_critical_count": 0,
+  "cycle_2_open_polish_count": 0,
+  "rationale": "Cycle 1 found 0 critical defects; cycle 2 integrated all 6 cycle-1 patches plus 3 second-order patches (S1/S3/S4) in-cycle, leaving 0 residual defects. Remaining open items are user arbitrages (Q-A/Q-B/Q-C), not defects. A third cycle would be decreasing-returns polish.",
+  "final_spec": "specs/calc-drill-redesign-spec.md",
+  "shipped_as": "V1"
+}

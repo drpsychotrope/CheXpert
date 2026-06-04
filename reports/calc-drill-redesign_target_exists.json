@@ -1,0 +1,13 @@
+{
+  "pr_name": "calc-drill-redesign",
+  "scope": "refactor",
+  "date": "2026-06-04",
+  "targets": [
+    { "path": "src/ui/Calculate.svelte", "exists": true, "loc": 175, "role": "primary — drill component to refactor" },
+    { "path": "src/ui/Board.svelte", "exists": true, "loc": 178, "role": "additive arrows prop", "onSelect_present": true, "drawable_enabled": true, "arrows_prop_present": false },
+    { "path": "src/calc/calc.ts", "exists": true, "loc": 24, "symbols": ["gradeCalcLine"], "firstWrongUserMove_present": false },
+    { "path": "src/calc/calc.test.ts", "exists": true, "tests": 4 },
+    { "path": "src/game/ChessGame.ts", "exists": true, "api": { "moveUci": "(uci) -> SAN|null", "history": "() -> SAN[]" }, "role": "reveal SAN list source" }
+  ],
+  "verdict": "PASS — all targets exist. Board already exposes onSelect + drawable; arrows prop and calc.firstWrongUserMove helper are absent (to be added). ChessGame.moveUci returns SAN, so the reveal SAN list is feasible without a new API."
+}

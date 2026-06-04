@@ -1,0 +1,13 @@
+{
+  "pr_name": "calc-drill-redesign",
+  "date": "2026-06-04",
+  "method": "gh pr list (open + merged); git log on calc paths",
+  "result": "no git remotes found — local-only repo (ADR-0002: local / no public distribution). PR tracker N/A; fell back to git log.",
+  "git_log_calc": [
+    "21dbeb9 fix: persist self-tag via in-place attempt update (ADR-0037)",
+    "12ba95e feat: Calculate chips + minimal puzzleAttempts write (ADR-0037)",
+    "1395568 feat: practice mechanics — calculation + vision drills + scheduler (ADR-0029)"
+  ],
+  "parallel_work": "none — no open branches/PRs touch the calc drill. Last calc commits are the original ADR-0029 ship + ADR-0037 chips, already in this branch's history.",
+  "verdict": "PASS — no collision."
+}

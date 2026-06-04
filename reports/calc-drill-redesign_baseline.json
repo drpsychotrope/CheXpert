@@ -1,0 +1,37 @@
+{
+  "pr_name": "calc-drill-redesign",
+  "captured": "2026-06-04",
+  "method": "Read + Grep (.svelte/.ts; no AST tool for .svelte components — LOC is raw line count)",
+  "current_flow": {
+    "component": "src/ui/Calculate.svelte",
+    "loc": 175,
+    "input_model": "move-by-move: onMove(from,to) -> TacticalTrainer.playUserMove -> board applied via display = new ChessGame(trainer.getFen()); opponent auto-reply shown each step",
+    "board_props": "movableColor=sideToMove(), dests=display.dests(), onMove set — interactive piece moves are APPLIED to the board during input",
+    "grading": "trainer.playUserMove returns 'wrong'/'solved' move-by-move (fails on first wrong). gradeCalcLine is called only to compute solvedPlies for the feedback string (Calculate.svelte:100-101, 111-112)",
+    "on_miss": "display reset to new ChessGame(puzzle.fen) — jarring snap-back; raw-UCI dump in feedback ('Solution: e2e4 e7e5 ...')",
+    "ap_violations": ["AP-CHESS-54 (board updates during input — defeats visualization)", "AP-CHESS-55 (move-by-move fail rather than whole-line grade)"]
+  },
+  "grader": {
+    "symbol": "gradeCalcLine(solutionMoves, userMoves)",
+    "loc": "src/calc/calc.ts:12-23",
+    "returns": "{ correct: boolean, solvedPlies: number }",
+    "contract": "userMoves = user turns only; walks solution skipping opponent plies; solvedPlies = solution index of the first wrong user ply (always even), or solution length on full match",
+    "pure": true,
+    "firstWrongUserMove_helper": "absent"
+  },
+  "board": {
+    "symbol": "src/ui/Board.svelte",
+    "loc": 178,
+    "onSelect": "present (chessground events.select, selectable.enabled = !!onSelect) — already used by the coordinate drill",
+    "drawable_enabled": true,
+    "autoShapes_wired": false,
+    "arrows_prop": "absent"
+  },
+  "tests": {
+    "file": "src/calc/calc.test.ts",
+    "count": 4,
+    "covers": ["full correct line -> solvedPlies 7", "first wrong user move -> solvedPlies 2", "short line -> miss", "queen-promo suffix tolerance"],
+    "firstWrongUserMove_test": "absent"
+  },
+  "sanity_check": "PASS — baseline confirms the spec premise: the drill is move-by-move + board-applied (AP-CHESS-54 violation) and gradeCalcLine is underused. Refactor premise valid, not obsolete."
+}
