@@ -130,6 +130,7 @@
       sp960Input = String(pos.id); // reflect the chosen id back to the field
       game = new ChessGame(startFen960, { variant: 'chess960', castle: castle960 });
       opening = null; // no opening book / steering for 960 (no theory)
+      app.steerDimension = null; // discard any pending steer so it doesn't leak to a later standard game (M-1)
       steerNote = `Chess960 · SP-ID ${pos.id} · drag the king onto its own rook to castle`;
     } else {
       game = new ChessGame();

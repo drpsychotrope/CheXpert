@@ -6,6 +6,7 @@
   import { PuzzleLadder } from '../calibration/Calibration';
   import { AdaptiveOpponent, initOpponentState } from '../engine/AdaptiveOpponent';
   import { runAnalysis } from '../analysis/runAnalysis';
+  import { loadPlayerModel } from '../store/playerModel';
   import { buildWeaknessProfile, type DimensionScore } from '../analysis/weakness';
   import { buildCoachProfile, COACH_MOTIF_PROBES, COACH_LADDER_MIN, COACH_LADDER_MAX } from '../coach/diagnostic';
   import { buildCoachProgram } from '../coach/program';
@@ -164,8 +165,12 @@
     profile = p;
     programPreview = buildCoachProgram(p, 30);
     if (app.model) {
-      app.model.coachProfilePrev = app.model.coachProfile;
-      app.model.coachProfile = p;
+      // Reload from DB so any weaknessCounters fold written by runAnalysis(source:'played')
+      // in finishGame() is preserved — persisting the stale boot snapshot would discard it (I-1).
+      const fresh = await loadPlayerModel(Date.now());
+      fresh.coachProfilePrev = fresh.coachProfile;
+      fresh.coachProfile = p;
+      app.model = fresh;
       await app.persistModel(Date.now());
     }
     step = 'result';
@@ -173,8 +178,7 @@
 
   function startCoaching() {
     if (!profile) return;
-    const plan = buildCoachProgram(profile, 30);
-    app.activeSession = { plan: buildSession(plan), current: 0, startedAt: Date.now(), reflection: '' };
+    app.activeSession = { plan: buildSession(programPreview), current: 0, startedAt: Date.now(), reflection: '' };
     app.go('session');
   }
 </script>
