@@ -147,17 +147,47 @@ No backend. No account. No telemetry.
 
 ## Run
 
-Requires **Node ≥ 18** (developed on 20.x).
+Requires **Node ≥ 18** to run the app (developed on 20.x). The one-shot `npm install` below
+also **downloads + unpacks the puzzle DB**, which needs **Node ≥ 22.15** for built-in
+Zstandard — on older Node that single step is skipped and the app uses its seed puzzles.
 
 ```bash
-npm install      # also vendors the ~7 MB lite engine into public/stockfish (postinstall)
+npm install      # one-shot setup: engine + puzzles + .exe launcher (see below)
 npm run dev      # http://localhost:5173
 npm test         # Vitest — 376 tests
 npm run check    # svelte-check (type check)
 npm run build    # type-check + production build
 ```
 
+### What `npm install` sets up
+
+`postinstall` runs `scripts/postinstall.mjs`, which does **everything needed to play and to
+ship the desktop app**, in order — each step **idempotent** (skipped when its output already
+exists) and **non-fatal** (a failure warns, never breaks the install):
+
+1. **Engine** — vendors the Stockfish lite + multi-thread builds into `public/stockfish/`.
+2. **Puzzles** — downloads the CC0 Lichess puzzle DB (~286 MB, one-time, cached under
+   `scripts/.cache/`), stream-decompresses it (Zstd, no multi-GB CSV touches disk), and writes
+   the curated `public/puzzles/puzzles.json` (~80k, spread across rating bands).
+3. **Launcher** — production-builds the app (`dist/`) and the single-file
+   `build/ChessTrainer.exe` desktop launcher.
+
+The **first** install is heavy (a big download + a full build); **later** installs reuse the
+cached download and existing build, so they're quick. Opt-outs (env vars):
+
+| Variable | Effect |
+|---|---|
+| `SKIP_INSTALL_EXTRAS=1` | skip puzzles **and** the launcher build (engine still vendored) — handy in CI |
+| `CHESS_SKIP_PUZZLES=1` | skip only the puzzle download/unpack |
+| `CHESS_SKIP_EXE=1` | skip only the app + `.exe` build |
+| `CHESS_FORCE=1` | rebuild even when outputs already exist |
+
+Re-run the whole chain any time with `npm run setup`, or a single piece with
+`npm run copy:engine`, `npm run fetch:puzzles`, or `npm run build:exe`.
+
 ### Desktop launcher (.exe)
+
+`npm install` already builds this (step 3 above). To rebuild it on its own after changing the app:
 
 ```bash
 npm run build:exe   # → build/ChessTrainer.exe + build/dist/
@@ -171,9 +201,9 @@ stays local, IndexedDB persistence works.
 Why a local server and not `file://`: the app uses module Web Workers + WASM `fetch` + IndexedDB,
 which browsers block under `file://`. The launcher is built with Node's built-in **SEA** (Single
 Executable Application) — it copies your own `node.exe` and injects the launcher, so building needs
-**no compiler and no extra toolchain**. The exe (~69 MB, mostly the Node runtime) sits beside
-`build/dist/` (the app + engine + puzzles). `npm run launch` runs the same launcher under plain Node
-for development.
+**no compiler and no extra toolchain**. The exe (the size of your `node.exe` — ~70–100 MB,
+mostly the Node runtime) sits beside `build/dist/` (the app + engine + puzzles). `npm run launch`
+runs the same launcher under plain Node for development.
 
 For a true native window with a much smaller binary, **Tauri** (Windows WebView2, ~10 MB) is the
 upgrade path — but it requires the Rust + MSVC toolchain to build, which the SEA approach avoids.
@@ -189,16 +219,20 @@ host that can't set those headers it **falls back to the lite single-thread** bu
 
 ### Puzzles
 
-A small, hand-verified seed set ships in `public/puzzles/seed-puzzles.json` so the app works out of
-the box. For the real curated subset, download the CC0 Lichess puzzle DB and run the ETL:
+`npm install` already downloads the CC0 Lichess puzzle DB and unpacks the curated
+`public/puzzles/puzzles.json` subset (~80k, spread across rating bands), which the app prefers over
+the seed set. Re-run just that step with `npm run fetch:puzzles` (`CHESS_FORCE=1` to rebuild,
+`PUZZLE_MAX=N` to resize, `PUZZLE_DB_URL=…` for a mirror). A small, hand-verified seed set in
+`public/puzzles/seed-puzzles.json` is the fallback when the subset is absent (older Node, offline
+install, or `CHESS_SKIP_PUZZLES=1`).
+
+Already have the CSV — or on Node < 22.15, which lacks built-in Zstd? Decompress it and run the ETL
+directly:
 
 ```bash
 # get lichess_db_puzzle.csv.zst from https://database.lichess.org/#puzzles, decompress, then:
 npm run etl:puzzles  path/to/lichess_db_puzzle.csv  80000
 ```
-
-This writes `public/puzzles/puzzles.json` (a curated ~80k subset spread across rating bands), which
-the app prefers over the seed set when present.
 
 ---
 
