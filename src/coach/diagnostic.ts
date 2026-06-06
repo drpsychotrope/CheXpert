@@ -8,8 +8,11 @@ import type { Dimension, DimensionScore } from '../analysis/weakness';
 import type { CoachProfile, MotifScore, ThemeProbeResult } from './types';
 
 export const COACH_MOTIF_PROBES = ['fork', 'pin', 'skewer', 'hangingPiece', 'discoveredAttack', 'mate'] as const;
-export const COACH_LADDER_MIN = 3;
-export const COACH_LADDER_MAX = 5;
+// One puzzle per theme: the coach samples each motif (+ endgame) exactly once — ≈7 puzzles total,
+// scored whether solved or not (a test, not a pass/fail gate). Trades per-motif signal vs the old 3/5
+// for a much shorter assessment (ADR-0048, supersedes ADR-0045 Q-D).
+export const COACH_LADDER_MIN = 1;
+export const COACH_LADDER_MAX = 1;
 
 const STRENGTH_DELTA = 40;
 const WEAKNESS_DELTA = -40;
