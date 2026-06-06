@@ -783,3 +783,16 @@ measured from the player's POV (sign flips for Black). Every game mode shows a f
 {White/Black}" cue (Sparring/Comeback already oriented to the trained side). No schema, no rating-pool
 change (a Black result updates the same per-time-control pool via the existing outcome mapping).
 Cross-links: ADR-0046 (side-to-move badge), ADR-0041 (Chess960 — color out of scope).
+
+## ADR-0048 — Coach assessment: one puzzle per motif, scored regardless of outcome (supersedes ADR-0045 Q-D)
+**Date:** 2026-06-06 · **Status:** accepted
+
+The coach assessment ran a 3–5 puzzle `PuzzleLadder` per theme (ADR-0045 Q-D) — ~21–35 puzzles across the
+six motifs + endgame, too long for a "quick" diagnostic. Cut each themed probe to **exactly one puzzle**
+(`COACH_LADDER_MIN/MAX = 1`), so the assessment is **≈7 puzzles total**, one per motif (+ endgame). Both
+solved and failed attempts already advanced the probe (`PuzzleLadder.report` counts either outcome); the
+old "— solve it" wording wrongly implied success was required, so the wizard copy now reads as a test you
+simply play through ("solved or not, we move on"). Tradeoff: n=1 per motif is noisier than 3–5, so the
+per-motif delta is even more strictly *directional* — the existing sample-size labels (`n`, "(N puzzles)")
+keep it honest (AP-COACH-2). No schema, no API change; only the two constants + wizard copy + the constants
+test assertion move. Cross-links: ADR-0045 (coach mode — Q-D superseded), ADR-0005 (calibration ladder method).
