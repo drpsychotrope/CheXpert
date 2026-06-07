@@ -814,3 +814,31 @@ smoke test). Limitation: profiles stranded under old random ports are **not** au
 re-onboard once, then it sticks. Dev/preview were never affected (vite's fixed 5173/4173). Launcher-only:
 no app code, schema, or API change. Cross-links: ADR-0032 (launcher COOP/COEP headers — the other
 `server.cjs` decision).
+
+## ADR-0050 — Board derives chessground `turnColor` from the FEN (fixes Black-side moves never applying)
+**Date:** 2026-06-07 · **Status:** accepted
+
+Symptom: in any human-vs-engine mode where the player was **Black** (Coach assessment game, Play, the
+onboarding calibration game), the human could grab pieces but moves never applied — chessground snapped
+them back "as if in check". Root cause was a **stale `turnColor`**. Callers computed the board's
+`turnColor` from a `ChessGame` instance held in `$state`, but Svelte 5 does **not** deep-proxy class
+instances — so the engine's reply (and the human's own move) **mutated** the game without **reassigning**
+it, and the `turnColor` derived, whose only reactive dependency was that `game` signal, never recomputed.
+It froze at its initial value (`'white'`, the side to move at game start). `movableColor`/`dests` stayed
+correct only because their deriveds *also* read `status`/`thinking` (which fire every move) and re-read
+the live game when they recomputed; `turnColor` read nothing else. chessground applies a drag as a real
+move only when `turnColor === movable.color`; with a frozen `'white'` turnColor and a fresh `'black'`
+movableColor, every Black move was silently demoted to a **premove** that never executed. White never hit
+it because the frozen `'white'` happens to match White's own turns; position-based drills where the human
+moves first (Sparring/Comeback/Endgames) were latently stale but coincidentally correct (the frozen value
+equalled the player's side). Fix: the side to move is a fact **of the position**, so `Board.svelte` now
+derives it from the `fen` prop (`fen.split(' ')[1]`) — the one input every caller refreshes on each move —
+and hands *that* to chessground, instead of the separately-passed `turnColor` prop (retained only as a
+fallback for a fen with no side field). One change at the single source of truth fixes every game mode at
+once and makes the class of bug unreintroducible. Note (out of scope): the `check` prop is stale by the
+same mechanism, but that is cosmetic (king-highlight lag) and never blocks a move; AnalysisBoard has a
+broader, colour-agnostic staleness (its `movableColor`/`dests` also read only `game`) tracked separately.
+jsdom does no layout and the WASM engine can't run headless, so the behaviour is guarded by a source
+invariant (`board-turn-color.test.ts`, same approach as ADR's mini-board sizing guard). No schema, no API
+change. Cross-links: ADR-0047 (play either colour — introduced the Black path), ADR-0046 (side-to-move
+badge — also now fen-derived).
