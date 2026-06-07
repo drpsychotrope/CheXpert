@@ -3,8 +3,7 @@
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
   import { ChessGame } from '../game/ChessGame';
-  import { AdaptiveOpponent, initOpponentState, recordGame, type GameOutcome } from '../engine/AdaptiveOpponent';
-  import { updateRating } from '../rating/glicko2';
+  import { AdaptiveOpponent, initOpponentState, type GameOutcome } from '../engine/AdaptiveOpponent';
   import { openTrainerDB, type GameRecord } from '../store/db';
   import { poolRating, poolOpponent } from '../store/playerModel';
   import type { RatingPool } from '../rating/pools';
@@ -13,7 +12,7 @@
     type ClockState, type Side,
   } from '../clock/Clock';
   import {
-    categoryFor, fmtClock, insufficientMatingMaterial, TIME_CONTROL_PRESETS,
+    categoryFor, fmtClock, TIME_CONTROL_PRESETS,
     type Category, type TimeControlPreset,
   } from '../clock/categories';
   import { loadAllAnalyses, runAnalysis } from '../analysis/runAnalysis';
@@ -24,6 +23,7 @@
   import { chess960Position, chess960PositionById } from '../variant/chess960';
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
+  import { applyGameResult, botMovetime, flagOutcome } from '../game/playSession';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   let game = $state(new ChessGame());
@@ -42,11 +42,6 @@
   let sp960Input = $state(''); // optional SP-ID string; blank = random
   let startFen960 = $state<string | null>(null);
   let castle960 = $state<import('../game/ChessGame').Chess960CastleFiles | null>(null);
-
-  // Clock-aware bot move budget bounds per category (ms) — [floor, ceil] (spec §4.3, Q-D).
-  const BUDGET_BOUNDS: Record<Category, [number, number]> = {
-    bullet: [40, 250], blitz: [80, 500], rapid: [150, 1200], classical: [200, 2000],
-  };
 
   // Time-control state. `clock` is null for the untimed ("No clock") path = today's behavior.
   let selectedTC = $state<TimeControlPreset>(TIME_CONTROL_PRESETS.find((p) => p.id === 'rapid-10-0')!);
@@ -232,30 +227,17 @@
   }
   onDestroy(stopClockLoop);
 
-  /** Clock-aware bot movetime (spec §4.3, Q-D): scale with the bot's remaining time,
-   *  using a phase-aware moves-left estimate, clamped per category. */
-  function botMovetime(remainingMs: number, ply: number, cat: Category): number {
-    const movesLeft = Math.max(8, 40 - Math.floor(ply / 2));
-    const raw = remainingMs / movesLeft;
-    const [floor, ceil] = BUDGET_BOUNDS[cat];
-    return Math.round(Math.min(ceil, Math.max(floor, raw)));
-  }
-
   /** A side flagged: game over. FIDE Art. 6.9 — if the OTHER side cannot mate, it's a draw
    *  (Q-C); otherwise the side that flagged loses. */
   async function onFlag(flaggedSide: Side) {
     stopClockLoop();
     status = 'over';
-    const winnerSide: Side = flaggedSide === 'w' ? 'b' : 'w';
-    let outcome: GameOutcome;
-    if (insufficientMatingMaterial(game.fen, winnerSide)) {
-      outcome = 'draw';
-      result = 'Flag — but insufficient mating material: draw (FIDE Art. 6.9).';
-    } else {
-      const playerFlagged = flaggedSide === playerSideClock;
-      outcome = playerFlagged ? 'loss' : 'win';
-      result = playerFlagged ? 'You flagged — out of time.' : 'Opponent flagged — you win on time! ♚';
-    }
+    const { outcome, draw } = flagOutcome(flaggedSide, playerSideClock, game.fen);
+    result = draw
+      ? 'Flag — but insufficient mating material: draw (FIDE Art. 6.9).'
+      : flaggedSide === playerSideClock
+        ? 'You flagged — out of time.'
+        : 'Opponent flagged — you win on time! ♚';
     await finishGame(outcome);
   }
 
@@ -382,28 +364,22 @@
     if (!m || !opp) return;
     const botElo = opp.state.targetElo;
 
-    const score = outcome === 'win' ? 1 : outcome === 'draw' ? 0.5 : 0;
-
     if (variant === 'chess960') {
       // Update the chess960 pool — seeded lazily on the first 960 game from classical (AP-960-7).
-      const prevOpp = poolOpponent(m, 'chess960');
-      const nextOpp = recordGame({ targetElo: prevOpp.targetElo, recent: prevOpp.recent }, outcome);
+      const seed = m.gameRatings.chess960 ?? m.gameRatings.classical ?? poolRating(m, 'classical');
+      const { nextOpp, nextRating } = applyGameResult(seed, poolOpponent(m, 'chess960'), outcome, botElo);
       m.opponentByPool.chess960 = nextOpp;
       opp.state = nextOpp;
       await opp.applyStrength().catch(() => {});
-      // Seed chess960 rating lazily from classical if not yet present.
-      const seed = m.gameRatings.chess960 ?? m.gameRatings.classical ?? poolRating(m, 'classical');
-      m.gameRatings.chess960 = updateRating(seed, [{ opponentRating: botElo, opponentRd: 60, score }]);
+      m.gameRatings.chess960 = nextRating;
     } else {
       // Standard path: adjust the SELECTED pool's adaptive bot toward the 55% band (AP-TC-3).
       const pool = selectedPool;
-      const prevOpp = poolOpponent(m, pool);
-      const nextOpp = recordGame({ targetElo: prevOpp.targetElo, recent: prevOpp.recent }, outcome);
+      const { nextOpp, nextRating } = applyGameResult(poolRating(m, pool), poolOpponent(m, pool), outcome, botElo);
       m.opponentByPool[pool] = nextOpp;
       opp.state = nextOpp;
       await opp.applyStrength().catch(() => {});
-      // Update the SELECTED pool's game rating via one Glicko match vs the bot Elo (AP-TC-3).
-      m.gameRatings[pool] = updateRating(poolRating(m, pool), [{ opponentRating: botElo, opponentRd: 60, score }]);
+      m.gameRatings[pool] = nextRating;
     }
 
     const now = Date.now();
