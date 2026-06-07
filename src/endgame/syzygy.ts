@@ -85,14 +85,19 @@ function normalize(data: RawTablebase): TablebaseResult {
     category: (data.category as TablebaseMove['category']) ?? 'unknown',
     dtz: data.dtz ?? null,
     dtm: data.dtm ?? null,
-    moves: (data.moves ?? []).map((m) => ({
-      uci: m.uci,
-      san: m.san,
-      category: (m.category as TablebaseMove['category']) ?? 'unknown',
-      dtz: m.dtz ?? null,
-      dtm: m.dtm ?? null,
-      zeroing: m.zeroing,
-    })),
+    // Defensive (audit W6): the response is untrusted JSON. Drop moves without a plausible UCI
+    // so a malformed/partial response can't crash downstream (game.moveUci(undefined)) or poison
+    // the cache.
+    moves: (data.moves ?? [])
+      .filter((m) => typeof m?.uci === 'string' && m.uci.length >= 4)
+      .map((m) => ({
+        uci: m.uci,
+        san: m.san,
+        category: (m.category as TablebaseMove['category']) ?? 'unknown',
+        dtz: m.dtz ?? null,
+        dtm: m.dtm ?? null,
+        zeroing: m.zeroing,
+      })),
   };
 }
 

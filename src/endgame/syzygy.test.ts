@@ -90,4 +90,20 @@ describe('TablebaseClient', () => {
     expect(r.cached).toBe(true);
     expect(r.category).toBe('win');
   });
+
+  it('drops malformed moves with no UCI from an untrusted response (audit W6)', async () => {
+    const cache = memoryCache();
+    const client = new TablebaseClient({
+      allowNetwork: () => true,
+      fetchFn: async () => ({
+        ok: true,
+        json: async () => ({ category: 'win', dtz: 1, moves: [{ category: 'loss' }, { uci: 'e2e7', category: 'loss' }] }),
+      }),
+      cacheGet: cache.get,
+      cacheSet: cache.set,
+    });
+    const r = await client.probe('8/8/8/4k3/8/8/4Q3/4K3 w - - 0 1');
+    expect(r.moves).toHaveLength(1);
+    expect(r.moves[0].uci).toBe('e2e7');
+  });
 });
