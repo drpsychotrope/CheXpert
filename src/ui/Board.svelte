@@ -51,7 +51,21 @@
     turnLabel = 'move',
   }: Props = $props();
 
-  const colorName = $derived(turnColor === 'white' ? 'White' : 'Black');
+  // chessground executes a drag as a real move only when its `turnColor` equals the side
+  // to move; when they disagree it treats the drag as a (never-applied) premove. The side
+  // to move is a fact OF the position, so derive it from `fen` — the one reactive input
+  // every caller refreshes on each move — rather than trusting the separately-passed
+  // `turnColor` prop. Callers computed that prop from a ChessGame held in $state, which
+  // Svelte 5 does NOT deep-proxy: the engine's reply MUTATES the game without reassigning
+  // it, so the prop's derived never recomputed and stayed frozen at its initial value
+  // (e.g. 'white' while Black was to move). That silently turned every move by a
+  // Black-playing human into a premove — pieces grabbable, moves never applied. Deriving
+  // from `fen` keeps turnColor in lockstep with the rendered position in every game mode
+  // (ADR-0050). The `turnColor` prop is kept only as a fallback for a fen with no side field.
+  const sideToMove = $derived<'white' | 'black'>(
+    fen.split(' ')[1] === 'b' ? 'black' : fen.split(' ')[1] === 'w' ? 'white' : turnColor,
+  );
+  const colorName = $derived(sideToMove === 'white' ? 'White' : 'Black');
   const turnText = $derived(turnLabel === 'play' ? `You play ${colorName}` : `${colorName} to move`);
 
   let el: HTMLDivElement;
@@ -65,7 +79,7 @@
     return {
       fen,
       orientation,
-      turnColor,
+      turnColor: sideToMove,
       viewOnly,
       check,
       // Disable chessground's own coordinate labels — their absolute positioning
@@ -118,7 +132,7 @@
 
 <div class="board-shell" class:has-turn={showTurn}>
   {#if showTurn}
-    <div class="turn-badge"><span class="disc {turnColor}"></span>{turnText}</div>
+    <div class="turn-badge"><span class="disc {sideToMove}"></span>{turnText}</div>
   {/if}
   <div class="board-frame">
   <!-- rank labels (left gutter), one flex cell per row, aligned to the board grid -->
