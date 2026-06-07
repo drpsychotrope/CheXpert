@@ -254,6 +254,12 @@
     return game.turn === 'w' ? 'white' : 'black';
   }
 
+  // In-check king highlight: `game` is mutated in place each move and Svelte 5 doesn't proxy the
+  // ChessGame instance, so a bare `game.inCheck()` binding never re-fires (movableColor/dests are
+  // saved only by their co-dependency on the toggling `status`). Depend on the reactive `fen`
+  // (reassigned every move) so the highlight refreshes mid-game. ADR-0051.
+  const inCheck = $derived(fen ? game.inCheck() : false);
+
   async function onMove(from: string, to: string) {
     if (status !== 'playing' || turnColor() !== playerColor) return;
     const uci = from + to + (game.isPromotion(from, to) ? 'q' : '');
@@ -543,7 +549,7 @@
       movableColor={status === 'playing' && turnColor() === playerColor ? playerColor : undefined}
       dests={status === 'playing' && turnColor() === playerColor ? game.dests() : new Map()}
       {lastMove}
-      check={game.inCheck()}
+      check={inCheck}
       {onMove}
     />
   </div>

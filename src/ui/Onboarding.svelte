@@ -44,6 +44,12 @@
   let gameInfo = $state('');
   const GAME_MOVE_LIMIT = 24; // short calibration game
 
+  // Calibration-game board in-check highlight: `game` is mutated in place each move and Svelte 5
+  // doesn't proxy the ChessGame instance, so a bare `game.inCheck()` binding never re-fires.
+  // Depend on the reactive `gameFen` (reassigned every move) so it refreshes. (The ladder board
+  // is fine — `display` is reassigned per puzzle.) ADR-0051.
+  const gameInCheck = $derived(gameFen ? game.inCheck() : false);
+
   let resultPuzzleRating = $state(0);
   let resultGameRating = $state(0);
 
@@ -293,7 +299,7 @@
         turnColor={game.turn === 'w' ? 'white' : 'black'}
         movableColor={!gameThinking && game.turn === gameSide ? (gameSide === 'w' ? 'white' : 'black') : undefined}
         dests={!gameThinking && game.turn === gameSide ? game.dests() : new Map()}
-        check={game.inCheck()}
+        check={gameInCheck}
         onMove={onGameMove}
       />
     </div>

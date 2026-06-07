@@ -43,6 +43,12 @@
   let coachColorChoice = $state<ColorChoice>('random');
   let coachSide = $state<'w' | 'b'>('w');
 
+  // Calibration-game board in-check highlight: `game` is mutated in place each move and Svelte 5
+  // doesn't proxy the ChessGame instance, so a bare `game.inCheck()` binding never re-fires.
+  // Depend on the reactive `gameFen` (reassigned every move) so it refreshes. (The ladder board
+  // is fine — `display` is reassigned per puzzle.) ADR-0051.
+  const gameInCheck = $derived(gameFen ? game.inCheck() : false);
+
   let profile = $state<CoachProfile | null>(null);
   let programPreview = $state<ReturnType<typeof buildCoachProgram>>([]);
 
@@ -231,7 +237,7 @@
         turnColor={game.turn === 'w' ? 'white' : 'black'}
         movableColor={!thinking && game.turn === coachSide ? (coachSide === 'w' ? 'white' : 'black') : undefined}
         dests={!thinking && game.turn === coachSide ? game.dests() : new Map()}
-        check={game.inCheck()} onMove={onGameMove} />
+        check={gameInCheck} onMove={onGameMove} />
     </div>
     {#if thinking}<p class="feedback">Bot thinking…</p>{/if}
 
