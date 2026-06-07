@@ -55,21 +55,21 @@
     await saveSet(active);
     cycleDone = false;
     mode = 'run';
-    loadCurrent();
+    void loadCurrent();
   }
 
-  function loadCurrent() {
+  async function loadCurrent() {
     if (!active) return;
     const idx = nextIndex(active);
     if (idx < 0) {
       void finishCycle();
       return;
     }
-    const p = app.puzzles.byId(active.puzzleIds[idx]);
+    const p = await app.puzzles.byId(active.puzzleIds[idx]);
     if (!p) {
       // A missing puzzle counts as an instant miss so the cycle still completes.
       active = recordResult(active, idx, false, 0);
-      loadCurrent();
+      await loadCurrent();
       return;
     }
     trainer = new TacticalTrainer(p, Date.now());

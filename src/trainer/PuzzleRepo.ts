@@ -44,8 +44,25 @@ export class PuzzleRepo {
       const shipped = await this.fetchSubset();
       if (shipped.length > curatedCount) await this.seedInBatches(db, shipped);
     }
-    this.cache = await db.getAll('puzzles');
+    // Load all personal puzzles (few) + a rating-spread sample of curated instead of all ~80k rows,
+    // to keep the heap bounded (audit W3). byId() falls back to a DB get for any id outside this
+    // working set (e.g. an old curated puzzle resurfacing from the SRS/Woodpecker queue).
+    const personal = await db.getAllFromIndex('puzzles', 'source', 'personal');
+    this.cache = [...personal, ...(await this.sampleCurated(db))];
     this.loaded = true;
+  }
+
+  /** A rating-spread sample of curated puzzles (capped per band) so next() has candidates near any
+   *  rating without holding the whole ~80k set in memory (audit W3). */
+  private async sampleCurated(db: Awaited<ReturnType<typeof openTrainerDB>>, perBand = 700): Promise<Puzzle[]> {
+    const BANDS = [0, 800, 1100, 1400, 1700, 2000, 2300, 4000];
+    const out: Puzzle[] = [];
+    for (let i = 0; i < BANDS.length - 1; i++) {
+      const range = IDBKeyRange.bound(BANDS[i], BANDS[i + 1] - 1);
+      const band = await db.getAllFromIndex('puzzles', 'rating', range, perBand);
+      for (const p of band) if (p.source === 'curated') out.push(p);
+    }
+    return out;
   }
 
   /** Seed puzzles in bounded transactions so a fresh ~80k-row import doesn't freeze the
@@ -93,9 +110,14 @@ export class PuzzleRepo {
     this.cache.push(...puzzles);
   }
 
-  /** Look up a puzzle by id from the in-memory cache (used by the SRS review queue). */
-  byId(id: string): Puzzle | null {
-    return this.cache.find((p) => p.id === id) ?? null;
+  /** Look up a puzzle by id — the in-memory working set first, then a DB get for any id outside it
+   *  (e.g. an older curated puzzle resurfacing from the SRS/Woodpecker queue). Async because the
+   *  working set no longer holds every curated puzzle (audit W3). */
+  async byId(id: string): Promise<Puzzle | null> {
+    const inMem = this.cache.find((p) => p.id === id);
+    if (inMem) return inMem;
+    const db = await openTrainerDB();
+    return (await db.get('puzzles', id)) ?? null;
   }
 
   /** Persist a single puzzle row (e.g. its drifting Glicko rating after an attempt) and keep the
