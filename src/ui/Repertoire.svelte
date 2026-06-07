@@ -77,9 +77,9 @@
     return new ChessGame(drill.fen()).dests();
   }
 
-  async function onDrillMove(from: string, to: string) {
+  async function onDrillMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
     if (!drill || drill.done) return;
-    const uci = from + to; // promotions rare in opening lines; default handled by drill
+    const uci = from + to + (new ChessGame(drill.fen()).isPromotion(from, to) ? promo : '');
     const res = drill.play(uci);
     if (res === 'wrong') {
       drillFeedback = 'Not your repertoire move — try again.';

@@ -8,6 +8,13 @@
   import type { Api } from 'chessground/api';
   import type { Config } from 'chessground/config';
   import type { Key } from 'chessground/types';
+  import {
+    isPromotionMove,
+    PROMOTION_ORDER,
+    PROMOTION_NAME,
+    PROMOTION_GLYPH,
+    type PromotionPiece,
+  } from './promotion';
 
   interface Props {
     fen: string;
@@ -18,7 +25,7 @@
     viewOnly?: boolean;
     lastMove?: [string, string] | null;
     check?: boolean;
-    onMove?: (from: string, to: string) => void;
+    onMove?: (from: string, to: string, promo?: PromotionPiece) => void;
     /** Hide the rank/file gutter labels (unlabeled board for the coordinate drill). ADR-0043. */
     coords?: boolean;
     /** Single-square click handler (chessground `events.select`). Enables `selectable`. ADR-0043. */
@@ -71,6 +78,25 @@
   let el: HTMLDivElement;
   let cg: Api | null = null;
 
+  // Promotion picker (audit W4): chessground's `after` gives only (from,to). When the move is
+  // a pawn reaching the last rank, pause and ask which piece, then forward it to onMove.
+  let pendingPromo = $state<{ from: string; to: string } | null>(null);
+
+  function handleAfter(from: string, to: string) {
+    if (!onMove) return;
+    if (isPromotionMove(fen, from, to)) pendingPromo = { from, to };
+    else onMove(from, to);
+  }
+  function choosePromo(piece: PromotionPiece) {
+    const mv = pendingPromo;
+    pendingPromo = null;
+    if (mv) onMove?.(mv.from, mv.to, piece);
+  }
+  function cancelPromo() {
+    pendingPromo = null;
+    cg?.set(config()); // revert chessground's optimistic pawn move back to the real position
+  }
+
   function toDests(d: Map<string, string[]>): Map<Key, Key[]> {
     return d as unknown as Map<Key, Key[]>;
   }
@@ -96,7 +122,7 @@
         dests: toDests(dests),
         showDests: true,
         events: {
-          after: (from: Key, to: Key) => onMove?.(from as string, to as string),
+          after: (from: Key, to: Key) => handleAfter(from as string, to as string),
         },
       },
       events: {
@@ -149,6 +175,24 @@
     </div>
   {/if}
   </div>
+  {#if pendingPromo}
+    <div class="promo-overlay">
+      <button class="promo-backdrop" type="button" aria-label="Cancel promotion" onclick={cancelPromo}></button>
+      <div class="promo-card" role="dialog" aria-label="Choose promotion piece">
+        <p class="promo-title">Promote to</p>
+        <div class="promo-pieces">
+          {#each PROMOTION_ORDER as pc (pc)}
+            <button
+              class="promo-btn"
+              type="button"
+              aria-label={PROMOTION_NAME[pc]}
+              onclick={() => choosePromo(pc)}
+            >{PROMOTION_GLYPH[sideToMove][pc]}</button>
+          {/each}
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -219,4 +263,13 @@
   .disc { display: inline-block; width: 0.85em; height: 0.85em; border-radius: 50%; border: 1px solid var(--border); }
   .disc.white { background: #ececec; }
   .disc.black { background: #2b2b2b; }
+
+  /* Promotion picker overlay (ADR-0052 / audit W4). */
+  .promo-overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; }
+  .promo-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.5); border: none; padding: 0; margin: 0; cursor: pointer; }
+  .promo-card { position: relative; background: var(--panel, #2b2b2b); border: 1px solid var(--border, #444); border-radius: 10px; padding: 1rem 1.2rem; text-align: center; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4); }
+  .promo-title { margin: 0 0 0.6rem; font-size: 0.9rem; color: var(--muted, #aaa); }
+  .promo-pieces { display: flex; gap: 0.4rem; }
+  .promo-btn { font-size: 2.2rem; line-height: 1; width: 3rem; height: 3rem; display: flex; align-items: center; justify-content: center; background: var(--panel-2, #1f1f1f); border: 1px solid var(--border, #444); border-radius: 8px; cursor: pointer; color: var(--text, #eee); }
+  .promo-btn:hover { background: var(--accent, #4a90d9); color: #000; }
 </style>

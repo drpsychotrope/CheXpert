@@ -83,9 +83,9 @@
     feedback = '';
   }
 
-  function onLadderMove(from: string, to: string) {
+  function onLadderMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
     if (!trainer || !ladder) return;
-    const uci = from + to + (display.isPromotion(from, to) ? 'q' : '');
+    const uci = from + to + (display.isPromotion(from, to) ? promo : '');
     const res = trainer.playUserMove(uci);
     if (res === 'wrong') {
       ladder.report(false);
@@ -141,10 +141,10 @@
     }
   }
 
-  async function onGameMove(from: string, to: string) {
+  async function onGameMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
     if (!opponent || game.turn !== coachSide || thinking) return;
     await app.engine.resetVariant();
-    const san = game.move(from, to, 'q');
+    const san = game.move(from, to, promo);
     if (!san) return;
     gameFen = game.fen;
     if (game.terminal().over || game.history().length >= GAME_MOVE_LIMIT) return finishGame();

@@ -68,9 +68,9 @@
   // (reassigned every move) so the highlight refreshes mid-game. ADR-0051.
   const inCheck = $derived(fen ? game.inCheck() : false);
 
-  async function onMove(from: string, to: string) {
+  async function onMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
     if (status !== 'playing' || game.turn !== playerSide) return;
-    if (!game.move(from, to, 'q')) return;
+    if (!game.move(from, to, promo)) return;
     fen = game.fen;
     lastMove = [from, to];
     if (checkEnd()) return;

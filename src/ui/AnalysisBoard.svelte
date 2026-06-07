@@ -55,8 +55,8 @@
     game = new ChessGame(fen);
     analyze();
   }
-  function onMove(from: string, to: string) {
-    if (!game.move(from, to, 'q')) return;
+  function onMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
+    if (!game.move(from, to, promo)) return;
     advance();
   }
   function playLine(uci: string) {

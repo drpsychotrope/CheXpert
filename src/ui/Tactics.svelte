@@ -179,9 +179,8 @@
     return display.turn === 'w' ? 'white' : 'black';
   }
 
-  async function onMove(from: string, to: string) {
+  async function onMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
     if (!trainer || !puzzle || trainer.state.status !== 'solving' || locked) return;
-    const promo = display.isPromotion(from, to) ? 'q' : 'q';
     const uci = from + to + (display.isPromotion(from, to) ? promo : '');
     const result = trainer.playUserMove(uci);
 
