@@ -31,6 +31,20 @@ const MIME = {
   '.map': 'application/json; charset=utf-8',
 };
 
+// Content-Security-Policy (audit W10). Shipped as REPORT-ONLY: it cannot break the app, only logs
+// violations to the console. The only intended egress is the Syzygy tablebase; everything else is
+// same-origin. `wasm-unsafe-eval` + `worker-src blob:` are required by the Stockfish WASM engine
+// (multi-thread spawns blob workers). To ENFORCE it, rename the header to 'Content-Security-Policy'
+// after confirming in a browser that the board + engine (multi-thread, then lite fallback) still work.
+const CSP =
+  "default-src 'self'; " +
+  "script-src 'self' 'wasm-unsafe-eval'; " +
+  "worker-src 'self' blob:; " +
+  "connect-src 'self' https://tablebase.lichess.ovh; " +
+  "img-src 'self' data:; " +
+  "style-src 'self' 'unsafe-inline'; " +
+  "object-src 'none'; base-uri 'none'";
+
 // In a pkg/SEA exe, __dirname points inside the snapshot; the real on-disk
 // location is dirname(process.execPath). Check both, plus the dev layout.
 const exeDir = dirname(process.execPath);
@@ -84,6 +98,9 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, {
       'Content-Type': MIME[extname(filePath)] || 'application/octet-stream',
       'Cache-Control': 'no-cache',
+      // Report-only so it can't break the app; rename to 'Content-Security-Policy' to enforce
+      // after a browser check that the engine + board still work (audit W10).
+      'Content-Security-Policy-Report-Only': CSP,
       // Sentinel: lets a second launch recognise *our* server (vs a foreign program
       // that grabbed the port) before reusing it on EADDRINUSE.
       'X-Chess-Trainer': '1',
