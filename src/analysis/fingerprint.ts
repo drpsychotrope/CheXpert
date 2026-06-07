@@ -26,6 +26,16 @@ export interface Leak {
   severity: { mistake: number; blunder: number };
 }
 
+/** Single routing decision for a leak's one-click drill (audit W14): opening→repertoire,
+ *  endgame→endgames, everything else→tactics. Shared by Insights and the study plan so the two
+ *  can never disagree (previously each re-implemented this `startsWith` branching inline). */
+export function leakTarget(leak: Leak): 'repertoire' | 'endgames' | 'tactics' {
+  const m = leak.motif.toLowerCase();
+  if (leak.key.startsWith('opening') || m.includes('opening')) return 'repertoire';
+  if (leak.key.startsWith('endgame') || leak.phase === 'endgame' || m.includes('endgame')) return 'endgames';
+  return 'tactics';
+}
+
 /** Rank the player's recurring mistakes by impact (count × avg win-prob loss). */
 export function buildFingerprint(analyses: GameAnalysis[]): { leaks: Leak[] } {
   interface Acc {

@@ -5,7 +5,7 @@
   import { app } from '../state/app.svelte';
   import { loadAllAnalyses } from '../analysis/runAnalysis';
   import { buildWeaknessProfile, type Dimension } from '../analysis/weakness';
-  import { buildFingerprint, weaknessTrend, type Leak, type TrendPoint } from '../analysis/fingerprint';
+  import { buildFingerprint, leakTarget, weaknessTrend, type Leak, type TrendPoint } from '../analysis/fingerprint';
   import { buildStudyPlan } from '../analysis/studyPlan';
   import { motifEfficacy, type EfficacyReadout } from '../analysis/efficacy';
   import { poolRating } from '../store/playerModel';
@@ -49,9 +49,9 @@
   });
 
   function drillLeak(l: Leak) {
-    const m = l.motif.toLowerCase();
-    if (l.key.startsWith('opening') || m.includes('opening')) return app.go('repertoire');
-    if (l.key.startsWith('endgame') || l.phase === 'endgame' || m.includes('endgame')) return app.go('endgames');
+    const t = leakTarget(l);
+    if (t === 'repertoire') return app.go('repertoire');
+    if (t === 'endgames') return app.go('endgames');
     app.tacticsFilterThemes = [l.key];
     app.tacticsTimed = false;
     app.go('tactics');
