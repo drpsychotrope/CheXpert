@@ -69,6 +69,9 @@ export interface PlayerModel {
   onboarded: boolean;
   createdAt: number;
   updatedAt: number;
+  /** Data-shape revision of this singleton (audit W13). Additive fields bump it and are
+   *  backfilled in the load path; a destructive store change bumps DB_VERSION instead. */
+  schemaRev?: number;
 }
 
 export interface SettingsRecord {
@@ -84,6 +87,8 @@ export interface SettingsRecord {
   lastTimeControl?: { initialSec: number; incrementSec: number };
   /** Opt-in: show confidence/error-cause chips on puzzles (default false). ADR-0037. */
   metacogEnabled?: boolean;
+  /** Data-shape revision (audit W13). See PlayerModel.schemaRev. */
+  schemaRev?: number;
 }
 
 /** A PGN brought in for analysis (Phase 2). Raw source + which side the user was. */
@@ -110,6 +115,10 @@ interface TrainerDB extends DBSchema {
 }
 
 export const DB_NAME = 'chess-trainer';
+// Migration policy (audit W13):
+//  - ADDITIVE change (new optional field on an existing store) → add the field + bump the
+//    record's `schemaRev`, backfilled in the load path (playerModel.ts). NO DB_VERSION bump.
+//  - DESTRUCTIVE change (drop/rename/reindex a store) → bump DB_VERSION + add an `upgrade` block.
 export const DB_VERSION = 4;
 
 /** Thrown when IndexedDB cannot be opened (private browsing, storage disabled by

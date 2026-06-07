@@ -16,8 +16,8 @@ jobs:
         with:
           node-version: '22'
       # --ignore-scripts skips postinstall (engine copy / puzzle DL / exe build); none of
-      # that is required by svelte-check or vitest. Switch to `npm ci` once a lockfile is
-      # committed (audit W10).
-      - run: npm install --no-audit --no-fund --ignore-scripts
+      # that is required by svelte-check or vitest. `npm ci` uses the committed lockfile for
+      # reproducible installs (audit W10).
+      - run: npm ci --ignore-scripts
       - run: npm run check
       - run: npm test

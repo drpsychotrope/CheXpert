@@ -14,7 +14,7 @@
 const http = require('node:http');
 const { readFile, stat } = require('node:fs/promises');
 const { existsSync } = require('node:fs');
-const { join, normalize, extname, dirname } = require('node:path');
+const { join, normalize, extname, dirname, relative, isAbsolute } = require('node:path');
 const { spawn } = require('node:child_process');
 
 const MIME = {
@@ -51,7 +51,11 @@ if (!ROOT) {
 function safeJoin(root, urlPath) {
   const clean = decodeURIComponent(urlPath.split('?')[0].split('#')[0]);
   const p = normalize(join(root, clean));
-  if (!p.startsWith(root)) return null;
+  // Exact containment: startsWith(root) alone would also accept a sibling dir sharing the
+  // prefix (e.g. dist-extra). path.relative gives '' for root itself and a '..'-prefixed or
+  // absolute path for anything outside it (audit W10).
+  const rel = relative(root, p);
+  if (rel !== '' && (rel.startsWith('..') || isAbsolute(rel))) return null;
   return p;
 }
 

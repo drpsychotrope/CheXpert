@@ -91,7 +91,9 @@ export class AdaptiveOpponent {
   async pickHumanMove(fen: string, movetime = 300): Promise<string | null> {
     let lines;
     try {
-      lines = await this.engine.analyzeLines(fen, { multipv: 4, movetime });
+      // MultiPV 3 (was 4): 3 lines suffice for temperature sampling and cost the engine less
+      // on the hot path (every bot move); the anti-blunder gap filter below is unchanged (audit W15).
+      lines = await this.engine.analyzeLines(fen, { multipv: 3, movetime });
     } catch {
       return this.pickMove(fen, movetime);
     }
