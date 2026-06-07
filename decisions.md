@@ -796,3 +796,21 @@ simply play through ("solved or not, we move on"). Tradeoff: n=1 per motif is no
 per-motif delta is even more strictly *directional* — the existing sample-size labels (`n`, "(N puzzles)")
 keep it honest (AP-COACH-2). No schema, no API change; only the two constants + wizard copy + the constants
 test assertion move. Cross-links: ADR-0045 (coach mode — Q-D superseded), ADR-0005 (calibration ladder method).
+
+## ADR-0049 — Launcher: fixed port (stable origin) so the profile persists across sessions
+**Date:** 2026-06-07 · **Status:** accepted
+
+Symptom: from one launch to the next the player profile/ratings looked unsaved. Root cause was **not** the
+persistence code — `savePlayerModel` writes the `playerModel` singleton correctly and the Chrome
+`--user-data-dir` was already fixed. The `.exe` launcher (`server.cjs`) bound `listen(0)`, a fresh random
+ephemeral port every run, and browser storage (IndexedDB) is partitioned per **origin = scheme + host +
+PORT**. So each session opened `http://127.0.0.1:<new port>` against its own empty partition; the real data
+sat stranded under each prior run's port. Fix: bind a **constant port (7424)**, overridable via
+`CHESS_TRAINER_PORT`. On `EADDRINUSE` the launcher probes the holder for a sentinel `X-Chess-Trainer`
+response header — our own already-running instance just gets another window at the same URL (same origin =
+same profile), while a foreign holder triggers a clear "set CHESS_TRAINER_PORT" message instead of opening a
+stranger's page. Added `CHESS_TRAINER_NO_OPEN=1` (headless / bring-your-own-tab; also drives the launcher
+smoke test). Limitation: profiles stranded under old random ports are **not** auto-migrated — users
+re-onboard once, then it sticks. Dev/preview were never affected (vite's fixed 5173/4173). Launcher-only:
+no app code, schema, or API change. Cross-links: ADR-0032 (launcher COOP/COEP headers — the other
+`server.cjs` decision).
