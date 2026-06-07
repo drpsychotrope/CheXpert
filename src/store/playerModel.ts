@@ -148,4 +148,7 @@ export async function clearAllData(): Promise<void> {
   // The tablebase cache lives in its own IndexedDB (endgame/tablebaseCache.ts).
   const { tbCacheClear } = await import('../endgame/tablebaseCache');
   await tbCacheClear();
+  // Drop the in-memory analyses cache so a wipe is reflected immediately (audit W15).
+  const { invalidateAnalysesCache } = await import('../analysis/runAnalysis');
+  invalidateAnalysesCache();
 }
