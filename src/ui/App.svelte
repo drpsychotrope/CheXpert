@@ -65,6 +65,16 @@
 <main class="app-main">
   {#if !booted}
     <p class="center muted">Loading…</p>
+  {:else if app.bootError}
+    <section class="col center" style="max-width:480px;margin:3rem auto;text-align:center">
+      <h2>⚠️ Storage unavailable</h2>
+      <p class="muted">{app.bootError}</p>
+      <p class="muted" style="font-size:0.85rem">
+        Chess Trainer keeps everything on your device using your browser's storage (IndexedDB).
+        Try a normal (non-private) window, allow site data for this page, then reload.
+      </p>
+      <button onclick={() => location.reload()}>Reload</button>
+    </section>
   {:else if app.view === 'onboarding'}
     <Onboarding />
   {:else if app.view === 'play'}

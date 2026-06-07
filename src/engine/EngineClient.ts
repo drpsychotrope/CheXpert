@@ -7,6 +7,15 @@
 //    implemented as terminate()+respawn, never a soft `stop` we rely on.
 //  - A single long-lived worker is reused across moves (cheap), respawned only
 //    to interrupt.
+//
+// CONCURRENCY (audit W1): there is ONE worker and ONE message stream. Two searches
+// in flight at once would both observe the same `bestmove` line and resolve each
+// other's promise (cross-talk), corrupting results. So every worker round-trip that
+// issues a `go`/`isready` is SERIALIZED through an internal FIFO queue (`enqueue`):
+// exactly one search is ever active. Pending waiters are tracked so terminate() and a
+// worker `error` event reject them deterministically instead of leaving them to hang
+// until the 30 s timeout. The public API (evaluate/analyzeLines/resetVariant/…) is
+// unchanged — serialization is entirely internal.
 
 import { parseBestmove, parseInfo, parseMultiPv, scoreToWhiteCp, type ScoreInfo } from './uci';
 import { engineWorkerUrl, multiThreadAvailable, forceLiteFallback, threadCount } from './stockfish.worker';
@@ -38,16 +47,43 @@ export interface LineResult {
 }
 
 type Listener = (line: string) => void;
+/** A search/isready promise currently waiting on the worker, so we can reject it on terminate/error. */
+type Pending = { reject: (e: unknown) => void };
+
+/** Validate a FEN enough to read the side to move (audit W6). Throws on a malformed FEN
+ *  instead of silently assuming White, which would invert every score's POV. */
+function sideToMove(fen: string): 'w' | 'b' {
+  const stm = fen.split(' ')[1];
+  if (stm !== 'w' && stm !== 'b') {
+    throw new Error(`EngineClient: malformed FEN (missing side-to-move field): "${fen}"`);
+  }
+  return stm;
+}
 
 export class EngineClient {
   private worker: Worker | null = null;
   private listeners = new Set<Listener>();
+  /** Active waiters (one at a time under serialization, plus boot waiters). */
+  private pending = new Set<Pending>();
   private ready = false;
   private bootPromise: Promise<void> | null = null;
   private options: Record<string, string | number | boolean> = {};
+  /** FIFO tail: every serialized op chains onto this so only one search runs at a time. */
+  private chain: Promise<unknown> = Promise.resolve();
 
   /** Override for tests: a factory that returns a Worker-like object. */
   constructor(private makeWorker: () => Worker = defaultWorkerFactory) {}
+
+  /** Serialize a worker round-trip: run `op` only after the previous one settles. */
+  private enqueue<T>(op: () => Promise<T>): Promise<T> {
+    const run = this.chain.then(op, op);
+    // Keep the chain alive whatever this op's outcome, without unhandled rejections.
+    this.chain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
 
   /** Boot (or re-boot) the worker and wait for uciok + readyok. */
   async init(): Promise<void> {
@@ -62,8 +98,13 @@ export class EngineClient {
     this.worker = this.makeWorker();
     this.worker.onmessage = (e: MessageEvent) => {
       const line = typeof e.data === 'string' ? e.data : String(e.data);
-      for (const l of this.listeners) l(line);
+      // Copy: a matching listener removes itself mid-iteration.
+      for (const l of [...this.listeners]) l(line);
     };
+    // A worker crash (OOM, bad .wasm, internal throw) stops the message stream. Without
+    // these handlers the in-flight waiter would hang until its 30 s timeout (audit W1).
+    this.worker.onerror = () => this.handleWorkerFailure('engine worker error');
+    this.worker.onmessageerror = () => this.handleWorkerFailure('engine worker message error');
 
     try {
       // The engine queues commands sent before it finishes loading, so we can send
@@ -102,10 +143,14 @@ export class EngineClient {
     this.send(`setoption name ${name} value ${value}`);
   }
 
-  /** Analyse a single position. Resolves on bestmove. */
+  /** Analyse a single position. Resolves on bestmove. Serialized (one search at a time). */
   async evaluate(fen: string, opts: GoOptions): Promise<EvalResult> {
+    const whiteToMove = sideToMove(fen) === 'w'; // validates the FEN before queueing
     await this.init();
-    const whiteToMove = fen.split(' ')[1] !== 'b';
+    return this.enqueue(() => this.evaluateInner(fen, whiteToMove, opts));
+  }
+
+  private async evaluateInner(fen: string, whiteToMove: boolean, opts: GoOptions): Promise<EvalResult> {
     let lastScore: ScoreInfo = { cp: 0 };
     let depthReached = 0;
     let bestmove: string | null = null;
@@ -139,11 +184,19 @@ export class EngineClient {
    * Analyse a position with MultiPV, returning the top `multipv` lines sorted
    * best-first (White-POV). Used by the puzzle generator's uniqueness check
    * (AP-CHESS-10): a position only becomes a puzzle if line 1 clearly beats line 2.
-   * Resets MultiPV back to 1 afterwards.
+   * Resets MultiPV back to 1 afterwards. Serialized (one search at a time).
    */
   async analyzeLines(fen: string, opts: GoOptions & { multipv: number }): Promise<LineResult[]> {
+    const whiteToMove = sideToMove(fen) === 'w'; // validates the FEN before queueing
     await this.init();
-    const whiteToMove = fen.split(' ')[1] !== 'b';
+    return this.enqueue(() => this.analyzeLinesInner(fen, whiteToMove, opts));
+  }
+
+  private async analyzeLinesInner(
+    fen: string,
+    whiteToMove: boolean,
+    opts: GoOptions & { multipv: number },
+  ): Promise<LineResult[]> {
     const best = new Map<number, { score: ScoreInfo; uci: string | null }>();
 
     this.send(`setoption name MultiPV value ${opts.multipv}`);
@@ -180,8 +233,10 @@ export class EngineClient {
   /** Ensure the engine is in STANDARD (non-960) mode. Idempotent; call before evaluating standard positions. */
   async resetVariant(): Promise<void> {
     await this.init();
-    this.setOption('UCI_Chess960', false);
-    await this.isready();
+    return this.enqueue(async () => {
+      this.setOption('UCI_Chess960', false);
+      await this.isready();
+    });
   }
 
   /** Hard interrupt: kill the worker and respawn (lite single-thread cannot soft-stop). */
@@ -191,10 +246,28 @@ export class EngineClient {
   }
 
   terminate(): void {
+    // Reject anything still waiting BEFORE we kill the worker, so no promise is orphaned
+    // and no stale listener survives into the next worker (audit W1).
+    this.failAll(new Error('engine terminated'));
     this.worker?.terminate();
     this.worker = null;
     this.ready = false;
     this.bootPromise = null;
+  }
+
+  /** A worker error/crash: reject in-flight waiters and mark dead so the next call re-boots. */
+  private handleWorkerFailure(msg: string): void {
+    this.failAll(new Error(msg));
+    this.worker = null;
+    this.ready = false;
+    this.bootPromise = null;
+  }
+
+  /** Reject every pending waiter and clear all listeners. */
+  private failAll(err: unknown): void {
+    for (const p of [...this.pending]) p.reject(err);
+    this.pending.clear();
+    this.listeners.clear();
   }
 
   private addListener(l: Listener): () => void {
@@ -202,24 +275,38 @@ export class EngineClient {
     return () => this.listeners.delete(l);
   }
 
-  /** Run `trigger`, then resolve when `match` returns true for some line. */
+  /** Run `trigger`, then resolve when `match` returns true for some line. Registers the
+   *  waiter so terminate()/worker-error can reject it deterministically. */
   private waitFor(
     trigger: () => void,
     match: (line: string) => boolean,
     timeoutMs: number,
     label: string,
   ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
+    return new Promise<void>((resolve, reject) => {
+      let settled = false;
+      let off: () => void = () => {};
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      // One-shot teardown shared by resolve / timeout / external rejection.
+      const settle = (action: () => void) => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
         off();
-        reject(new Error(`EngineClient timeout waiting for ${label}`));
-      }, timeoutMs);
-      const off = this.addListener((line) => {
-        if (match(line)) {
-          clearTimeout(timer);
-          off();
-          resolve();
-        }
+        this.pending.delete(entry);
+        action();
+      };
+
+      const entry: Pending = { reject: (e: unknown) => settle(() => reject(e)) };
+      this.pending.add(entry);
+
+      timer = setTimeout(
+        () => settle(() => reject(new Error(`EngineClient timeout waiting for ${label}`))),
+        timeoutMs,
+      );
+      off = this.addListener((line) => {
+        if (match(line)) settle(() => resolve());
       });
       trigger();
     });

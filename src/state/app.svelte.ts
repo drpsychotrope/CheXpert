@@ -35,6 +35,9 @@ export type View =
 class AppState {
   view = $state<View>('home');
   ready = $state(false);
+  /** Set when boot() fails (e.g. IndexedDB unavailable). The UI shows this instead of
+   *  a normal view or an endless "Loading…" (audit W2). */
+  bootError = $state<string | null>(null);
   model = $state<PlayerModel | null>(null);
   settings = $state<SettingsRecord | null>(null);
   /** Set by the dashboard "Drill" buttons; consumed by the tactics trainer. */
@@ -59,12 +62,18 @@ class AppState {
   readonly puzzles = new PuzzleRepo();
 
   async boot(now: number): Promise<void> {
-    this.model = await loadPlayerModel(now);
-    this.settings = await loadSettings();
-    await this.puzzles.init();
-    this.ready = true;
-    // First run → route to onboarding (launch-time skill evaluation).
-    this.view = this.model.onboarded ? 'home' : 'onboarding';
+    try {
+      this.model = await loadPlayerModel(now);
+      this.settings = await loadSettings();
+      await this.puzzles.init();
+      // First run → route to onboarding (launch-time skill evaluation).
+      this.view = this.model.onboarded ? 'home' : 'onboarding';
+    } catch (e) {
+      // Never hang on "Loading…": surface an explicit error and stop (audit W2).
+      this.bootError = e instanceof Error ? e.message : String(e);
+    } finally {
+      this.ready = true;
+    }
   }
 
   go(view: View): void {

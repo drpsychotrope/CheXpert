@@ -84,6 +84,8 @@
   // Loop closure: the bot (Black here) opens toward the player's weakest area.
   let opening: OpeningEntry | null = null;
   let playedUci: string[] = [];
+  // Guard against finishGame() running twice (onFlag + checkEnd race, audit W6).
+  let gameFinished = false;
 
   const model = $derived(app.model);
   const coached = $derived(app.settings?.coachedMode ?? false);
@@ -126,9 +128,16 @@
     castle960 = null;
     lastMove = null;
     playedUci = [];
+    gameFinished = false;
 
     if (variant === 'chess960') {
-      const id = sp960Input.trim() === '' ? null : Math.max(0, Math.min(959, Number(sp960Input) | 0));
+      // Distinguish an invalid entry from a deliberate 0: NaN → random, not silently SP 0 (audit W6).
+      const raw = sp960Input.trim();
+      let id: number | null = null;
+      if (raw !== '') {
+        const n = Number(raw);
+        id = Number.isFinite(n) ? Math.max(0, Math.min(959, Math.floor(n))) : null;
+      }
       const pos = id === null ? chess960Position(Math.random()) : chess960PositionById(id);
       startFen960 = pos.startFen;
       castle960 = pos.castle;
@@ -299,7 +308,18 @@
       }
       if ((status as string) === 'over') { thinking = false; return; }
       if (uci) {
-        game.moveUci(uci); // shim routes a king-to-rook castle UCI (e.g. e1h1); chess.js handles the rest
+        // shim routes a king-to-rook castle UCI (e.g. e1h1); chess.js handles the rest.
+        const san = game.moveUci(uci);
+        if (!san) {
+          // Engine returned a move the rules layer rejected (desync/illegal). Halt rather
+          // than advance a phantom move and corrupt the board/last-move (audit W6).
+          result = 'Engine returned an illegal move — game halted.';
+          status = 'over';
+          stopClockLoop();
+          if (clock) clock = stopClock(clock);
+          thinking = false;
+          return;
+        }
         playedUci.push(uci);
         fen = game.fen;
         lastMove = [uci.slice(0, 2), uci.slice(2, 4)];
@@ -355,6 +375,8 @@
   }
 
   async function finishGame(outcome: GameOutcome) {
+    if (gameFinished) return; // idempotent: onFlag and checkEnd can both fire (audit W6)
+    gameFinished = true;
     const m = model;
     const opp = opponent;
     if (!m || !opp) return;

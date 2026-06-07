@@ -1,0 +1,23 @@
+name: CI
+
+# Gate every push and PR on the type-check + test suite so "type-clean / tests green"
+# is enforced, not just hoped for (audit W7). Heavy install extras (the 286 MB puzzle
+# download and the .exe build) are not needed to type-check or test.
+on:
+  push:
+  pull_request:
+
+jobs:
+  check-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # --ignore-scripts skips postinstall (engine copy / puzzle DL / exe build); none of
+      # that is required by svelte-check or vitest. Switch to `npm ci` once a lockfile is
+      # committed (audit W10).
+      - run: npm install --no-audit --no-fund --ignore-scripts
+      - run: npm run check
+      - run: npm test

@@ -57,6 +57,12 @@ export class ChessGame {
   private rights: { w: Side960Rights; b: Side960Rights } | null = null;
   /** Shim-tracked SAN history (chess.js history misses our manual castles). */
   private san960: string[] = [];
+  /** The FEN the game started from — kept for the Chess960 PGN [FEN] header (ADR-0041, audit W5). */
+  private readonly startFen: string;
+  /** Shim-tracked repetition counter. chess.js's `_positionCount` is wiped by the load()
+   *  we do on every manual 960 castle, so its isThreefoldRepetition() goes blind across a
+   *  castle. We count positions ourselves (960 only) and consult it in terminal() (audit W5). */
+  private repetition = new Map<string, number>();
 
   constructor(fen?: string, opts?: ChessGameOpts) {
     this.variant = opts?.variant ?? 'standard';
@@ -65,12 +71,14 @@ export class ChessGame {
     // standard castles (chess.js uses KQkq to produce ±2 king moves; the shim owns castling).
     const loadFen = this.variant === 'chess960' && fen ? neutralizeCastling(fen) : fen;
     this.chess = new Chess(loadFen);
+    this.startFen = fen ?? this.chess.fen();
     if (this.variant === 'chess960') {
       this.rights = { w: { short: true, long: true }, b: { short: true, long: true } };
       // If the start FEN lacks a rook on a castle file (already moved), drop that right.
       this.syncRightsToBoard();
       // Seed shim history from any moves already in the loaded FEN's PGN (usually none).
       this.san960 = this.chess.history();
+      this.repetition.set(this.repKey(), 1);
     }
   }
 
@@ -86,7 +94,12 @@ export class ChessGame {
     // In 960 mode neutralize chess.js's castling field to '-' (same reason as constructor).
     const loadFen = this.variant === 'chess960' ? neutralizeCastling(fen) : fen;
     this.chess.load(loadFen);
-    if (this.variant === 'chess960') this.syncRightsToBoard();
+    if (this.variant === 'chess960') {
+      this.syncRightsToBoard();
+      // Reset the repetition counter to the freshly loaded position (audit W5).
+      this.repetition.clear();
+      this.repetition.set(this.repKey(), 1);
+    }
   }
 
   loadPgn(pgn: string): void {
@@ -94,7 +107,44 @@ export class ChessGame {
   }
 
   pgn(): string {
-    return this.chess.pgn();
+    if (this.variant !== 'chess960') return this.chess.pgn();
+    // chess.js only knows the moves played since the last manual-castle load(), so its pgn()
+    // is truncated after any 960 castle. Rebuild from the shim's own SAN history (audit W5).
+    const sp = this.startFen.split(' ');
+    let moveNo = Number(sp[5] || '1');
+    let whiteToMove = (sp[1] || 'w') === 'w';
+    let body = '';
+    for (let k = 0; k < this.san960.length; k++) {
+      if (whiteToMove) {
+        body += `${moveNo}. ${this.san960[k]} `;
+      } else {
+        if (k === 0) body += `${moveNo}... `;
+        body += `${this.san960[k]} `;
+        moveNo++;
+      }
+      whiteToMove = !whiteToMove;
+    }
+    const headers = [
+      '[Event "Chess Trainer — Chess960"]',
+      '[Variant "Chess960"]',
+      '[SetUp "1"]',
+      `[FEN "${this.startFen}"]`,
+    ].join('\n');
+    return `${headers}\n\n${body.trim()}`.trim();
+  }
+
+  /** Repetition key (960): piece placement + side to move + shim castling rights + en-passant.
+   *  Excludes the move clocks so a genuine position repeat is detected (FIDE threefold). */
+  private repKey(): string {
+    const f = this.fen.split(' ');
+    const castle = this.variant === 'chess960' && this.rights ? this.castleFieldForEngine() : f[2];
+    return `${f[0]} ${f[1]} ${castle} ${f[3] ?? '-'}`;
+  }
+
+  /** Record one more occurrence of the current position (960 repetition tracking). */
+  private bumpRepetition(): void {
+    const key = this.repKey();
+    this.repetition.set(key, (this.repetition.get(key) ?? 0) + 1);
   }
 
   history(): string[] {
@@ -125,13 +175,18 @@ export class ChessGame {
   move(from: string, to: string, promotion: 'q' | 'r' | 'b' | 'n' = 'q'): string | null {
     if (this.variant === 'chess960') {
       const side = this.castleSideFor(from, to);
-      if (side) return this.applyCastle(side); // returns SAN or null (illegal)
+      if (side) {
+        const san = this.applyCastle(side); // returns SAN or null (illegal)
+        if (san) this.bumpRepetition();
+        return san;
+      }
     }
     try {
       const m = this.chess.move({ from: from as Square, to: to as Square, promotion });
       if (this.variant === 'chess960' && m) {
         this.san960.push(m.san);
         this.updateRightsAfterNormalMove(m);
+        this.bumpRepetition();
       }
       return m ? m.san : null;
     } catch {
@@ -156,6 +211,13 @@ export class ChessGame {
   }
 
   undo(): void {
+    if (this.variant === 'chess960') {
+      // Drop one occurrence of the position we're leaving (audit W5).
+      const key = this.repKey();
+      const n = this.repetition.get(key) ?? 0;
+      if (n <= 1) this.repetition.delete(key);
+      else this.repetition.set(key, n - 1);
+    }
     this.chess.undo();
     if (this.variant === 'chess960') {
       this.san960.pop();
@@ -169,7 +231,13 @@ export class ChessGame {
     }
     if (this.chess.isStalemate()) return { over: true, reason: 'stalemate' };
     if (this.chess.isInsufficientMaterial()) return { over: true, reason: 'insufficient' };
-    if (this.chess.isThreefoldRepetition()) return { over: true, reason: 'threefold' };
+    // 960: chess.js loses its repetition history across our manual-castle reloads, so consult
+    // the shim's own counter; standard keeps using chess.js's detector (audit W5).
+    if (this.variant === 'chess960') {
+      if ((this.repetition.get(this.repKey()) ?? 0) >= 3) return { over: true, reason: 'threefold' };
+    } else if (this.chess.isThreefoldRepetition()) {
+      return { over: true, reason: 'threefold' };
+    }
     if (this.chess.isDraw()) return { over: true, reason: 'draw' };
     return { over: false };
   }
