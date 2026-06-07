@@ -6,7 +6,7 @@
   import { ChessGame } from '../game/ChessGame';
   import { TacticalTrainer, gradeAttempt } from '../trainer/TacticalTrainer';
   import type { Puzzle } from '../trainer/puzzle';
-  import { openTrainerDB } from '../store/db';
+  import { putAttempt, getAttempt, attemptsByPuzzle } from '../store/attemptsRepo';
   import { reviewItem } from '../srs/SrsStore';
   import { resultToGrade } from '../srs/fsrs';
   import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
@@ -166,8 +166,7 @@
   async function refreshLeech(puzzleId: string): Promise<void> {
     leech = false;
     try {
-      const db = await openTrainerDB();
-      const prior = await db.getAllFromIndex('puzzleAttempts', 'puzzleId', puzzleId);
+      const prior = await attemptsByPuzzle(puzzleId);
       const fails = failCountByPuzzle(prior).get(puzzleId) ?? 0;
       leech = isLeech(fails, LEECH_THRESHOLD);
     } catch {
@@ -236,8 +235,7 @@
     // Review, no "misses"). Snapshot to a plain, cloneable object first (cf. woodpecker.saveSet).
     const p = $state.snapshot(puzzle);
     const attemptId = `${p.id}:${now}`;
-    const db = await openTrainerDB();
-    await db.put('puzzleAttempts', {
+    await putAttempt({
       id: attemptId,
       puzzleId: p.id,
       solved,
@@ -254,7 +252,7 @@
     // Remember the row id so self-tag clicks can UPDATE the same row (not insert a new one).
     if (!solved) lastAttemptId = attemptId;
     // Persist the updated puzzle rating into the puzzle row too (it drifts down).
-    await db.put('puzzles', { ...p, rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) });
+    await app.puzzles.savePuzzle({ ...p, rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) });
     // Schedule this puzzle for spaced repetition (FSRS) so it resurfaces in Review.
     await reviewItem('puzzle', puzzle.id, resultToGrade(solved, ms), now);
     await app.persistModel(now);
@@ -265,10 +263,9 @@
   async function updateSelfTag(tag: SelfTag) {
     selfTag = selfTag === tag ? undefined : tag;
     if (!lastAttemptId) return;
-    const db = await openTrainerDB();
-    const row = await db.get('puzzleAttempts', lastAttemptId);
+    const row = await getAttempt(lastAttemptId);
     if (!row) return;
-    await db.put('puzzleAttempts', { ...row, selfTag });
+    await putAttempt({ ...row, selfTag });
   }
 
   // Load the first puzzle once the model is ready.

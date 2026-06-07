@@ -4,7 +4,8 @@
   import Board from './Board.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { AdaptiveOpponent, initOpponentState, type GameOutcome } from '../engine/AdaptiveOpponent';
-  import { openTrainerDB, type GameRecord } from '../store/db';
+  import type { GameRecord } from '../store/db';
+  import { putGame, getAnalysis } from '../store/gamesRepo';
   import { poolRating, poolOpponent } from '../store/playerModel';
   import type { RatingPool } from '../rating/pools';
   import {
@@ -383,7 +384,6 @@
     }
 
     const now = Date.now();
-    const db = await openTrainerDB();
     const rec: GameRecord = {
       id: `g:${now}`,
       pgn: game.pgn(),
@@ -403,7 +403,7 @@
                 },
           }),
     };
-    await db.put('games', rec);
+    await putGame(rec);
     lastGame = { id: rec.id, pgn: rec.pgn };
     await app.persistModel(now);
   }
@@ -414,9 +414,7 @@
     aStatus = 'analyzing';
     aProgress = 0;
     try {
-      const { openTrainerDB } = await import('../store/db');
-      const db = await openTrainerDB();
-      const existing = await db.get('gameAnalyses', lastGame.id);
+      const existing = await getAnalysis(lastGame.id);
       if (existing) {
         aResult = existing;
         aPuzzles = 0;
