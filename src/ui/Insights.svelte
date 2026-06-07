@@ -9,7 +9,7 @@
   import { buildStudyPlan } from '../analysis/studyPlan';
   import { motifEfficacy, type EfficacyReadout } from '../analysis/efficacy';
   import { poolRating } from '../store/playerModel';
-  import { openTrainerDB } from '../store/db';
+  import { allAttempts } from '../store/attemptsRepo';
   import { calibration, SELF_TAG_LABELS, type Calibration, type MetacogAttempt } from '../metacog/metacog';
 
   let loading = $state(true);
@@ -42,8 +42,7 @@
       trend = weaknessTrend(analyses, { window: 5 });
       weakest = buildWeaknessProfile(analyses, model ? poolRating(model, 'classical').rating : 1200).weakest;
     }
-    const db = await openTrainerDB();
-    const attempts = (await db.getAll('puzzleAttempts')) as MetacogAttempt[];
+    const attempts = (await allAttempts()) as MetacogAttempt[];
     cal = calibration(attempts);
     loading = false;
   });

@@ -42,9 +42,8 @@
       const t0 = performance.now();
 
       // Persist the imported game record first.
-      const { openTrainerDB } = await import('../store/db');
-      const db = await openTrainerDB();
-      await db.put('importedGames', {
+      const { putImportedGame } = await import('../store/gamesRepo');
+      await putImportedGame({
         id: gameId,
         pgn,
         playerColor: color,
@@ -68,7 +67,7 @@
         },
       });
 
-      await db.put('importedGames', {
+      await putImportedGame({
         id: gameId,
         pgn,
         playerColor: color,

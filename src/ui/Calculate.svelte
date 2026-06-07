@@ -8,7 +8,7 @@
   import { ChessGame } from '../game/ChessGame';
   import { gradeCalcLine, firstWrongUserMove, formatSanLine } from '../calc/calc';
   import type { Puzzle } from '../trainer/puzzle';
-  import { openTrainerDB } from '../store/db';
+  import { putAttempt, getAttempt } from '../store/attemptsRepo';
   import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
 
   let puzzle = $state<Puzzle | null>(null);
@@ -80,8 +80,7 @@
     const p = $state.snapshot(puzzle); // IndexedDB cannot clone a $state proxy
     const r = model.puzzleRating.rating; // Calculate is not a Glicko writer (rating unchanged)
     const attemptId = `${p.id}:${now}`;
-    const db = await openTrainerDB();
-    await db.put('puzzleAttempts', {
+    await putAttempt({
       id: attemptId,
       puzzleId: p.id,
       solved: didSolve,
@@ -101,10 +100,9 @@
   async function updateSelfTag(tag: SelfTag) {
     selfTag = selfTag === tag ? undefined : tag;
     if (!lastAttemptId) return;
-    const db = await openTrainerDB();
-    const row = await db.get('puzzleAttempts', lastAttemptId);
+    const row = await getAttempt(lastAttemptId);
     if (!row) return;
-    await db.put('puzzleAttempts', { ...row, selfTag });
+    await putAttempt({ ...row, selfTag });
   }
 
   function fmtUci(uci: string): string {

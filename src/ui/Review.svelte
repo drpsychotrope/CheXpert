@@ -6,7 +6,7 @@
   import type { Puzzle } from '../trainer/puzzle';
   import { dueCards, reviewItem, allCards } from '../srs/SrsStore';
   import { resultToGrade, intervalLabel } from '../srs/fsrs';
-  import { openTrainerDB } from '../store/db';
+  import { allAttempts } from '../store/attemptsRepo';
   import { interleave, buildLapseSet } from '../srs/schedule';
   import { createSet, saveSet } from '../woodpecker/woodpecker';
 
@@ -116,9 +116,8 @@
       const graded = gradeAttempt(model.puzzleRating, puzzle, solved);
       model.puzzleRating = graded.player;
       if (!solved) for (const t of puzzle.themes) model.weaknessCounters[t] = (model.weaknessCounters[t] ?? 0) + 1;
-      const db = await openTrainerDB();
       // Snapshot the $state puzzle — a proxy can't be structured-cloned by IndexedDB.
-      await db.put('puzzles', { ...$state.snapshot(puzzle), rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) });
+      await app.puzzles.savePuzzle({ ...$state.snapshot(puzzle), rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) });
       await app.persistModel(Date.now());
     }
     reviewed += 1;
@@ -135,8 +134,7 @@
 
   /** Build a fixed "Your misses" Woodpecker set from the puzzles you fail most (any source). */
   async function buildMissesSet() {
-    const db = await openTrainerDB();
-    const attempts = (await db.getAll('puzzleAttempts')) as Array<{ puzzleId: string; solved: boolean }>;
+    const attempts = (await allAttempts()) as Array<{ puzzleId: string; solved: boolean }>;
     const ids = buildLapseSet(attempts, 12);
     if (!ids.length) {
       missesMsg = 'No failed puzzles yet — miss a few in Tactics first.';
