@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { migratePlayerModel, poolRating, poolOpponent, freshPlayerModel } from '../store/playerModel';
+import { migratePlayerModel, poolRating, poolOpponent, freshPlayerModel, CURRENT_PLAYER_SCHEMA_REV } from '../store/playerModel';
 import { defaultRating } from './glicko2';
 import { STANDARD_POOLS } from './pools';
 import type { PlayerModel } from '../store/db';
@@ -71,6 +71,19 @@ describe('migratePlayerModel', () => {
     const m = migratePlayerModel(fresh as unknown as Record<string, unknown>);
     expect(m.gameRatings.bullet!.rating).toBe(1700);
     expect(m.gameRatings.classical).toBeDefined();
+  });
+
+  it('stamps the current schemaRev on migration (audit W13)', () => {
+    expect(migratePlayerModel(legacyRecord()).schemaRev).toBe(CURRENT_PLAYER_SCHEMA_REV);
+    expect(freshPlayerModel(0).schemaRev).toBe(CURRENT_PLAYER_SCHEMA_REV);
+  });
+
+  it('treats a schemaRev-stamped record as current (no legacy re-seed)', () => {
+    const fresh = freshPlayerModel(0);
+    fresh.gameRatings.blitz = defaultRating(1888, 100, 0.06);
+    const m = migratePlayerModel({ ...(fresh as unknown as Record<string, unknown>), schemaRev: 1 });
+    expect(m.gameRatings.blitz!.rating).toBe(1888);
+    expect(m.schemaRev).toBe(1);
   });
 });
 

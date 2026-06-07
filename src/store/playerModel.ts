@@ -5,6 +5,12 @@ import { defaultRating, type Rating } from '../rating/glicko2';
 import { STANDARD_POOLS, type RatingPool } from '../rating/pools';
 import type { GameOutcome } from '../engine/AdaptiveOpponent';
 
+/** Current data-shape revision of the PlayerModel singleton (audit W13). Bump when adding a
+ *  field the load-path migration must backfill; rev 0 = legacy single gameRating, rev 1 = per-pool. */
+export const CURRENT_PLAYER_SCHEMA_REV = 1;
+/** Current data-shape revision of the Settings singleton (audit W13). */
+export const CURRENT_SETTINGS_SCHEMA_REV = 1;
+
 export function freshPlayerModel(now: number): PlayerModel {
   const gameRatings: PlayerModel['gameRatings'] = {};
   const opponentByPool: PlayerModel['opponentByPool'] = {};
@@ -19,6 +25,7 @@ export function freshPlayerModel(now: number): PlayerModel {
     opponentByPool,
     weaknessCounters: {},
     conceptSeen: [],
+    schemaRev: CURRENT_PLAYER_SCHEMA_REV,
     onboarded: false,
     createdAt: now,
     updatedAt: now,
@@ -35,39 +42,47 @@ export function freshPlayerModel(now: number): PlayerModel {
  */
 export function migratePlayerModel(raw: Record<string, unknown>): PlayerModel {
   const r = raw as Partial<PlayerModel> & {
+    schemaRev?: number;
     gameRating?: Rating;
     opponentTargetElo?: number;
     recentOutcomes?: GameOutcome[];
   };
-  if (r.gameRatings && r.opponentByPool) {
-    // Already in the new shape — return as a PlayerModel (defensive copy of nested maps).
-    return { ...(raw as unknown as PlayerModel) };
+  // Determine the record's revision. New records carry `schemaRev`; older ones are inferred by
+  // shape — rev 1 already has the per-pool maps, rev 0 is the legacy single rating (audit W13).
+  const fromRev = typeof r.schemaRev === 'number' ? r.schemaRev : r.gameRatings && r.opponentByPool ? 1 : 0;
+
+  let model: PlayerModel;
+  if (fromRev >= 1) {
+    // Already current shape — defensive copy.
+    model = { ...(raw as unknown as PlayerModel) };
+  } else {
+    // rev 0 → 1: seed the standard pools from the legacy single gameRating (RD widened, since
+    // per-pool evidence is thinner) and opponentByPool from the legacy opponent fields.
+    const legacy = r.gameRating ?? defaultRating();
+    const widenedRd = Math.max(legacy.rd, 150);
+    const seeded: Rating = { rating: legacy.rating, rd: widenedRd, vol: legacy.vol };
+    const targetElo = r.opponentTargetElo ?? Math.round(legacy.rating);
+    const recent = r.recentOutcomes ?? [];
+    const gameRatings: PlayerModel['gameRatings'] = {};
+    const opponentByPool: PlayerModel['opponentByPool'] = {};
+    for (const pool of STANDARD_POOLS) {
+      gameRatings[pool] = { ...seeded };
+      opponentByPool[pool] = { targetElo, recent: [...recent] };
+    }
+    model = {
+      id: 'singleton',
+      puzzleRating: r.puzzleRating ?? defaultRating(),
+      gameRatings,
+      opponentByPool,
+      weaknessCounters: r.weaknessCounters ?? {},
+      conceptSeen: r.conceptSeen ?? [],
+      onboarded: r.onboarded ?? false,
+      createdAt: r.createdAt ?? Date.now(),
+      updatedAt: r.updatedAt ?? Date.now(),
+    };
   }
-
-  const legacy = r.gameRating ?? defaultRating();
-  const widenedRd = Math.max(legacy.rd, 150);
-  const seeded: Rating = { rating: legacy.rating, rd: widenedRd, vol: legacy.vol };
-  const targetElo = r.opponentTargetElo ?? Math.round(legacy.rating);
-  const recent = r.recentOutcomes ?? [];
-
-  const gameRatings: PlayerModel['gameRatings'] = {};
-  const opponentByPool: PlayerModel['opponentByPool'] = {};
-  for (const pool of STANDARD_POOLS) {
-    gameRatings[pool] = { ...seeded };
-    opponentByPool[pool] = { targetElo, recent: [...recent] };
-  }
-
-  return {
-    id: 'singleton',
-    puzzleRating: r.puzzleRating ?? defaultRating(),
-    gameRatings,
-    opponentByPool,
-    weaknessCounters: r.weaknessCounters ?? {},
-    conceptSeen: r.conceptSeen ?? [],
-    onboarded: r.onboarded ?? false,
-    createdAt: r.createdAt ?? Date.now(),
-    updatedAt: r.updatedAt ?? Date.now(),
-  };
+  model.schemaRev = CURRENT_PLAYER_SCHEMA_REV;
+  return model;
 }
 
 /** The game rating for a pool, falling back to the nearest seeded standard pool, then defaultRating(). */
@@ -93,7 +108,7 @@ export function poolOpponent(m: PlayerModel, pool: RatingPool): { targetElo: num
 }
 
 export function freshSettings(): SettingsRecord {
-  return { id: 'singleton', coachedMode: false, allowNetwork: false, boardOrientation: 'white', opponentStyle: 'human', metacogEnabled: false };
+  return { id: 'singleton', coachedMode: false, allowNetwork: false, boardOrientation: 'white', opponentStyle: 'human', metacogEnabled: false, schemaRev: CURRENT_SETTINGS_SCHEMA_REV };
 }
 
 export async function loadPlayerModel(now: number): Promise<PlayerModel> {
@@ -113,7 +128,7 @@ export async function savePlayerModel(model: PlayerModel, now: number): Promise<
 export async function loadSettings(): Promise<SettingsRecord> {
   const db = await openTrainerDB();
   const existing = await db.get('settings', 'singleton');
-  if (existing) return existing;
+  if (existing) return { ...existing, schemaRev: existing.schemaRev ?? CURRENT_SETTINGS_SCHEMA_REV };
   const fresh = freshSettings();
   await db.put('settings', fresh);
   return fresh;
