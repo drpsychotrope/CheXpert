@@ -71,9 +71,12 @@ export class PuzzleRepo {
       try {
         const res = await this.fetchFn(url);
         if (!res.ok) continue;
-        const data = await res.json();
-        const puzzles: Puzzle[] = Array.isArray(data) ? data : data.puzzles;
-        if (puzzles && puzzles.length) return puzzles;
+        const data: unknown = await res.json();
+        const raw = Array.isArray(data) ? data : (data as { puzzles?: unknown }).puzzles;
+        // Validate untrusted JSON: a single malformed entry would otherwise crash loadNext via
+        // new ChessGame(p.fen). Keep only well-formed puzzles (audit W6).
+        const puzzles = Array.isArray(raw) ? raw.filter(isValidPuzzle) : [];
+        if (puzzles.length) return puzzles;
       } catch {
         // try next
       }
@@ -123,6 +126,20 @@ export class PuzzleRepo {
     const pick = topN[hashId(q.rating + (q.themes?.join() ?? '')) % topN.length];
     return pick ?? candidates[0];
   }
+}
+
+/** Shape-check an untrusted puzzle entry from the shipped/ETL JSON (audit W6). */
+function isValidPuzzle(p: unknown): p is Puzzle {
+  const q = p as Partial<Puzzle> | null;
+  return (
+    !!q &&
+    typeof q.id === 'string' &&
+    typeof q.fen === 'string' &&
+    q.fen.split(' ').length >= 2 &&
+    Array.isArray(q.moves) &&
+    q.moves.length > 0 &&
+    typeof q.rating === 'number'
+  );
 }
 
 function hashId(s: string): number {

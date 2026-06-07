@@ -62,4 +62,14 @@ describe('PuzzleRepo', () => {
     await b.init();
     expect(b.size).toBe(4);
   });
+
+  it('drops malformed puzzles from an untrusted subset (audit W6)', async () => {
+    const bad = [
+      { id: 'nofen', moves: ['a1a8'], rating: 1000 },
+      { id: 'nomoves', fen: '8/8/8/8/8/8/8/8 w - - 0 1', moves: [], rating: 1000 },
+    ];
+    const repo = new PuzzleRepo(fakeFetch([...fakePuzzles(), ...(bad as unknown as Puzzle[])]));
+    await repo.init();
+    expect(repo.size).toBe(4); // only the 4 well-formed puzzles were seeded
+  });
 });
