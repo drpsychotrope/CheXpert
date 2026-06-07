@@ -37,7 +37,11 @@
     const now = Date.now();
     const due = await dueCards(now, 'puzzle', 100);
     // Interleave by theme (desirable difficulty) so consecutive cards differ where possible.
-    queue = interleave(due.map((c) => c.refId), (id) => app.puzzles.byId(id)?.themes?.[0] ?? '');
+    const ids = due.map((c) => c.refId);
+    // byId is async now (working set + DB fallback); prefetch themes so interleave's key stays sync (W3).
+    const themeById = new Map<string, string>();
+    await Promise.all(ids.map(async (id) => themeById.set(id, (await app.puzzles.byId(id))?.themes?.[0] ?? '')));
+    queue = interleave(ids, (id) => themeById.get(id) ?? '');
     index = 0;
     reviewed = 0;
     // Schedule transparency for the empty state: how many puzzle cards exist + when the next is due.
@@ -45,20 +49,19 @@
     scheduledCount = puz.length;
     const soonest = puz.filter((c) => c.due > now).sort((a, b) => a.due - b.due)[0];
     nextDue = soonest ? intervalLabel(soonest, now) : '';
-    if (queue.length) loadCurrent();
+    if (queue.length) await loadCurrent();
     loading = false;
   }
 
-  function findPuzzle(id: string): Puzzle | null {
-    // PuzzleRepo caches all puzzles in memory; reuse its selection by id.
+  async function findPuzzle(id: string): Promise<Puzzle | null> {
     return app.puzzles.byId(id);
   }
 
-  function loadCurrent() {
+  async function loadCurrent() {
     feedback = '';
     feedbackKind = '';
     while (index < queue.length) {
-      const p = findPuzzle(queue[index]);
+      const p = await findPuzzle(queue[index]);
       if (p) {
         puzzle = p;
         trainer = new TacticalTrainer(p, Date.now());
@@ -125,7 +128,7 @@
 
   function nextCard() {
     index += 1;
-    if (index < queue.length) loadCurrent();
+    if (index < queue.length) void loadCurrent();
     else {
       trainer = null;
       puzzle = null;

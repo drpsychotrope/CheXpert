@@ -54,6 +54,13 @@ describe('PuzzleRepo', () => {
     expect(p?.id).not.toBe('p600');
   });
 
+  it('byId returns a cached puzzle and null for an unknown id (audit W3)', async () => {
+    const repo = new PuzzleRepo(fakeFetch(fakePuzzles()));
+    await repo.init();
+    expect((await repo.byId('p1000'))?.rating).toBe(1000);
+    expect(await repo.byId('missing')).toBeNull();
+  });
+
   it('persists across a second repo instance (no re-seed)', async () => {
     const a = new PuzzleRepo(fakeFetch(fakePuzzles()));
     await a.init();
