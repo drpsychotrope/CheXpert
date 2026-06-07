@@ -2,9 +2,10 @@
 //
 // The app is a static, client-only build that MUST be served over http://localhost
 // (module Web Workers, WASM fetch, and IndexedDB all break under file://). This
-// launcher starts a tiny 127.0.0.1 static server for the bundled `dist/`, then
-// opens it in a borderless app window via Edge/Chrome `--app=` mode (falls back to
-// the default browser). No backend, no telemetry, no network needed to play.
+// launcher starts a tiny 127.0.0.1 static server on a FIXED port (see PORT below)
+// for the bundled `dist/`, then opens it in a borderless app window via Edge/Chrome
+// `--app=` mode (falls back to the default browser). No backend, no telemetry, no
+// network needed to play.
 //
 // Asset resolution: when run as a packaged .exe, `dist/` sits NEXT TO the exe
 // (process.execPath dir). In dev (`node launcher/server.cjs`), it's ../dist.
@@ -54,6 +55,16 @@ function safeJoin(root, urlPath) {
   return p;
 }
 
+// Fixed listen port → STABLE ORIGIN across launches. Browser storage (IndexedDB,
+// where the player profile + ratings live) is partitioned per origin = scheme + host
+// + PORT. This launcher used to call listen(0) — a fresh random ephemeral port every
+// run — so each session landed on a different origin with its own empty IndexedDB
+// partition, and the profile looked like it was never saved (ADR-0049). A constant
+// port keeps every session on one partition. Override with CHESS_TRAINER_PORT only if
+// 7424 collides on your machine — note a different port is a different origin, hence a
+// separate profile.
+const PORT = Number(process.env.CHESS_TRAINER_PORT) || 7424;
+
 const server = http.createServer(async (req, res) => {
   try {
     let urlPath = req.url || '/';
@@ -69,6 +80,9 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, {
       'Content-Type': MIME[extname(filePath)] || 'application/octet-stream',
       'Cache-Control': 'no-cache',
+      // Sentinel: lets a second launch recognise *our* server (vs a foreign program
+      // that grabbed the port) before reusing it on EADDRINUSE.
+      'X-Chess-Trainer': '1',
       // Cross-origin isolation → SharedArrayBuffer → the multi-thread engine (ADR-0032).
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
@@ -79,15 +93,63 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(0, '127.0.0.1', () => {
-  const { port } = server.address();
-  const url = `http://127.0.0.1:${port}/`;
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE') {
+    // Port busy. Almost always our own previous instance still serving on the fixed
+    // port — reusing it is exactly right (same origin = same profile), so just open
+    // another window at the running URL. If a *foreign* program holds the port, bail
+    // with a clear message rather than opening a stranger's page.
+    const url = `http://127.0.0.1:${PORT}/`;
+    probeOurServer(PORT).then((ours) => {
+      if (ours) {
+        console.log(`Chess Trainer is already running — opening a window at ${url}`);
+        openAppWindow(url);
+        setTimeout(() => process.exit(0), 1500);
+      } else {
+        console.error(
+          `Chess Trainer: port ${PORT} is in use by another program.\n` +
+            `Relaunch on a free port, e.g.  set CHESS_TRAINER_PORT=8080  (PowerShell: $env:CHESS_TRAINER_PORT=8080).\n` +
+            `Note: a different port is a different browser origin, so it starts a separate profile.`
+        );
+        setTimeout(() => process.exit(1), 8000);
+      }
+    });
+  } else {
+    console.error('Chess Trainer: server error:', err);
+    setTimeout(() => process.exit(1), 8000);
+  }
+});
+
+server.listen(PORT, '127.0.0.1', () => {
+  const url = `http://127.0.0.1:${PORT}/`;
   console.log(`Chess Trainer running at ${url}`);
   console.log('(Keep this window open while you play. Close it to quit.)');
   openAppWindow(url);
 });
 
+// Confirm an already-listening server on `port` is *us* (sentinel header) and not a
+// foreign program that happens to hold the port. Resolves false on any error/timeout.
+function probeOurServer(port) {
+  return new Promise((resolve) => {
+    const req = http.get({ host: '127.0.0.1', port, path: '/', timeout: 1500 }, (res) => {
+      const ours = res.headers['x-chess-trainer'] === '1';
+      res.resume(); // drain so the socket can close
+      resolve(ours);
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
+
 function openAppWindow(url) {
+  // Headless / "I'll open my own tab" escape hatch (also used by the launcher smoke test).
+  if (process.env.CHESS_TRAINER_NO_OPEN === '1') {
+    console.log(`Open your browser at: ${url}`);
+    return;
+  }
   const isWin = process.platform === 'win32';
   const pf = process.env['ProgramFiles'] || 'C:/Program Files';
   const pf86 = process.env['ProgramFiles(x86)'] || 'C:/Program Files (x86)';

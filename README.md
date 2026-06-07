@@ -194,9 +194,13 @@ npm run build:exe   # → build/ChessTrainer.exe + build/dist/
 ```
 
 Ships the whole `build/` folder. Double-click **ChessTrainer.exe**: it starts a tiny local server
-(127.0.0.1, random port) for the bundled app and opens it in a borderless app window (Edge/Chrome
-`--app=` mode, falling back to the default browser). No install, no admin, no network — everything
-stays local, IndexedDB persistence works.
+(127.0.0.1 on **fixed port 7424**) for the bundled app and opens it in a borderless app window
+(Edge/Chrome `--app=` mode, falling back to the default browser). No install, no admin, no network —
+everything stays local. The port is fixed on purpose: browser storage (your profile, ratings, SRS
+cards) is keyed to the origin `http://127.0.0.1:7424`, so a **stable** port is what makes IndexedDB
+persist across launches (ADR-0049). Set `CHESS_TRAINER_PORT` if 7424 is already taken — but note a
+different port is a different origin, hence a separate profile. `CHESS_TRAINER_NO_OPEN=1` serves
+without opening a window (headless / bring-your-own-tab).
 
 Why a local server and not `file://`: the app uses module Web Workers + WASM `fetch` + IndexedDB,
 which browsers block under `file://`. The launcher is built with Node's built-in **SEA** (Single
