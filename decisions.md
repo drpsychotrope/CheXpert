@@ -842,3 +842,32 @@ jsdom does no layout and the WASM engine can't run headless, so the behaviour is
 invariant (`board-turn-color.test.ts`, same approach as ADR's mini-board sizing guard). No schema, no API
 change. Cross-links: ADR-0047 (play either colour — introduced the Black path), ADR-0046 (side-to-move
 badge — also now fen-derived).
+
+## ADR-0051 — Board props reactive per move: reassign `game` (AnalysisBoard) / tie `check` to `fen`
+**Date:** 2026-06-07 · **Status:** accepted
+
+Same root-cause family as ADR-0050 (turnColor in Board.svelte): Svelte 5's `$state` does **not**
+deep-proxy a `ChessGame` (a class instance), so an in-place `game.move()`/`moveUci()` never fires
+the `game` signal — only *reassigning* `game` does. Any board prop derived solely from `game`
+therefore goes stale until the next reassignment (back()/reset()).
+
+**Blocking bug — AnalysisBoard (spec E / ADR-0031):** `movableColor`/`dests`/`check` derive only
+from `game`, and the analysis board has no other reactive co-dependency, so after the FIRST manual
+move all three froze and a second consecutive move was impossible (clicking an engine line hit the
+same wall). Fix: `advance()` now reassigns `game = new ChessGame(fen)` after each move — the pattern
+back()/reset() already used — refreshing all three at once. Safe here because the analysis board is
+standard-only, keeps its own `stack` for history, and never calls `game.terminal()`.
+
+**Cosmetic sibling — Play / Sparring / Comeback / Endgames + the calibration-game boards in Coach &
+Onboarding:** there `movableColor`/`dests` survive because they share a co-dependency on a toggling
+`$state` (`status`/`thinking`/`gameThinking`) that re-fires every move-cycle and re-reads the mutated
+`game`; but `check={game.inCheck()}` has no such co-dependency, so the in-check king highlight never
+updated mid-game. Fix: a `$derived` anchored on the reactive `fen`/`gameFen` (reassigned every move)
+— `const inCheck = $derived(fen ? game.inCheck() : false)`. We deliberately do **not** reassign
+`game` in these modes: they support Chess960 (rebuilding from a standard FEN would drop the castling
+shim — ChessGame.ts) and need full move history for threefold/fifty-move `terminal()`. The
+puzzle/ladder boards (Coach & Onboarding `display`, plus Tactics / Woodpecker / GuessMove / Review /
+Calculate) already reassign `display` per move, so they were never stale.
+
+Board wiring only — no schema, API, or rules change. Cross-links: ADR-0050 (Board turnColor — the
+other half of the same fen-reactivity fix), ADR-0031 (interactive analysis board / spec E).

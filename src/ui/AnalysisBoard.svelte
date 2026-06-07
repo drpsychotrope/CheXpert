@@ -48,6 +48,11 @@
   function advance() {
     stack.push(game.fen);
     fen = game.fen;
+    // Reassign `game` so the board's movableColor/dests/check deriveds recompute: Svelte 5
+    // does not deep-proxy a ChessGame instance, so the in-place game.move()/moveUci() above
+    // never fires the `game` signal — without this, those props go stale after the first move
+    // and a second consecutive move is impossible. Mirrors back()/reset(). ADR-0051.
+    game = new ChessGame(fen);
     analyze();
   }
   function onMove(from: string, to: string) {
