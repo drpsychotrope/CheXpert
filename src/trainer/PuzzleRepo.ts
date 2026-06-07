@@ -98,6 +98,16 @@ export class PuzzleRepo {
     return this.cache.find((p) => p.id === id) ?? null;
   }
 
+  /** Persist a single puzzle row (e.g. its drifting Glicko rating after an attempt) and keep the
+   *  in-memory cache in sync (audit W11 — replaces ad-hoc db.put('puzzles', …) in Tactics/Review). */
+  async savePuzzle(p: Puzzle): Promise<void> {
+    const db = await openTrainerDB();
+    await db.put('puzzles', p);
+    const i = this.cache.findIndex((c) => c.id === p.id);
+    if (i >= 0) this.cache[i] = p;
+    else this.cache.push(p);
+  }
+
   /**
    * Pick the next puzzle nearest the requested rating, honoring theme/phase/source
    * filters and exclusions. Pure selection over the in-memory cache.
