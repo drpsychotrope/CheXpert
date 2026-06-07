@@ -23,6 +23,7 @@ import { createInterface } from 'node:readline';
 import zlib from 'node:zlib';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { createHash } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildSubset, BANDS, DEFAULT_OUT } from './lib/puzzle-etl.mjs';
@@ -31,12 +32,45 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = process.env.PUZZLE_DB_URL || 'https://database.lichess.org/lichess_db_puzzle.csv.zst';
 const MAX = Number(process.env.PUZZLE_MAX || 80000);
 const FORCE = process.env.CHESS_FORCE === '1';
+// Supply-chain hardening (audit W10): optional integrity pin + a decompressed-size ceiling.
+const EXPECT_SHA = process.env.PUZZLE_DB_SHA256;
+const MAX_DECOMP_BYTES = Number(process.env.PUZZLE_MAX_DECOMPRESSED_BYTES || 5 * 1024 * 1024 * 1024);
 
 const cacheDir = join(root, 'scripts', '.cache');
 const zstPath = join(cacheDir, 'lichess_db_puzzle.csv.zst');
 const partPath = zstPath + '.partial';
 
 const mb = (n) => (n / 1048576).toFixed(1);
+
+/** Optional supply-chain check: verify the cached .zst against PUZZLE_DB_SHA256 (audit W10).
+ *  The Lichess file isn't versioned, so this is OPT-IN — set the env to pin a known-good build.
+ *  Without it we still rely on HTTPS; with it the download is tamper-evident. */
+async function verifyHash() {
+  if (!EXPECT_SHA) return;
+  const hash = createHash('sha256');
+  await pipeline(createReadStream(zstPath), hash);
+  const got = hash.digest('hex');
+  if (got.toLowerCase() !== EXPECT_SHA.trim().toLowerCase()) {
+    rmSync(zstPath, { force: true }); // drop the bad file so a re-run re-downloads
+    throw new Error(`puzzle DB sha256 mismatch (expected ${EXPECT_SHA}, got ${got})`);
+  }
+  console.log('[puzzles] sha256 verified');
+}
+
+/** Abort if the decompressed stream blows past a sane ceiling (anti zip-bomb, audit W10). */
+function decompressedCap() {
+  let seen = 0;
+  return new Transform({
+    transform(chunk, _enc, cb) {
+      seen += chunk.length;
+      if (seen > MAX_DECOMP_BYTES) {
+        cb(new Error(`decompressed stream exceeded the ${mb(MAX_DECOMP_BYTES)} MB cap (possible zip-bomb)`));
+        return;
+      }
+      cb(null, chunk);
+    },
+  });
+}
 
 async function downloadZst() {
   if (existsSync(zstPath) && statSync(zstPath).size > 0) {
@@ -91,11 +125,12 @@ async function main() {
   }
 
   await downloadZst();
+  await verifyHash();
 
   console.log('[puzzles] decompressing (zstd) + running ETL…');
   let stats;
   try {
-    const input = createReadStream(zstPath).pipe(zlib.createZstdDecompress());
+    const input = createReadStream(zstPath).pipe(zlib.createZstdDecompress()).pipe(decompressedCap());
     const lines = createInterface({ input, crlfDelay: Infinity });
     stats = await buildSubset(lines, { max: MAX, out: DEFAULT_OUT });
   } catch (err) {
