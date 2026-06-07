@@ -112,12 +112,31 @@ interface TrainerDB extends DBSchema {
 export const DB_NAME = 'chess-trainer';
 export const DB_VERSION = 4;
 
+/** Thrown when IndexedDB cannot be opened (private browsing, storage disabled by
+ *  policy, quota, or a failed upgrade). The boot path catches it to degrade with an
+ *  explicit message instead of hanging forever on "Loading…" (audit W2). */
+export class StorageUnavailableError extends Error {
+  constructor(cause?: unknown) {
+    super(
+      'Storage (IndexedDB) is unavailable — the app cannot save your progress. ' +
+        'This usually means private/incognito browsing or disabled site storage.',
+    );
+    this.name = 'StorageUnavailableError';
+    if (cause !== undefined) (this as { cause?: unknown }).cause = cause;
+  }
+}
+
 // Cached single connection. Opening a fresh connection per call leaks handles
 // and, critically, blocks deleteDatabase (which matters for clean test resets).
 let dbPromise: Promise<IDBPDatabase<TrainerDB>> | null = null;
 
 export function openTrainerDB(): Promise<IDBPDatabase<TrainerDB>> {
-  if (!dbPromise) dbPromise = createDB();
+  if (!dbPromise) {
+    dbPromise = createDB().catch((e) => {
+      dbPromise = null; // allow a later retry rather than caching the failure forever
+      throw e instanceof StorageUnavailableError ? e : new StorageUnavailableError(e);
+    });
+  }
   return dbPromise;
 }
 
