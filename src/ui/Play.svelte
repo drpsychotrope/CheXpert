@@ -269,10 +269,10 @@
   // (reassigned every move) so the highlight refreshes mid-game. ADR-0051.
   const inCheck = $derived(fen ? game.inCheck() : false);
 
-  async function onMove(from: string, to: string) {
+  async function onMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
     if (status !== 'playing' || turnColor() !== playerColor) return;
-    const uci = from + to + (game.isPromotion(from, to) ? 'q' : '');
-    const san = game.move(from, to, 'q');
+    const uci = from + to + (game.isPromotion(from, to) ? promo : '');
+    const san = game.move(from, to, promo);
     if (!san) return;
     playedUci.push(uci);
     fen = game.fen;

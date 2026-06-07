@@ -79,9 +79,9 @@
     return display.turn === 'w' ? 'white' : 'black';
   }
 
-  async function onMove(from: string, to: string) {
+  async function onMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
     if (!trainer || !puzzle || trainer.state.status !== 'solving') return;
-    const uci = from + to + (display.isPromotion(from, to) ? 'q' : '');
+    const uci = from + to + (display.isPromotion(from, to) ? promo : '');
     const res = trainer.playUserMove(uci);
 
     if (res === 'wrong') {

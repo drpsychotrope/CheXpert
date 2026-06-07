@@ -82,9 +82,9 @@
     ladderProgress = ladder.count;
   }
 
-  function onLadderMove(from: string, to: string) {
+  function onLadderMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
     if (!trainer || !ladder) return;
-    const uci = from + to + (display.isPromotion(from, to) ? 'q' : '');
+    const uci = from + to + (display.isPromotion(from, to) ? promo : '');
     const res = trainer.playUserMove(uci);
     if (res === 'wrong') {
       ladder.report(false);
@@ -129,7 +129,7 @@
     if (gameSide === 'b') await engineReply(); // engine (White) opens
   }
 
-  async function onGameMove(from: string, to: string) {
+  async function onGameMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
     if (!opponent || game.turn !== gameSide || gameThinking) return;
 
     // Ensure standard mode (onboarding is never 960; guard against leaked state).
@@ -142,7 +142,7 @@
       bestCp = before.whiteCp;
     } catch { /* ignore */ }
 
-    const san = game.move(from, to, 'q');
+    const san = game.move(from, to, promo);
     if (!san) return;
     gameFen = game.fen;
 

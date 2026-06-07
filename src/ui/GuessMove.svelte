@@ -34,9 +34,9 @@
     return chosen?.guessColor === 'b' ? 'black' : 'white';
   }
 
-  function onMove(from: string, to: string) {
+  function onMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
     if (!guess || guess.done) return;
-    const uci = from + to + (display.isPromotion(from, to) ? 'q' : '');
+    const uci = from + to + (display.isPromotion(from, to) ? promo : '');
     const before = guess.fen();
     const res = guess.guess(uci);
     if (res === 'wrong') {
