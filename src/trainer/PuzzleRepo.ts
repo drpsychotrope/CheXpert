@@ -30,27 +30,34 @@ export class PuzzleRepo {
   async init(): Promise<void> {
     if (this.loaded) return;
     const db = await openTrainerDB();
-    const curatedCount = (await db.getAllKeysFromIndex('puzzles', 'source', 'curated')).length;
+    // Count via the index instead of materialising ~80k keys just to take .length (audit W3).
+    const curatedCount = await db.countFromIndex('puzzles', 'source', 'curated');
     // Seed when the store has no curated puzzles, OR when the shipped subset has
     // GROWN since last seed (e.g. a new seed file or a freshly-run ETL). This lets
     // a bigger puzzle set land for existing users without wiping their personal
     // puzzles or attempt history. We never delete existing rows here.
     const subset = curatedCount === 0 ? await this.fetchSubset() : null;
     if (subset && subset.length) {
-      const tx = db.transaction('puzzles', 'readwrite');
-      await Promise.all(subset.map((p) => tx.store.put(p)));
-      await tx.done;
+      await this.seedInBatches(db, subset);
     } else if (curatedCount > 0) {
       // Curated rows already present, but check whether the shipped set is bigger.
       const shipped = await this.fetchSubset();
-      if (shipped.length > curatedCount) {
-        const tx = db.transaction('puzzles', 'readwrite');
-        await Promise.all(shipped.map((p) => tx.store.put(p)));
-        await tx.done;
-      }
+      if (shipped.length > curatedCount) await this.seedInBatches(db, shipped);
     }
     this.cache = await db.getAll('puzzles');
     this.loaded = true;
+  }
+
+  /** Seed puzzles in bounded transactions so a fresh ~80k-row import doesn't freeze the
+   *  main thread with one 80k-put transaction at first launch (audit W3). */
+  private async seedInBatches(db: Awaited<ReturnType<typeof openTrainerDB>>, puzzles: Puzzle[]): Promise<void> {
+    const BATCH = 2000;
+    for (let i = 0; i < puzzles.length; i += BATCH) {
+      const tx = db.transaction('puzzles', 'readwrite');
+      const slice = puzzles.slice(i, i + BATCH);
+      await Promise.all(slice.map((p) => tx.store.put(p)));
+      await tx.done;
+    }
   }
 
   /** Number of puzzles available. */
