@@ -3,7 +3,7 @@
 // budget. Worst-impact leaks first, mapped to the matching training activity. Pure,
 // no Date (the UI stamps dates), no engine, no LLM.
 
-import type { Leak } from './fingerprint';
+import { leakTarget, type Leak } from './fingerprint';
 import type { Dimension } from './weakness';
 
 export interface PlanItem {
@@ -14,10 +14,14 @@ export interface PlanItem {
 }
 
 function activityForLeak(leak: Leak): { activity: PlanItem['activity']; focus: string } {
-  const m = leak.motif.toLowerCase();
-  if (leak.key.startsWith('opening') || m.includes('opening')) return { activity: 'repertoire', focus: `opening: ${leak.motif}` };
-  if (leak.key.startsWith('endgame') || leak.phase === 'endgame' || m.includes('endgame')) return { activity: 'endgames', focus: `endgame: ${leak.motif}` };
-  return { activity: 'tactics', focus: leak.motif };
+  switch (leakTarget(leak)) {
+    case 'repertoire':
+      return { activity: 'repertoire', focus: `opening: ${leak.motif}` };
+    case 'endgames':
+      return { activity: 'endgames', focus: `endgame: ${leak.motif}` };
+    default:
+      return { activity: 'tactics', focus: leak.motif };
+  }
 }
 
 export interface StudyPlanOpts {

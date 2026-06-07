@@ -61,6 +61,7 @@ export async function runAnalysis(
   // Persist analysis + puzzles.
   const db = await openTrainerDB();
   await db.put('gameAnalyses', analysis);
+  invalidateAnalysesCache(); // a new analysis → drop the dashboard cache (audit W15)
   if (puzzles.length) await repo.addPuzzles(puzzles);
 
   // Fold motif tags into the player's weakness counters (used by the trainer's
@@ -81,8 +82,20 @@ export async function runAnalysis(
   return { analysis, puzzles };
 }
 
-/** Load all stored analyses (for the weakness dashboard). */
+// The (read-only) analyses are re-read by the dashboard, insights, comeback, sparring, session,
+// when-to-think AND every "New game" (for opponent steering). Cache them so a heavy history isn't
+// re-deserialized on each navigation; invalidate on a new analysis or a data wipe (audit W15).
+let analysesCache: GameAnalysis[] | null = null;
+
+/** Load all stored analyses (for the weakness dashboard). Cached — see invalidateAnalysesCache. */
 export async function loadAllAnalyses(): Promise<GameAnalysis[]> {
+  if (analysesCache) return analysesCache;
   const db = await openTrainerDB();
-  return db.getAll('gameAnalyses');
+  analysesCache = await db.getAll('gameAnalyses');
+  return analysesCache;
+}
+
+/** Drop the cached analyses (after storing a new one, or wiping all local data). */
+export function invalidateAnalysesCache(): void {
+  analysesCache = null;
 }

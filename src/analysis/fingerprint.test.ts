@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildFingerprint, weaknessTrend, leakKey } from './fingerprint';
+import { buildFingerprint, weaknessTrend, leakKey, leakTarget, type Leak } from './fingerprint';
 import type { GameAnalysis, GamePhase, PhaseStat, PlyAnalysis, MotifResult } from './types';
 
 function ply(p: Partial<PlyAnalysis>): PlyAnalysis {
@@ -94,5 +94,21 @@ describe('leakKey', () => {
     expect(keys).toEqual(['endgame:blunder', 'pin'].sort());
     expect(keys).toContain(leakKey(confident));
     expect(keys).toContain(leakKey(fallback));
+  });
+});
+
+describe('leakTarget (W14)', () => {
+  const leak = (key: string, motifLabel: string, phase: Leak['phase'] = 'middlegame'): Leak => ({
+    key, motif: motifLabel, phase, count: 1, avgWpl: 10, sampleFens: [], severity: { mistake: 1, blunder: 0 },
+  });
+  it('routes opening leaks to the repertoire', () => {
+    expect(leakTarget(leak('opening:mistake', 'opening mistake'))).toBe('repertoire');
+  });
+  it('routes endgame leaks to the endgames trainer', () => {
+    expect(leakTarget(leak('endgame:blunder', 'endgame blunder', 'endgame'))).toBe('endgames');
+  });
+  it('routes tactical motifs to tactics', () => {
+    expect(leakTarget(leak('fork', 'fork'))).toBe('tactics');
+    expect(leakTarget(leak('pin', 'pin'))).toBe('tactics');
   });
 });
