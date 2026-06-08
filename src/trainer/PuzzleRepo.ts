@@ -130,6 +130,14 @@ export class PuzzleRepo {
     else this.cache.push(p);
   }
 
+  /** Sync the in-memory working set for a puzzle whose DB row was written elsewhere (e.g. inside the
+   *  atomic recordTacticsAttempt transaction), with no second DB write (audit W11). No-op if the
+   *  puzzle isn't in the working set (it was served from there, so normally it is). */
+  updateCached(p: Puzzle): void {
+    const i = this.cache.findIndex((c) => c.id === p.id);
+    if (i >= 0) this.cache[i] = p;
+  }
+
   /**
    * Pick the next puzzle nearest the requested rating, honoring theme/phase/source
    * filters and exclusions. Pure selection over the in-memory cache.

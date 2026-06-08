@@ -6,8 +6,7 @@
   import { ChessGame } from '../game/ChessGame';
   import { TacticalTrainer, gradeAttempt } from '../trainer/TacticalTrainer';
   import type { Puzzle } from '../trainer/puzzle';
-  import { putAttempt, getAttempt, attemptsByPuzzle } from '../store/attemptsRepo';
-  import { reviewItem } from '../srs/SrsStore';
+  import { putAttempt, getAttempt, attemptsByPuzzle, recordTacticsAttempt } from '../store/attemptsRepo';
   import { resultToGrade } from '../srs/fsrs';
   import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
   import { cardForThemes, loadConcepts, type ConceptCard as ConceptCardData } from '../concepts/concepts';
@@ -235,27 +234,32 @@
     // Review, no "misses"). Snapshot to a plain, cloneable object first (cf. woodpecker.saveSet).
     const p = $state.snapshot(puzzle);
     const attemptId = `${p.id}:${now}`;
-    await putAttempt({
-      id: attemptId,
-      puzzleId: p.id,
-      solved,
-      ms,
-      themes: p.themes,
-      ratingBefore: graded.player.rating,
-      ratingAfter: model.puzzleRating.rating,
-      playedAt: now,
-      source: p.source,
-      // metacognition: whichever were set (undefined drops cleanly on structured clone).
-      confidence,
-      selfTag: !solved ? selfTag : undefined,
-    });
     // Remember the row id so self-tag clicks can UPDATE the same row (not insert a new one).
     if (!solved) lastAttemptId = attemptId;
-    // Persist the updated puzzle rating into the puzzle row too (it drifts down).
-    await app.puzzles.savePuzzle({ ...p, rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) });
-    // Schedule this puzzle for spaced repetition (FSRS) so it resurfaces in Review.
-    await reviewItem('puzzle', puzzle.id, resultToGrade(solved, ms), now);
-    await app.persistModel(now);
+    const updatedPuzzle = { ...p, rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) };
+    // One atomic transaction (audit W11): attempt log + puzzle rating + FSRS card + player model —
+    // a mid-write failure can no longer leave an attempt with no SRS card (a puzzle missing from Review).
+    await recordTacticsAttempt({
+      attempt: {
+        id: attemptId,
+        puzzleId: p.id,
+        solved,
+        ms,
+        themes: p.themes,
+        ratingBefore: graded.player.rating,
+        ratingAfter: model.puzzleRating.rating,
+        playedAt: now,
+        source: p.source,
+        // metacognition: whichever were set (undefined drops cleanly on structured clone).
+        confidence,
+        selfTag: !solved ? selfTag : undefined,
+      },
+      puzzle: updatedPuzzle,
+      model: $state.snapshot(model),
+      srs: { kind: 'puzzle', refId: puzzle.id, grade: resultToGrade(solved, ms) },
+      now,
+    });
+    app.puzzles.updateCached(updatedPuzzle);
   }
 
   /** UPDATE the existing attempt row's selfTag after the chips render post-miss.
