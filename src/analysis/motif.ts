@@ -12,6 +12,10 @@ import type { GamePhase, MotifResult, Severity } from './types';
 
 const VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
+/** Precedence of high-confidence tactical motifs, most forcing first (ADR-0020). Single source of
+ *  truth — concepts.ts derives CARD_PRECEDENCE from this so they can't desync (audit W14). */
+export const MOTIF_PRECEDENCE = ['doubleCheck', 'fork', 'skewer', 'pin', 'discoveredAttack', 'hangingPiece'];
+
 // --- Geometric helpers for pin / skewer / discovered attack (high confidence) ---
 const FILES = 'abcdefgh';
 function fileRank(sq: string): { f: number; r: number } {
@@ -281,8 +285,7 @@ export function detectMotif(ctx: MotifContext): MotifResult {
     if (severity === 'blunder') tags.push('crushing');
     else tags.push('advantage');
     // Primary tag by precedence (most forcing first) — Q-A accepted default.
-    const PRECEDENCE = ['doubleCheck', 'fork', 'skewer', 'pin', 'discoveredAttack', 'hangingPiece'];
-    const primary = PRECEDENCE.find((t) => tags.includes(t)) ?? tags[0];
+    const primary = MOTIF_PRECEDENCE.find((t) => tags.includes(t)) ?? tags[0];
     return { tag: primary, tags, confidence: 'high' };
   }
 

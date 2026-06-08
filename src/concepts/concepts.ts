@@ -3,6 +3,8 @@
 // discoveredAttack, doubleCheck). Pure lookup + a graceful fetch loader, mirroring
 // src/opening/eco.ts. CURATED static content only — never generated (no LLM).
 
+import { MOTIF_PRECEDENCE } from '../analysis/motif';
+
 export interface ConceptExample {
   /** Legal FEN with the SOLVER to move. */
   fen: string;
@@ -38,15 +40,7 @@ export const MOTIF_ALIASES: Record<string, string> = {
  * Detector precedence (ADR-0020): mate is most forcing, then the in-code motif.ts
  * order. Used by cardForThemes to pick the single most relevant card for a puzzle.
  */
-export const CARD_PRECEDENCE: string[] = [
-  'mate',
-  'doubleCheck',
-  'fork',
-  'skewer',
-  'pin',
-  'discoveredAttack',
-  'hangingPiece',
-];
+export const CARD_PRECEDENCE: string[] = ['mate', ...MOTIF_PRECEDENCE];
 
 /** Canonicalize a raw theme/motif key to its family key (via the alias table). */
 function familyKey(motif: string): string {

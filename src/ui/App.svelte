@@ -1,29 +1,35 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { app } from '../state/app.svelte';
-  import Home from './Home.svelte';
-  import Play from './Play.svelte';
-  import Tactics from './Tactics.svelte';
-  import Onboarding from './Onboarding.svelte';
-  import Settings from './Settings.svelte';
-  import Import from './Import.svelte';
-  import Dashboard from './Dashboard.svelte';
-  import Review from './Review.svelte';
-  import Endgames from './Endgames.svelte';
-  import Repertoire from './Repertoire.svelte';
-  import Woodpecker from './Woodpecker.svelte';
-  import GuessMove from './GuessMove.svelte';
-  import Vision from './Vision.svelte';
-  import Comeback from './Comeback.svelte';
-  import WhenToThink from './WhenToThink.svelte';
-  import Insights from './Insights.svelte';
-  import Explorer from './Explorer.svelte';
-  import Calculate from './Calculate.svelte';
-  import AnalysisBoard from './AnalysisBoard.svelte';
-  import Sparring from './Sparring.svelte';
-  import Concepts from './Concepts.svelte';
-  import Session from './Session.svelte';
-  import Coach from './Coach.svelte';
+  import { onMount, type Component } from 'svelte';
+  import { app, type View } from '../state/app.svelte';
+
+  // Lazy-load each view so the initial bundle is the shell + first view, not all 23 (audit W15).
+  // Vite emits one chunk per view; the browser fetches a view's code on first navigation to it.
+  const loaders: Record<View, () => Promise<{ default: Component }>> = {
+    home: () => import('./Home.svelte'),
+    onboarding: () => import('./Onboarding.svelte'),
+    play: () => import('./Play.svelte'),
+    tactics: () => import('./Tactics.svelte'),
+    import: () => import('./Import.svelte'),
+    dashboard: () => import('./Dashboard.svelte'),
+    review: () => import('./Review.svelte'),
+    endgames: () => import('./Endgames.svelte'),
+    repertoire: () => import('./Repertoire.svelte'),
+    woodpecker: () => import('./Woodpecker.svelte'),
+    guess: () => import('./GuessMove.svelte'),
+    vision: () => import('./Vision.svelte'),
+    comeback: () => import('./Comeback.svelte'),
+    'when-to-think': () => import('./WhenToThink.svelte'),
+    insights: () => import('./Insights.svelte'),
+    explorer: () => import('./Explorer.svelte'),
+    calculate: () => import('./Calculate.svelte'),
+    sparring: () => import('./Sparring.svelte'),
+    concepts: () => import('./Concepts.svelte'),
+    session: () => import('./Session.svelte'),
+    'analysis-board': () => import('./AnalysisBoard.svelte'),
+    settings: () => import('./Settings.svelte'),
+    coach: () => import('./Coach.svelte'),
+  };
+  const viewLoader = $derived(loaders[app.view] ?? loaders.home);
 
   let booted = $state(false);
 
@@ -75,51 +81,10 @@
       </p>
       <button onclick={() => location.reload()}>Reload</button>
     </section>
-  {:else if app.view === 'onboarding'}
-    <Onboarding />
-  {:else if app.view === 'play'}
-    <Play />
-  {:else if app.view === 'tactics'}
-    <Tactics />
-  {:else if app.view === 'import'}
-    <Import />
-  {:else if app.view === 'dashboard'}
-    <Dashboard />
-  {:else if app.view === 'review'}
-    <Review />
-  {:else if app.view === 'endgames'}
-    <Endgames />
-  {:else if app.view === 'repertoire'}
-    <Repertoire />
-  {:else if app.view === 'woodpecker'}
-    <Woodpecker />
-  {:else if app.view === 'guess'}
-    <GuessMove />
-  {:else if app.view === 'vision'}
-    <Vision />
-  {:else if app.view === 'comeback'}
-    <Comeback />
-  {:else if app.view === 'when-to-think'}
-    <WhenToThink />
-  {:else if app.view === 'insights'}
-    <Insights />
-  {:else if app.view === 'explorer'}
-    <Explorer />
-  {:else if app.view === 'calculate'}
-    <Calculate />
-  {:else if app.view === 'sparring'}
-    <Sparring />
-  {:else if app.view === 'concepts'}
-    <Concepts />
-  {:else if app.view === 'session'}
-    <Session />
-  {:else if app.view === 'analysis-board'}
-    <AnalysisBoard />
-  {:else if app.view === 'settings'}
-    <Settings />
-  {:else if app.view === 'coach'}
-    <Coach />
   {:else}
-    <Home />
+    {#await viewLoader() then mod}
+      {@const Comp = mod.default}
+      <Comp />
+    {/await}
   {/if}
 </main>
