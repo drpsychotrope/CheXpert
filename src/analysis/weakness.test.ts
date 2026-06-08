@@ -92,6 +92,30 @@ describe('weakness aggregation', () => {
     expect(r.n).toBe(1);
     expect(r.score).toBe(100);
   });
+
+  it('does not score an unreached phase as perfect (empty endgame = no-data, not 100)', () => {
+    // A short game that never reaches an endgame: endgame phase has 0 plies.
+    const g = game([
+      ply({ ply: 0, phase: 'opening', cpLoss: 10 }),
+      ply({ ply: 1, phase: 'opening', cpLoss: 10 }),
+      ply({ ply: 2, phase: 'opening', cpLoss: 10 }),
+      ply({ ply: 3, phase: 'opening', cpLoss: 10 }),
+      ply({ ply: 4, phase: 'middlegame', cpLoss: 20 }),
+      ply({ ply: 5, phase: 'middlegame', cpLoss: 20 }),
+      ply({ ply: 6, phase: 'middlegame', cpLoss: 20 }),
+      ply({ ply: 7, phase: 'middlegame', cpLoss: 20 }),
+    ]);
+    const endgame = buildWeaknessProfile([g], 1500).dimensions.find((d) => d.dimension === 'endgameConversion')!;
+    expect(endgame.sampleSize).toBe(0); // unmeasured
+    expect(endgame.score).toBe(50); // neutral — NOT the old acplToScore(0) = 100
+  });
+
+  it('treats a single losing dip as too little to score resilience (not a forced 0)', () => {
+    const g = game([ply({ ply: 0, playedWhiteCp: -300 })]); // one dip, no recovery
+    const res = buildWeaknessProfile([g], 1500).dimensions.find((d) => d.dimension === 'resilience')!;
+    expect(res.sampleSize).toBe(0); // below MIN_BEHIND_EPISODES → unmeasured
+    expect(res.score).toBe(50); // not 0
+  });
 });
 
 describe('drillTarget — every dimension routes to a view (loop-closers 3b)', () => {
