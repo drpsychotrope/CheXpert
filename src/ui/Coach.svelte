@@ -39,7 +39,7 @@
   let opponent: AdaptiveOpponent | null = null;
   let thinking = $state(false);
   let info = $state('');
-  const GAME_MOVE_LIMIT = 24;
+  const GAME_MOVE_LIMIT = 48;
   let coachColorChoice = $state<ColorChoice>('random');
   let coachSide = $state<'w' | 'b'>('w');
 
@@ -201,14 +201,14 @@
   <h2>Personal coaching</h2>
 
   {#if step === 'intro'}
-    <p class="muted">A quick assessment — one puzzle per tactical motif (about 7) plus an optional short game —
+    <p class="muted">A quick assessment — two puzzles per tactical motif (about 14) plus an optional short game —
       then a program of drills and game modes aimed at your weak spots. Just play your best move on each:
       solved or not, we read the attempt and move on. Directional, not a grade.</p>
     <button onclick={startLadders} disabled={app.puzzles.size === 0}>Start the assessment →</button>
     {#if app.puzzles.size === 0}<p class="muted">Loading puzzles…</p>{/if}
 
   {:else if step === 'ladders'}
-    <p class="muted">Puzzle {themeIdx + 1}/{THEMES.length} — <b>{THEMES[themeIdx].theme}</b>. Play your best move; solved or not, we move on.</p>
+    <p class="muted">Theme {themeIdx + 1}/{THEMES.length} — <b>{THEMES[themeIdx].theme}</b> (2 puzzles). Play your best move; solved or not, we move on.</p>
     <div class="board-wrap">
       <Board {fen} {orientation}
         turnColor={display.turn === 'w' ? 'white' : 'black'}
@@ -220,8 +220,8 @@
   {:else if step === 'offer-game'}
     <div class="panel col center">
       <h3>Assessment puzzles done</h3>
-      <p class="muted">Optional: play a short game (~12 moves) so we can also assess opening accuracy,
-        time, and resilience — things puzzles can't measure.</p>
+      <p class="muted">Optional: play a game (~24 moves) for a read on your opening, middlegame, and general play.
+        Endgame conversion, time, and resilience need full games — they show as “n/a” until you play more.</p>
       <ColorPicker bind:value={coachColorChoice} />
       <div class="row center">
         <button onclick={startGame}>Play the game →</button>
@@ -248,7 +248,7 @@
     <div class="panel col center" style="gap:0.75rem;width:100%">
       <h3>Your coaching profile</h3>
       <Radar dimensions={profile.dimensions} />
-      <p class="muted" style="font-size:0.8rem">Directional — built from {profile.source.ladders ? 'one puzzle per motif' : 'no puzzle data'}{profile.source.game ? ' + one short game' : ''}. Small samples; treat as "where to focus".</p>
+      <p class="muted" style="font-size:0.8rem">Directional — built from {profile.source.ladders ? 'one puzzle per motif' : 'no puzzle data'}{profile.source.game ? ' + one short game' : ''}. Small samples; treat as "where to focus". Greyed “n/a” axes weren't measured by this assessment.</p>
       <div class="row" style="gap:1.5rem;align-items:flex-start">
         <div class="col"><b>Strengths</b>{#each profile.strengths as s}<span>✔ {s}</span>{:else}<span class="muted">—</span>{/each}</div>
         <div class="col"><b>Focus on</b>{#each profile.weaknesses as w}<span>△ {w}</span>{:else}<span class="muted">—</span>{/each}</div>

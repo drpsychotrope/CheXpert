@@ -5,10 +5,10 @@ import type { DimensionScore } from '../analysis/weakness';
 const probe = (theme: string, rating: number, n = 4) => ({ theme, rating, n });
 
 describe('constants', () => {
-  it('probes the six geometric motifs, one puzzle per theme', () => {
+  it('probes the six geometric motifs, two puzzles per theme', () => {
     expect(COACH_MOTIF_PROBES).toEqual(['fork', 'pin', 'skewer', 'hangingPiece', 'discoveredAttack', 'mate']);
-    expect(COACH_LADDER_MIN).toBe(1);
-    expect(COACH_LADDER_MAX).toBe(1);
+    expect(COACH_LADDER_MIN).toBe(2);
+    expect(COACH_LADDER_MAX).toBe(2);
   });
 });
 

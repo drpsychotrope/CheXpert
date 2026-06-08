@@ -173,6 +173,32 @@ function timeScore(analyses: GameAnalysis[]): { score: number; n: number } {
   return { score: clamp(Math.round(100 - rate * 100), 0, 100), n: blunders };
 }
 
+// Minimum evidence before a dimension is TRUSTED. Below this it is reported as
+// "not measured" (sampleSize 0, neutral 50) instead of scored. Rationale (balance
+// fix): a single short calibration game can't fairly grade endgame conversion,
+// time, or resilience, and an empty phase must NOT read as a perfect 100 on the
+// radar — the old `acplToScore(0)` → 100 trap inflated Endgame whenever no endgame
+// was reached, while a single losing dip pinned Resilience to 0. One policy point
+// here keeps every consumer (radar/program/strengths/dashboard) honest.
+const MIN_PHASE_PLIES = 4;
+const MIN_BEHIND_EPISODES = 3;
+const MIN_TIME_BLUNDERS = 2;
+const MIN_TACTICS_PLIES = 4;
+
+/** Emit a measured cell, or collapse to a neutral "not measured" one when evidence is too thin. */
+function dimensionScore(
+  dimension: Dimension,
+  measured: boolean,
+  score: number,
+  detail: string,
+  n: number,
+  unmeasuredDetail: string,
+): DimensionScore {
+  return measured
+    ? { dimension, score, detail, sampleSize: n }
+    : { dimension, score: 50, detail: unmeasuredDetail, sampleSize: 0 };
+}
+
 export function buildWeaknessProfile(analyses: GameAnalysis[], playerRating: number): WeaknessProfile {
   const expected = expectedAcpl(playerRating);
 
@@ -183,36 +209,33 @@ export function buildWeaknessProfile(analyses: GameAnalysis[], playerRating: num
   const resilience = resilienceScore(analyses);
 
   const dimensions: DimensionScore[] = [
-    {
-      dimension: 'tactics',
-      score: tactics.score,
-      detail: `${tactics.n} middlegame moves analysed`,
-      sampleSize: tactics.n,
-    },
-    {
-      dimension: 'openingAccuracy',
-      score: acplToScore(opening.acpl, expected),
-      detail: `Opening ACPL ${Math.round(opening.acpl)} vs ~${Math.round(expected)} expected`,
-      sampleSize: opening.n,
-    },
-    {
-      dimension: 'endgameConversion',
-      score: acplToScore(endgame.acpl, expected),
-      detail: `Endgame ACPL ${Math.round(endgame.acpl)} vs ~${Math.round(expected)} expected`,
-      sampleSize: endgame.n,
-    },
-    {
-      dimension: 'timeManagement',
-      score: time.score,
-      detail: time.n > 0 ? `${time.n} blunders checked for rushing` : 'No clock data',
-      sampleSize: time.n,
-    },
-    {
-      dimension: 'resilience',
-      score: resilience.score,
-      detail: resilience.n > 0 ? `${resilience.n} times behind; recovery rate` : 'Never clearly behind',
-      sampleSize: resilience.n,
-    },
+    dimensionScore(
+      'tactics', tactics.n >= MIN_TACTICS_PLIES,
+      tactics.score, `${tactics.n} middlegame moves analysed`,
+      tactics.n, 'Too few middlegame moves to assess',
+    ),
+    dimensionScore(
+      'openingAccuracy', opening.n >= MIN_PHASE_PLIES,
+      acplToScore(opening.acpl, expected),
+      `Opening ACPL ${Math.round(opening.acpl)} vs ~${Math.round(expected)} expected`,
+      opening.n, 'Too few opening moves to assess',
+    ),
+    dimensionScore(
+      'endgameConversion', endgame.n >= MIN_PHASE_PLIES,
+      acplToScore(endgame.acpl, expected),
+      `Endgame ACPL ${Math.round(endgame.acpl)} vs ~${Math.round(expected)} expected`,
+      endgame.n, 'No endgame reached — play longer games to assess',
+    ),
+    dimensionScore(
+      'timeManagement', time.n >= MIN_TIME_BLUNDERS,
+      time.score, `${time.n} blunders checked for rushing`,
+      time.n, 'Not enough clock data to assess',
+    ),
+    dimensionScore(
+      'resilience', resilience.n >= MIN_BEHIND_EPISODES,
+      resilience.score, `${resilience.n} times behind; recovery rate`,
+      resilience.n, 'Rarely behind — not enough to assess recovery',
+    ),
   ];
 
   // Weakest dimension with enough data to trust.

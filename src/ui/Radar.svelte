@@ -44,12 +44,14 @@
   <polygon points={baseline} class="baseline" />
   <polygon points={polygon} class="value" />
   {#each dimensions as d, i}
+    {@const na = d.sampleSize === 0}
     {@const [lx, ly] = point(i, 1.18)}
-    <text x={lx} y={ly} class="label" text-anchor="middle" dominant-baseline="middle">
+    <text x={lx} y={ly} class="label" class:na text-anchor="middle" dominant-baseline="middle">
       {labels[d.dimension] ?? d.dimension}
+      {#if na}<tspan x={lx} dy="1.15em" class="na-tag">n/a</tspan>{/if}
     </text>
     {@const [dx, dy] = point(i, d.score / 100)}
-    <circle cx={dx} cy={dy} r="3" class="dot" />
+    <circle cx={dx} cy={dy} r="3" class="dot" class:na />
   {/each}
 </svg>
 
@@ -59,5 +61,8 @@
   .baseline { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.7; }
   .value { fill: color-mix(in srgb, var(--accent) 30%, transparent); stroke: var(--accent); stroke-width: 2; }
   .dot { fill: var(--accent); }
+  .dot.na { fill: transparent; stroke: var(--muted); stroke-width: 1.5; }
   .label { fill: var(--text); font-size: 12px; }
+  .label.na { fill: var(--muted); }
+  .na-tag { fill: var(--muted); font-size: 9px; letter-spacing: 0.5px; }
 </style>
