@@ -247,4 +247,35 @@ Chaque workstream est une branche/PR isolée → `git revert` du merge suffit, s
 - Signature Authenticode du `.exe` (distribution publique) ; revue licences GPL/AGPL si distribution.
 - ESLint + Prettier en mode rapport (Q6) ; `@vitest/coverage-v8` + seuils.
 - Analyse 960-aware (lever l'exclusion d'analyse des parties 960).
-```
+
+---
+
+## 12. Statut final (2026-06-08) — LIVRÉ ✅
+
+Les 15 workstreams sont implémentés, vérifiés (`svelte-check` 0 erreur/0 warning · `vitest` **476 verts** · `vite build` vert avec chunks par vue) et mergés sur `main`.
+
+| Workstream | Statut | PR |
+|---|---|---|
+| W1 — EngineClient sérialisé (+ `onerror`, reject-on-terminate, validation FEN) | ✅ | #6 |
+| W2 — garde ouverture IndexedDB + boot (dégradation explicite) | ✅ | #6 |
+| W3 — heap puzzles : seeding par lots (·1) + working-set borné / `byId` async (·2) | ✅ | #8, #15 |
+| W4 — sélecteur de sous-promotion (Board + 12 écrans) | ✅ | #7 |
+| W5 — Chess960 triple répétition + PGN après roque | ✅ | #6 |
+| W6 — garde `moveUci`/`finishGame`/SP-ID + (W6-bis) validation tablebase/JSON | ✅ | #6, #10 |
+| W7 — CI GitHub Actions (`check` + `test`) | ✅ | #6 |
+| W8 — tests EngineClient (faux Worker) | ✅ | #6 |
+| W9 — tests de règles (pat, e.p., 50c, 3×, sous-promo, 960) | ✅ | #6 |
+| W10 — `safeJoin`/intégrité download/lockfile (·1) + CSP enforcing (·2) | ✅ | #9, #13, #16 |
+| W11 — repos persistance + atomicité `Tactics.finish` | ✅ | #14, #19 |
+| W12 — extraction logique testable de `Play.svelte` (`playSession`) | ✅ | #12 |
+| W13 — `schemaRev` + migration chaînée + politique documentée | ✅ | #9 |
+| W14 — routeur de leak unique + taxonomie de motifs unique | ✅ | #11, #18 |
+| W15 — MultiPV 4→3 + mémoïsation analyses + code-splitting des vues | ✅ | #9, #11, #18 |
+| Q6 — couverture mesurable (`@vitest/coverage-v8`) | ✅ | #13 |
+
+**Métriques** : tests 376 (README) → **476** (+100) · type-clean · build vert · CI active · chunk JS initial ~360 ko → ~64 ko.
+
+**Choix assumés (non-régressions, documentés en §11)** :
+- CSP **enforcing** côté launcher avec kill-switch `CHESS_TRAINER_NO_CSP=1` (le moteur retombe en lite si la policy le gêne — ADR-0032) ; non posée sur `index.html`/dev pour ne pas casser le HMR Vite.
+- W14(c) params de nav typés : non fait (over-engineering, bénéfice marginal — les 7 champs actuels conviennent).
+- `variant` multi-variante (YAGNI, Q7), fallback IDB mémoire complet, virtualisation des listes, signature `.exe` : hors scope assumé.
