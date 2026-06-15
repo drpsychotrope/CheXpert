@@ -82,6 +82,12 @@ export class EngineClient {
   /** Override for tests: a factory that returns a Worker-like object. */
   constructor(private makeWorker: () => Worker = defaultWorkerFactory) {}
 
+  /** True while ≥1 search/isready is in flight — lets callers interrupt only when needed
+   *  (e.g. on navigation) instead of respawning an idle worker (audit v2 P1-06). */
+  get busy(): boolean {
+    return this.pending.size > 0;
+  }
+
   /** Serialize a worker round-trip: run `op` only after the previous one settles. */
   private enqueue<T>(op: () => Promise<T>): Promise<T> {
     const run = this.chain.then(op, op);
@@ -246,6 +252,17 @@ export class EngineClient {
     await this.init();
     return this.enqueue(async () => {
       this.setOption('UCI_Chess960', false);
+      await this.isready();
+    });
+  }
+
+  /** Apply UCI options SERIALIZED with respect to the search queue, then wait for readyok. Use
+   *  this (not bare setOption) when a search may be in flight, so option writes never interleave
+   *  with a running search (audit v2 L8). */
+  async applyOptions(opts: Record<string, string | number | boolean>): Promise<void> {
+    await this.init();
+    return this.enqueue(async () => {
+      for (const [k, v] of Object.entries(opts)) this.setOption(k, v);
       await this.isready();
     });
   }

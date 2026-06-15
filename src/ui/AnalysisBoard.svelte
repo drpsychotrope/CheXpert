@@ -33,6 +33,10 @@
     thinking = true;
     lines = [];
     try {
+      // Drop the previous position's in-flight/queued search so fast move-walking doesn't pile up
+      // serialized searches behind the seq token (audit v2 P1-04, AP-CHESS-62).
+      if (app.engine.busy) await app.engine.interrupt();
+      if (my !== seq) return;
       await app.engine.resetVariant();
       const res = await app.engine.analyzeLines(game.fen, { multipv: 3, movetime: 600, fullStrength: true });
       if (my !== seq) return;
