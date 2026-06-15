@@ -43,7 +43,10 @@
   let prevView: View | null = null;
   $effect(() => {
     const v = app.view;
-    if (prevView !== null && prevView !== v && app.engine.busy) void app.engine.interrupt();
+    if (prevView !== null && prevView !== v) {
+      if (app.engine.busy) void app.engine.interrupt();
+      void app.refreshDue(Date.now()); // keep the Review badge fresh after grading (audit v2 P1-07)
+    }
     prevView = v;
   });
 </script>
@@ -58,7 +61,7 @@
     <button onclick={() => app.go('play')}>Play</button>
     <button onclick={() => app.go('sparring')}>Spar</button>
     <button onclick={() => app.go('tactics')}>Tactics</button>
-    <button onclick={() => app.go('review')}>Review</button>
+    <button onclick={() => app.go('review')}>Review{#if app.dueReview > 0} ({app.dueReview}){/if}</button>
     <button onclick={() => app.go('woodpecker')}>Woodpecker</button>
     <button onclick={() => app.go('import')}>Analyse</button>
     <button onclick={() => app.go('analysis-board')}>Board</button>

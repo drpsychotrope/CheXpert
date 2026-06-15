@@ -29,7 +29,7 @@
   <div class="actions">
     <button onclick={() => app.go('play')}>Play the adaptive bot</button>
     <button onclick={() => app.go('tactics')}>Train tactics</button>
-    <button onclick={() => app.go('review')}>Review (spaced repetition)</button>
+    <button onclick={() => app.go('review')}>Review (spaced repetition){#if app.dueReview > 0} · {app.dueReview} due{/if}</button>
     <button onclick={() => app.go('woodpecker')}>Woodpecker (speed drills)</button>
     <button onclick={() => app.go('import')}>Analyse a game</button>
     <button onclick={() => app.go('dashboard')}>Weakness dashboard</button>

@@ -4,6 +4,7 @@
 import { EngineClient } from '../engine/EngineClient';
 import { PuzzleRepo } from '../trainer/PuzzleRepo';
 import { loadPlayerModel, savePlayerModel, loadSettings, saveSettings } from '../store/playerModel';
+import { dueCount } from '../srs/SrsStore';
 import type { PlayerModel, SettingsRecord } from '../store/db';
 import type { SessionPlan } from '../analysis/session';
 
@@ -57,6 +58,9 @@ class AppState {
   sparringScenarioId = $state<string | null>(null);
   /** Set by a coach 'play-steered' program step; consumed once by Play.svelte to override the steer dimension. */
   steerDimension = $state<import('../analysis/weakness').Dimension | null>(null);
+  /** Due SRS cards (puzzle + repertoire) for the Home/Review badge — the loop's re-engagement
+   *  signal in a no-backend app (audit v2 P1-07). Recomputed on boot and each view change. */
+  dueReview = $state(0);
 
   readonly engine = new EngineClient();
   readonly puzzles = new PuzzleRepo();
@@ -66,6 +70,7 @@ class AppState {
       this.model = await loadPlayerModel(now);
       this.settings = await loadSettings();
       await this.puzzles.init();
+      await this.refreshDue(now);
       // First run → route to onboarding (launch-time skill evaluation).
       this.view = this.model.onboarded ? 'home' : 'onboarding';
     } catch (e) {
@@ -78,6 +83,16 @@ class AppState {
 
   go(view: View): void {
     this.view = view;
+  }
+
+  /** Recompute the due-card count for the Review badge (cheap `due` index range query). */
+  async refreshDue(now: number): Promise<void> {
+    try {
+      const [p, r] = await Promise.all([dueCount(now, 'puzzle'), dueCount(now, 'repertoire')]);
+      this.dueReview = p + r;
+    } catch {
+      /* storage unavailable — leave the badge at 0 */
+    }
   }
 
   async persistModel(now: number): Promise<void> {
