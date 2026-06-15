@@ -86,10 +86,26 @@ export function parsePgn(pgn: string): ParsedGame {
   return { plies, headers, incrementSec };
 }
 
-/** Best-effort: which color did `playerName` play? Falls back to white. */
-export function inferPlayerColor(headers: Record<string, string>, playerName?: string): 'w' | 'b' {
-  if (!playerName) return 'w';
-  const lc = playerName.toLowerCase();
-  if ((headers.Black ?? '').toLowerCase().includes(lc)) return 'b';
-  return 'w';
+/**
+ * Which colour did `playerName` play? Inspects BOTH headers and returns `null` when it
+ * cannot decide, so the caller asks instead of silently defaulting to White and analysing
+ * a Black-side game from the wrong POV (audit v2 C-3 / P0-02).
+ */
+export function inferPlayerColor(
+  headers: Record<string, string>,
+  playerName?: string,
+): 'w' | 'b' | null {
+  if (!playerName) return null;
+  const lc = playerName.trim().toLowerCase();
+  if (!lc) return null;
+  const white = (headers.White ?? '').toLowerCase();
+  const black = (headers.Black ?? '').toLowerCase();
+  // Exact match wins (handles a name that is a substring of the other side).
+  if (white === lc && black !== lc) return 'w';
+  if (black === lc && white !== lc) return 'b';
+  const inWhite = white.includes(lc);
+  const inBlack = black.includes(lc);
+  if (inWhite && !inBlack) return 'w';
+  if (inBlack && !inWhite) return 'b';
+  return null; // absent, ambiguous, or matches neither — caller must resolve
 }

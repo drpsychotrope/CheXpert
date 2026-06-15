@@ -191,6 +191,13 @@
         {lastMove}
         check={display.inCheck()}
         {onMove}
+        onMoveText={(t) => {
+          if (!trainer || !puzzle || trainer.state.status !== 'solving') return false;
+          const r = display.resolveMove(t);
+          if (!r) return false;
+          void onMove(r.from, r.to, r.promo ?? 'q');
+          return true;
+        }}
       />
     </div>
     <p class="feedback {feedbackKind}">{feedback}</p>

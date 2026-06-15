@@ -25,6 +25,14 @@ export interface GoOptions {
   movetime?: number;
   /** Or fixed depth (used by single-position calibration eval). */
   depth?: number;
+  /**
+   * Force FULL engine strength for THIS search. Analysis paths (analysis board, post-game
+   * analysis, endgame fallback, calibration ACPL) must set this: the shared worker may have
+   * been left throttled to the bot's Elo by a prior game (`UCI_LimitStrength` is sticky), which
+   * would silently corrupt evals/blunder-classification/puzzles (audit v2 C-1 / P0-01). The flag
+   * is sent inline before `go` (like MultiPV), so it is correct regardless of prior option state.
+   */
+  fullStrength?: boolean;
 }
 
 export interface EvalResult {
@@ -157,6 +165,8 @@ export class EngineClient {
 
     await this.waitFor(
       () => {
+        // Sent inline before the search so it wins over any sticky UCI_LimitStrength (C-1).
+        if (opts.fullStrength) this.send('setoption name UCI_LimitStrength value false');
         this.send(`position fen ${fen}`);
         if (opts.depth != null) this.send(`go depth ${opts.depth}`);
         else this.send(`go movetime ${opts.movetime ?? 500}`);
@@ -200,6 +210,7 @@ export class EngineClient {
     const best = new Map<number, { score: ScoreInfo; uci: string | null }>();
 
     this.send(`setoption name MultiPV value ${opts.multipv}`);
+    if (opts.fullStrength) this.send('setoption name UCI_LimitStrength value false');
     await this.waitFor(
       () => {
         this.send(`position fen ${fen}`);

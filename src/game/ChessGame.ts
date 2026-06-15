@@ -63,6 +63,14 @@ export class ChessGame {
    *  we do on every manual 960 castle, so its isThreefoldRepetition() goes blind across a
    *  castle. We count positions ourselves (960 only) and consult it in terminal() (audit W5). */
   private repetition = new Map<string, number>();
+  /** Pre-move snapshots enabling a correct 960 undo even across a manual castle, whose
+   *  chess.load() wipes chess.js's own undo stack (audit v2 C-2 / P0-03). */
+  private history960: Array<{
+    fen: string;
+    rights: { w: Side960Rights; b: Side960Rights };
+    san: string[];
+    rep: Map<string, number>;
+  }> = [];
 
   constructor(fen?: string, opts?: ChessGameOpts) {
     this.variant = opts?.variant ?? 'standard';
@@ -99,6 +107,8 @@ export class ChessGame {
       // Reset the repetition counter to the freshly loaded position (audit W5).
       this.repetition.clear();
       this.repetition.set(this.repKey(), 1);
+      // A load() is a hard reset — earlier moves are no longer undoable (audit v2 P0-03).
+      this.history960 = [];
     }
   }
 
@@ -174,20 +184,31 @@ export class ChessGame {
    */
   move(from: string, to: string, promotion: 'q' | 'r' | 'b' | 'n' = 'q'): string | null {
     if (this.variant === 'chess960') {
+      const snap = this.snapshot960(); // restore point captured BEFORE any mutation (P0-03)
       const side = this.castleSideFor(from, to);
       if (side) {
         const san = this.applyCastle(side); // returns SAN or null (illegal)
-        if (san) this.bumpRepetition();
+        if (san) {
+          this.history960.push(snap);
+          this.bumpRepetition();
+        }
         return san;
+      }
+      try {
+        const m = this.chess.move({ from: from as Square, to: to as Square, promotion });
+        if (m) {
+          this.san960.push(m.san);
+          this.updateRightsAfterNormalMove(m);
+          this.history960.push(snap);
+          this.bumpRepetition();
+        }
+        return m ? m.san : null;
+      } catch {
+        return null;
       }
     }
     try {
       const m = this.chess.move({ from: from as Square, to: to as Square, promotion });
-      if (this.variant === 'chess960' && m) {
-        this.san960.push(m.san);
-        this.updateRightsAfterNormalMove(m);
-        this.bumpRepetition();
-      }
       return m ? m.san : null;
     } catch {
       return null;
@@ -202,6 +223,58 @@ export class ChessGame {
     return this.move(from, to, promo);
   }
 
+  /**
+   * Resolve a typed move (SAN "Nf3"/"exd5"/"O-O", UCI "g1f3"/"e7e8q", or coordinate "e2-e4")
+   * to `{from,to,promo}` WITHOUT mutating the game, so a caller can feed it through the same
+   * `onMove(from,to,promo)` path a drag uses (audit v2 C-4 / P0-04, keyboard move entry).
+   * Returns null if unparseable/illegal in the current position. Variant-aware: 960 castling is
+   * resolved to the king-onto-own-rook coordinates the shim expects.
+   */
+  resolveMove(input: string): { from: string; to: string; promo?: 'q' | 'r' | 'b' | 'n' } | null {
+    const t = input.trim();
+    if (!t) return null;
+    // UCI / coordinate form (separators optional): e2e4, e2-e4, e7e8q.
+    const compact = t.replace(/[\s-]/g, '');
+    if (/^[a-h][1-8][a-h][1-8][qrbn]?$/i.test(compact)) {
+      const c = compact.toLowerCase();
+      const promo = c[4] as 'q' | 'r' | 'b' | 'n' | undefined;
+      return { from: c.slice(0, 2), to: c.slice(2, 4), promo: promo || undefined };
+    }
+    // Castling words (O-O / O-O-O, also tolerating zeros).
+    if (/^[o0](-?[o0]){1,2}$/i.test(t)) {
+      const long = (t.match(/[o0]/gi) ?? []).length === 3;
+      return this.resolveCastle(long ? 'long' : 'short');
+    }
+    // SAN for any non-castle move via a scratch board (no mutation). In 960, neutralise the
+    // castling field so chess.js parses the position; castling is handled above.
+    try {
+      const scratchFen = this.variant === 'chess960' ? neutralizeCastling(this.chess.fen()) : this.chess.fen();
+      const m = new Chess(scratchFen).move(t);
+      if (!m) return null;
+      return { from: m.from, to: m.to, promo: (m.promotion as 'q' | 'r' | 'b' | 'n') || undefined };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Resolve a castle (SAN word) to its from/to coordinates without mutating. */
+  private resolveCastle(side: 'short' | 'long'): { from: string; to: string } | null {
+    if (this.variant === 'chess960' && this.castleFiles) {
+      const color = this.turn;
+      const rank = color === 'w' ? 1 : 8;
+      const kingFile = color === 'w' ? this.castleFiles.whiteKingFile : this.castleFiles.blackKingFile;
+      const rookFiles = color === 'w' ? this.castleFiles.whiteRookFiles : this.castleFiles.blackRookFiles;
+      const rookFile = side === 'short' ? Math.max(...rookFiles) : Math.min(...rookFiles);
+      return { from: sqOf(kingFile, rank), to: sqOf(rookFile, rank) }; // king onto own rook (960)
+    }
+    try {
+      const m = new Chess(this.chess.fen()).move(side === 'short' ? 'O-O' : 'O-O-O');
+      return m ? { from: m.from, to: m.to } : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** True if moving from->to would be a pawn reaching the last rank. */
   isPromotion(from: string, to: string): boolean {
     const piece = this.chess.get(from as Square);
@@ -212,17 +285,33 @@ export class ChessGame {
 
   undo(): void {
     if (this.variant === 'chess960') {
-      // Drop one occurrence of the position we're leaving (audit W5).
-      const key = this.repKey();
-      const n = this.repetition.get(key) ?? 0;
-      if (n <= 1) this.repetition.delete(key);
-      else this.repetition.set(key, n - 1);
+      // A 960 castle reloads chess.js (wiping its undo stack), so chess.undo() cannot revert
+      // it. Restore the full pre-move snapshot instead — uniform for castles and normal moves
+      // (audit v2 C-2 / P0-03).
+      const snap = this.history960.pop();
+      if (!snap) return;
+      this.chess.load(snap.fen); // snap.fen already has castling neutralised to '-'
+      this.rights = snap.rights;
+      this.san960 = snap.san;
+      this.repetition = snap.rep;
+      return;
     }
     this.chess.undo();
-    if (this.variant === 'chess960') {
-      this.san960.pop();
-      this.syncRightsToBoard();
-    }
+  }
+
+  /** Capture the full restorable 960 state before a move (audit v2 P0-03). */
+  private snapshot960(): {
+    fen: string;
+    rights: { w: Side960Rights; b: Side960Rights };
+    san: string[];
+    rep: Map<string, number>;
+  } {
+    return {
+      fen: this.chess.fen(),
+      rights: { w: { ...this.rights!.w }, b: { ...this.rights!.b } },
+      san: [...this.san960],
+      rep: new Map(this.repetition),
+    };
   }
 
   terminal(): TerminalState {

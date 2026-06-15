@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parsePgn, parseIncrement, clockToMs } from './pgn';
+import { parsePgn, parseIncrement, clockToMs, inferPlayerColor } from './pgn';
 
 describe('pgn parsing', () => {
   it('parses increment and clock strings', () => {
@@ -35,5 +35,23 @@ describe('pgn parsing', () => {
 
   it('throws on malformed PGN', () => {
     expect(() => parsePgn('1. e4 e5 2. Qxz9')).toThrow();
+  });
+});
+
+describe('inferPlayerColor (audit v2 C-3)', () => {
+  const h = (White: string, Black: string) => ({ White, Black });
+  it('detects each side from the matching header', () => {
+    expect(inferPlayerColor(h('Alice', 'Bob'), 'alice')).toBe('w');
+    expect(inferPlayerColor(h('Alice', 'Bob'), 'Bob')).toBe('b');
+  });
+  it('does NOT default a Black-side game to White', () => {
+    // The regression: player is Black; must return 'b', never 'w'.
+    expect(inferPlayerColor(h('Opp123', 'DrNykterstein'), 'DrNykterstein')).toBe('b');
+  });
+  it('returns null when undecidable (absent / empty / no match / ambiguous)', () => {
+    expect(inferPlayerColor(h('Alice', 'Bob'))).toBeNull();
+    expect(inferPlayerColor(h('Alice', 'Bob'), '')).toBeNull();
+    expect(inferPlayerColor(h('Alice', 'Bob'), 'Carol')).toBeNull();
+    expect(inferPlayerColor(h('player1', 'player2'), 'player')).toBeNull(); // substring of both
   });
 });

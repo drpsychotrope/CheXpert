@@ -35,7 +35,7 @@ export interface PositionEvaluator {
 export function engineEvaluator(engine: EngineClient, movetimeMs: number): PositionEvaluator {
   return {
     async evaluatePosition(fen: string): Promise<PositionEval> {
-      const r = await engine.evaluate(fen, { movetime: movetimeMs });
+      const r = await engine.evaluate(fen, { movetime: movetimeMs, fullStrength: true });
       return { whiteCp: r.whiteCp, bestUci: r.bestmove, mate: r.score.mate };
     },
   };

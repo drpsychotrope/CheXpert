@@ -33,8 +33,23 @@
     try {
       const parsed = parsePgn(pgn); // throws on malformed
       total = parsed.plies.length + 1;
-      const color =
-        colorChoice === 'auto' ? inferPlayerColor(parsed.headers, playerName || 'You') : colorChoice;
+      let color: 'w' | 'b';
+      if (colorChoice === 'auto') {
+        const detected = inferPlayerColor(parsed.headers, playerName);
+        if (!detected) {
+          // Don't silently default to White — a Black-side game analysed from White's POV
+          // corrupts every player-attributed metric and the weakness profile (audit v2 C-3 / P0-02).
+          error =
+            `Couldn't auto-detect your colour (White: "${parsed.headers.White ?? '?'}", ` +
+            `Black: "${parsed.headers.Black ?? '?'}"). Type your name as it appears in the PGN, ` +
+            `or pick White/Black above, then Analyse again.`;
+          status = 'error';
+          return;
+        }
+        color = detected;
+      } else {
+        color = colorChoice;
+      }
 
       const baseRating = model ? Math.round(model.puzzleRating.rating) : 1200;
       const gameId = `import:${parsed.headers.White ?? '?'}-${parsed.headers.Black ?? '?'}-${parsed.plies.length}`;

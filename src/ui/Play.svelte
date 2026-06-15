@@ -318,7 +318,7 @@
   /** Coached mode (Phase 1, best-effort): quick shallow eval; warn on a big drop. */
   async function coachCheck() {
     try {
-      const evalRes = await app.engine.evaluate(variant === 'chess960' ? game.fenForEngine() : game.fen, { depth: 8 });
+      const evalRes = await app.engine.evaluate(variant === 'chess960' ? game.fenForEngine() : game.fen, { depth: 8, fullStrength: true });
       // After the player's move it is the opponent's turn; a very negative
       // White-POV score (for a white player) means the move likely blundered.
       const cp = evalRes.whiteCp;
@@ -547,6 +547,13 @@
       {lastMove}
       check={inCheck}
       {onMove}
+      onMoveText={(t) => {
+        if (status !== 'playing' || turnColor() !== playerColor) return false;
+        const r = game.resolveMove(t);
+        if (!r) return false;
+        void onMove(r.from, r.to, r.promo ?? 'q');
+        return true;
+      }}
     />
   </div>
 

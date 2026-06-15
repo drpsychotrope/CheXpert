@@ -114,7 +114,7 @@
       if (tb && tb.moves.length) uci = tb.moves[0].uci;
       if (!uci) {
         await app.engine.resetVariant();
-        const r = await app.engine.evaluate(game.fen, { movetime: 300 });
+        const r = await app.engine.evaluate(game.fen, { movetime: 300, fullStrength: true });
         uci = r.bestmove;
       }
       if (uci) {

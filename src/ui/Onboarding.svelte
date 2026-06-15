@@ -138,7 +138,7 @@
     // Best-move eval BEFORE the user moves, to compute centipawn loss.
     let bestCp = 0;
     try {
-      const before = await app.engine.evaluate(game.fen, { depth: 10 });
+      const before = await app.engine.evaluate(game.fen, { depth: 10, fullStrength: true });
       bestCp = before.whiteCp;
     } catch { /* ignore */ }
 
@@ -147,7 +147,7 @@
     gameFen = game.fen;
 
     try {
-      const after = await app.engine.evaluate(game.fen, { depth: 10 });
+      const after = await app.engine.evaluate(game.fen, { depth: 10, fullStrength: true });
       // Loss from the PLAYER's POV: White wants whiteCp high, Black wants it low.
       const loss = gameSide === 'w'
         ? Math.max(0, bestCp - after.whiteCp)

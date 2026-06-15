@@ -114,10 +114,16 @@ export async function generatePuzzlesFromAnalysis(
 
 /** Wrap an EngineClient as a LineEvaluator for the uniqueness re-check. */
 export function engineLineEvaluator(
-  engine: { analyzeLines: (fen: string, opts: { multipv: number; movetime?: number }) => Promise<LineResult[]> },
+  engine: {
+    analyzeLines: (
+      fen: string,
+      opts: { multipv: number; movetime?: number; fullStrength?: boolean },
+    ) => Promise<LineResult[]>;
+  },
   movetimeMs = 300,
 ): LineEvaluator {
   return {
-    evaluateLines: (fen, multipv) => engine.analyzeLines(fen, { multipv, movetime: movetimeMs }),
+    evaluateLines: (fen, multipv) =>
+      engine.analyzeLines(fen, { multipv, movetime: movetimeMs, fullStrength: true }),
   };
 }
