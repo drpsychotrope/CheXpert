@@ -194,10 +194,18 @@ Chaque workstream = une branche/PR isolée → `git revert` du merge suffit. W1/
 
 | Workstream | Statut | Preuve DoD (commande) | PR |
 |---|---|---|---|
-| V2-W1 — force d'analyse explicite (flag `fullStrength`, 6 sites) | ✅ implémenté (local) | `npm test` 486 ✓ · `check` 0 err | local (non commité) |
-| V2-W2 — couleur d'import (2 en-têtes + refus de deviner) | ✅ implémenté (local) | `pgn.test` regression C-3 ✓ | local (non commité) |
-| V2-W3 — undo 960 castle-aware (pile de snapshots) | ✅ implémenté (local) | suite undo 960 ✓ | local (non commité) |
-| V2-W4 — coup clavier (`resolveMove` + input Board, Play/Tactics/Review) | ✅ implémenté + vérifié preview (Nf3 joué sans souris, 0 erreur console) | `resolveMove` tests ✓ + live | local (non commité) |
-| V2-W5…W19 | ◻️ à venir (P1 → P2) | — | — |
+| V2-W1 — force d'analyse explicite (flag `fullStrength`, 6 sites) | ✅ livré | `check` 0 · `test` 487 | `a2abf9b` (P0) |
+| V2-W2 — couleur d'import (2 en-têtes + refus de deviner) | ✅ livré | regression C-3 ✓ | `a2abf9b` (P0) |
+| V2-W3 — undo 960 castle-aware (pile de snapshots) | ✅ livré | suite undo 960 ✓ | `a2abf9b` (P0) |
+| V2-W4 — coup clavier (`resolveMove` + input Board) | ✅ livré + preview | `resolveMove` tests + live | `a2abf9b` (P0) |
+| V2-W6 — gardes règles (moveUci ×5 modes, roi-960 case libérée) | ✅ livré | test P1-16 ✓ | `9172f11` (P1a) |
+| V2-W9 — gardes drills (Vision double-comptage, résignation) | ✅ livré | `test` 487 ✓ | `9172f11` (P1a) |
+| V2-W8 — honnêteté coach/insights (radar n/a, caption 2/motif, trend rating) | ✅ livré | `check` 0 · `test` 487 | `c3c5687` (P1b) |
+| V2-W5 — coutures moteur & résilience coquille | ◻️ à venir (P1) | — | — |
+| V2-W7 — ids anti-collision import/répertoire + PGN multi-parties | ◻️ à venir (P1) | — | — |
+| V2-W10 — closers de boucle (badge cartes dues) | ◻️ à venir (P1) | — | — |
+| V2-W11 — `next()` async par index (ripple appelants) | ◻️ à venir (P1) | — | — |
+| V2-W12 — décomposition `Play.svelte` + confirm non bloquant | ◻️ à venir (P1) | — | — |
+| V2-W13…W19 | ◻️ à venir (P2 + docs) | — | — |
 
-> **P0 livré (2026-06-10)** : 4/4 critiques implémentés, `svelte-check` 0 erreur, `vitest` **486 verts** (+8), `vite build` vert, et le coup au clavier vérifié en preview. Changements en working-tree (non commités) — à découper en 4 PR (Q1=a) sur demande.
+> **Avancement (2026-06-10)** : **P0 4/4** + **P1 W6/W8/W9** livrés et commités (`a2abf9b`, `9172f11`, `c3c5687`) ; `svelte-check` 0 erreur, `vitest` **487 verts**, `vite build` vert, coup clavier vérifié en preview. Restent **P1 : W5, W7, W10, W11, W12** et **tout P2 (W13–W19)**.
