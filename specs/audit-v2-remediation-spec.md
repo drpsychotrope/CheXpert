@@ -201,11 +201,11 @@ Chaque workstream = une branche/PR isolée → `git revert` du merge suffit. W1/
 | V2-W6 — gardes règles (moveUci ×5 modes, roi-960 case libérée) | ✅ livré | test P1-16 ✓ | `9172f11` (P1a) |
 | V2-W9 — gardes drills (Vision double-comptage, résignation) | ✅ livré | `test` 487 ✓ | `9172f11` (P1a) |
 | V2-W8 — honnêteté coach/insights (radar n/a, caption 2/motif, trend rating) | ✅ livré | `check` 0 · `test` 487 | `c3c5687` (P1b) |
-| V2-W5 — coutures moteur & résilience coquille | ◻️ à venir (P1) | — | — |
-| V2-W7 — ids anti-collision import/répertoire + PGN multi-parties | ◻️ à venir (P1) | — | — |
-| V2-W10 — closers de boucle (badge cartes dues) | ◻️ à venir (P1) | — | — |
-| V2-W11 — `next()` async par index (ripple appelants) | ◻️ à venir (P1) | — | — |
-| V2-W12 — décomposition `Play.svelte` + confirm non bloquant | ◻️ à venir (P1) | — | — |
+| V2-W5 — coutures moteur & résilience coquille (P1-03/04/06 + L8 ; P1-05 différé) | ✅ livré | `check` 0 · nav smoke | `e9f1...` (W5) |
+| V2-W7 — ids anti-collision import/répertoire + PGN multi-parties | ✅ livré | `check` 0 · `test` 487 | (W7) |
+| V2-W10 — closers de boucle (badge cartes dues P1-07) | ✅ livré | boot smoke · `test` 487 | (W10) |
+| V2-W11 — `next()` async par index (ripple appelants) | ◻️ à venir (P1, structurel) | — | — |
+| V2-W12 — décomposition `Play.svelte` + confirm non bloquant | ◻️ à venir (P1, structurel) | — | — |
 | V2-W13…W19 | ◻️ à venir (P2 + docs) | — | — |
 
-> **Avancement (2026-06-10)** : **P0 4/4** + **P1 W6/W8/W9** livrés et commités (`a2abf9b`, `9172f11`, `c3c5687`) ; `svelte-check` 0 erreur, `vitest` **487 verts**, `vite build` vert, coup clavier vérifié en preview. Restent **P1 : W5, W7, W10, W11, W12** et **tout P2 (W13–W19)**.
+> **Avancement (2026-06-10)** : **P0 4/4** + **P1 W5/W6/W7/W8/W9/W10** livrés, commités et **poussés** (PR [#22](https://github.com/drpsychotrope/Chess/pull/22)) ; `svelte-check` 0 erreur, `vitest` **487 verts**, `vite build` vert. Restent **P1 : W11 + W12 (structurels)**, **P1-05** (reprise crash moteur, différé de W5) et **tout P2 (W13–W19)**.
