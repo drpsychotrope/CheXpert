@@ -27,7 +27,11 @@
   }
 
   const polygon = $derived(
-    dimensions.map((d, i) => point(i, Math.max(0.02, d.score / 100)).join(',')).join(' '),
+    // Unmeasured axes (sampleSize 0) collapse to the centre so the filled shape never implies a
+    // measurement at the expectation ring (audit v2 L17 — completes PR #21's honest no-data axes).
+    dimensions
+      .map((d, i) => point(i, d.sampleSize === 0 ? 0.02 : Math.max(0.02, d.score / 100)).join(','))
+      .join(' '),
   );
   const baseline = $derived(dimensions.map((_, i) => point(i, 0.5).join(',')).join(' '));
   const rings = [0.25, 0.5, 0.75, 1];
@@ -50,7 +54,7 @@
       {labels[d.dimension] ?? d.dimension}
       {#if na}<tspan x={lx} dy="1.15em" class="na-tag">n/a</tspan>{/if}
     </text>
-    {@const [dx, dy] = point(i, d.score / 100)}
+    {@const [dx, dy] = point(i, na ? 0.02 : d.score / 100)}
     <circle cx={dx} cy={dy} r="3" class="dot" class:na />
   {/each}
 </svg>

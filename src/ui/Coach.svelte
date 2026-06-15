@@ -251,7 +251,7 @@
     <div class="panel col center" style="gap:0.75rem;width:100%">
       <h3>Your coaching profile</h3>
       <Radar dimensions={profile.dimensions} />
-      <p class="muted" style="font-size:0.8rem">Directional — built from {profile.source.ladders ? 'one puzzle per motif' : 'no puzzle data'}{profile.source.game ? ' + one short game' : ''}. Small samples; treat as "where to focus". Greyed “n/a” axes weren't measured by this assessment.</p>
+      <p class="muted" style="font-size:0.8rem">Directional — built from {profile.source.ladders ? 'two puzzles per motif' : 'no puzzle data'}{profile.source.game ? ' + one short game' : ''}. Small samples; treat as "where to focus". Greyed “n/a” axes weren't measured by this assessment.</p>
       <div class="row" style="gap:1.5rem;align-items:flex-start">
         <div class="col"><b>Strengths</b>{#each profile.strengths as s}<span>✔ {s}</span>{:else}<span class="muted">—</span>{/each}</div>
         <div class="col"><b>Focus on</b>{#each profile.weaknesses as w}<span>△ {w}</span>{:else}<span class="muted">—</span>{/each}</div>
