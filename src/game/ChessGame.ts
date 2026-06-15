@@ -186,8 +186,11 @@ export class ChessGame {
     if (this.variant === 'chess960') {
       const snap = this.snapshot960(); // restore point captured BEFORE any mutation (P0-03)
       const side = this.castleSideFor(from, to);
-      if (side) {
-        const san = this.applyCastle(side); // returns SAN or null (illegal)
+      // Only treat king-onto-rook-file as a castle while the right is LIVE. Once the rook has
+      // left that file (right cleared), the same king step is a NORMAL move and must fall through
+      // to chess.js rather than being rejected as a dead castle (audit v2 P1-16).
+      if (side && this.rights?.[this.turn][side]) {
+        const san = this.applyCastle(side); // returns SAN or null (currently illegal)
         if (san) {
           this.history960.push(snap);
           this.bumpRepetition();

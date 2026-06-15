@@ -169,8 +169,8 @@
     try {
       const uci = await opponent.pickMove(game.fen, 400);
       if (uci) {
-        game.moveUci(uci);
-        gameFen = game.fen;
+        const san = game.moveUci(uci); // only advance if the engine move actually applied (P1-17)
+        if (san) gameFen = game.fen;
       }
     } catch { /* ignore */ }
     gameThinking = false;

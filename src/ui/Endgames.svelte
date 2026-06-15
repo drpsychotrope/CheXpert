@@ -118,7 +118,11 @@
         uci = r.bestmove;
       }
       if (uci) {
-        game.moveUci(uci);
+        const san = game.moveUci(uci); // halt on an illegal engine/tablebase move (audit v2 P1-17)
+        if (!san) {
+          status = 'over';
+          return;
+        }
         fen = game.fen;
         lastMove = [uci.slice(0, 2), uci.slice(2, 4)];
       }
