@@ -37,6 +37,18 @@
     await app.boot(Date.now());
     booted = true;
   });
+
+  // Drop any engine search abandoned when leaving an engine-using view, so the next view's first
+  // search isn't head-of-line-blocked behind work the user walked away from (audit v2 P1-06).
+  let prevView: View | null = null;
+  $effect(() => {
+    const v = app.view;
+    if (prevView !== null && prevView !== v) {
+      if (app.engine.busy) void app.engine.interrupt();
+      void app.refreshDue(Date.now()); // keep the Review badge fresh after grading (audit v2 P1-07)
+    }
+    prevView = v;
+  });
 </script>
 
 <header class="topbar">
@@ -49,7 +61,7 @@
     <button onclick={() => app.go('play')}>Play</button>
     <button onclick={() => app.go('sparring')}>Spar</button>
     <button onclick={() => app.go('tactics')}>Tactics</button>
-    <button onclick={() => app.go('review')}>Review</button>
+    <button onclick={() => app.go('review')}>Review{#if app.dueReview > 0} ({app.dueReview}){/if}</button>
     <button onclick={() => app.go('woodpecker')}>Woodpecker</button>
     <button onclick={() => app.go('import')}>Analyse</button>
     <button onclick={() => app.go('analysis-board')}>Board</button>
@@ -85,6 +97,14 @@
     {#await viewLoader() then mod}
       {@const Comp = mod.default}
       <Comp />
+    {:catch}
+      <section class="col center" style="max-width:480px;margin:3rem auto;text-align:center">
+        <h2>⚠️ Couldn't load this screen</h2>
+        <p class="muted">
+          A part of the app failed to load — this can happen after an update. Reloading usually fixes it.
+        </p>
+        <button onclick={() => location.reload()}>Reload</button>
+      </section>
     {/await}
   {/if}
 </main>

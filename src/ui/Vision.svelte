@@ -135,6 +135,7 @@
     promptAt = Date.now();
   }
   function answerKnight() {
+    if (feedback) return; // already graded this prompt — don't double-count (audit v2 P1-13)
     const truth = knightDistance(kFrom, kTo);
     const ok = Number(kAnswer) === truth;
     score(ok, `${truth} move${truth === 1 ? '' : 's'}.`);
@@ -159,6 +160,7 @@
     promptAt = Date.now();
   }
   function answerFindAll() {
+    if (feedback) return; // already graded this prompt — don't double-count (audit v2 P1-13)
     const truth = faTargets.length;
     const ok = Number(faAnswer) === truth;
     score(ok, `there ${truth === 1 ? 'is' : 'are'} ${truth} ${faLabel[faTask]}.`);

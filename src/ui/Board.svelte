@@ -39,6 +39,10 @@
     /** Badge phrasing: 'play' → "You play Black" (drills where you play the side to move);
      *  'move' → "Black to move" (count/illustration drills). */
     turnLabel?: 'play' | 'move';
+    /** Optional keyboard move entry: resolve + apply a typed SAN/UCI/coordinate move and
+     *  return true if applied. When set (and not view-only), renders an accessible text input
+     *  under the board so a move can be made without a mouse (audit v2 C-4 / P0-04, WCAG 2.1.1). */
+    onMoveText?: (text: string) => boolean;
   }
 
   let {
@@ -56,6 +60,7 @@
     arrows = [],
     showTurn = false,
     turnLabel = 'move',
+    onMoveText,
   }: Props = $props();
 
   // chessground executes a drag as a real move only when its `turnColor` equals the side
@@ -95,6 +100,22 @@
   function cancelPromo() {
     pendingPromo = null;
     cg?.set(config()); // revert chessground's optimistic pawn move back to the real position
+  }
+
+  // Keyboard move entry (audit v2 P0-04): a typed SAN/UCI move applied via the caller's resolver,
+  // giving a no-mouse path to play on every board. The error is an aria-live region for AT users.
+  let kbMove = $state('');
+  let kbError = $state('');
+  function submitKbMove(e: Event) {
+    e.preventDefault();
+    const text = kbMove.trim();
+    if (!text || !onMoveText) return;
+    if (onMoveText(text)) {
+      kbMove = '';
+      kbError = '';
+    } else {
+      kbError = `"${text}" is not a legal move here`;
+    }
   }
 
   function toDests(d: Map<string, string[]>): Map<Key, Key[]> {
@@ -175,6 +196,23 @@
     </div>
   {/if}
   </div>
+  {#if onMoveText && !viewOnly}
+    <form class="kbmove" onsubmit={submitKbMove}>
+      <label class="kbmove-label" for="kbmove-input">Move (keyboard):</label>
+      <input
+        id="kbmove-input"
+        class="kbmove-input"
+        bind:value={kbMove}
+        placeholder="e.g. Nf3 or g1f3"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        aria-describedby="kbmove-err"
+      />
+      <button type="submit">Play</button>
+      <span id="kbmove-err" class="kbmove-err" role="alert" aria-live="assertive">{kbError}</span>
+    </form>
+  {/if}
   {#if pendingPromo}
     <div class="promo-overlay">
       <button class="promo-backdrop" type="button" aria-label="Cancel promotion" onclick={cancelPromo}></button>
@@ -272,4 +310,10 @@
   .promo-pieces { display: flex; gap: 0.4rem; }
   .promo-btn { font-size: 2.2rem; line-height: 1; width: 3rem; height: 3rem; display: flex; align-items: center; justify-content: center; background: var(--panel-2, #1f1f1f); border: 1px solid var(--border, #444); border-radius: 8px; cursor: pointer; color: var(--text, #eee); }
   .promo-btn:hover { background: var(--accent, #4a90d9); color: #000; }
+
+  /* Keyboard move entry (audit v2 P0-04). */
+  .kbmove { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; margin-top: 0.5rem; }
+  .kbmove-label { font-size: 0.8rem; color: var(--muted); }
+  .kbmove-input { flex: 0 1 9rem; min-width: 7rem; }
+  .kbmove-err { font-size: 0.8rem; color: var(--bad, #e06c6c); min-height: 1em; }
 </style>

@@ -114,11 +114,15 @@
       if (tb && tb.moves.length) uci = tb.moves[0].uci;
       if (!uci) {
         await app.engine.resetVariant();
-        const r = await app.engine.evaluate(game.fen, { movetime: 300 });
+        const r = await app.engine.evaluate(game.fen, { movetime: 300, fullStrength: true });
         uci = r.bestmove;
       }
       if (uci) {
-        game.moveUci(uci);
+        const san = game.moveUci(uci); // halt on an illegal engine/tablebase move (audit v2 P1-17)
+        if (!san) {
+          status = 'over';
+          return;
+        }
         fen = game.fen;
         lastMove = [uci.slice(0, 2), uci.slice(2, 4)];
       }

@@ -65,15 +65,16 @@ export class AdaptiveOpponent {
     private chess960 = false,
   ) {}
 
-  /** Apply the current target Elo to the engine. Call after init / after changes. */
+  /** Apply the current target Elo to the engine. Call after init / after changes.
+   *  Options are written serialized w.r.t. the search queue so they never change mid-search
+   *  (audit v2 L8). UCI_Chess960 re-applied so a respawn doesn't drop it (AP-960-4), and set
+   *  false for standard games to overwrite any cached true from a prior 960 game. */
   async applyStrength(): Promise<void> {
-    await this.engine.init();
-    this.engine.setOption('UCI_LimitStrength', true);
-    this.engine.setOption('UCI_Elo', clampElo(this.state.targetElo));
-    // Re-applied here so a respawn (interrupt) doesn't silently drop it (AP-960-4).
-    // Setting false for standard games also overwrites any cached true from a prior 960 game.
-    this.engine.setOption('UCI_Chess960', this.chess960);
-    await this.engine.isready();
+    await this.engine.applyOptions({
+      UCI_LimitStrength: true,
+      UCI_Elo: clampElo(this.state.targetElo),
+      UCI_Chess960: this.chess960,
+    });
   }
 
   /** Ask the opponent for a move in the given position. */

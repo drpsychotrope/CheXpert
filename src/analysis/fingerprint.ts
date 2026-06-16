@@ -83,14 +83,20 @@ export interface TrendPoint {
 }
 
 /** Recompute the weakness radar over rolling windows of games (oldest→newest). */
-export function weaknessTrend(analyses: GameAnalysis[], opts: { window?: number } = {}): TrendPoint[] {
+export function weaknessTrend(
+  analyses: GameAnalysis[],
+  opts: { window?: number; rating?: number } = {},
+): TrendPoint[] {
   const window = opts.window ?? 5;
+  // Benchmark the ACPL axes against the player's real rating, not a hardcoded 1200 — otherwise the
+  // Opening/Endgame trend disagrees with the radar beside it for any non-1200 player (audit v2 P1-09).
+  const rating = opts.rating ?? 1200;
   const sorted = [...analyses].sort((a, b) => a.analyzedAt - b.analyzedAt);
   const out: TrendPoint[] = [];
   for (let i = 0, w = 1; i < sorted.length; i += window, w++) {
     const block = sorted.slice(i, i + window);
     if (block.length === 0) continue;
-    const profile = buildWeaknessProfile(block, 1200);
+    const profile = buildWeaknessProfile(block, rating);
     const dims = {} as Record<Dimension, number>;
     for (const d of profile.dimensions) dims[d.dimension] = d.score;
     out.push({ window: w, games: block.length, dims });

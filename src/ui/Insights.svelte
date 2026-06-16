@@ -39,7 +39,7 @@
     analysesAll = analyses;
     if (analyses.length) {
       leaks = buildFingerprint(analyses).leaks;
-      trend = weaknessTrend(analyses, { window: 5 });
+      trend = weaknessTrend(analyses, { window: 5, rating: model ? poolRating(model, 'classical').rating : 1200 });
       weakest = buildWeaknessProfile(analyses, model ? poolRating(model, 'classical').rating : 1200).weakest;
     }
     const attempts = (await allAttempts()) as MetacogAttempt[];

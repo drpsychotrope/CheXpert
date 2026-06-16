@@ -82,8 +82,14 @@
     status = 'thinking';
     try {
       const uci = await opponent.pickMove(game.fen, 500);
+      if ((status as string) === 'over') return; // user resigned while the engine was thinking (audit v2 P1-14)
       if (uci) {
-        game.moveUci(uci);
+        const san = game.moveUci(uci); // halt on an illegal engine move instead of desyncing (P1-17)
+        if (!san) {
+          result = 'Engine returned an illegal move — game halted.';
+          status = 'over';
+          return;
+        }
         fen = game.fen;
         lastMove = [uci.slice(0, 2), uci.slice(2, 4)];
       }

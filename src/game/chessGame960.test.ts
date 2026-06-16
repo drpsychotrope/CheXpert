@@ -171,3 +171,66 @@ describe('standard mode unaffected by the 960 shim', () => {
     expect(g.fenForEngine()).toBe(g.fen);
   });
 });
+
+describe('Chess960 undo — castle-aware (audit v2 C-2 / P0-03)', () => {
+  it('undo after a 960 castle restores board, turn, history and the castle right', () => {
+    const g = game('4k3/8/8/8/8/8/8/R3K2R w - - 0 1', 4, [0, 7]);
+    const fen0 = g.fen;
+    expect(g.move('e1', 'h1')).toBe('O-O'); // king→g1, rook→f1, turn→b
+    expect(g.turn).toBe('b');
+    g.undo();
+    expect(g.fen).toBe(fen0); // board fully restored (silently corrupted before the fix)
+    expect(g.turn).toBe('w'); // side-to-move restored
+    expect(g.history()).toEqual([]); // san960 popped
+    const after = new Chess(g.fen);
+    expect(after.get('e1' as never)).toMatchObject({ type: 'k', color: 'w' });
+    expect(after.get('h1' as never)).toMatchObject({ type: 'r', color: 'w' });
+    expect(g.dests().get('e1') ?? []).toContain('h1'); // right restored → castle legal again
+  });
+
+  it('undo after a normal 960 move restores position and side rights', () => {
+    const g = game('4k3/8/8/8/8/8/8/R3K2R w - - 0 1', 4, [0, 7]);
+    const fen0 = g.fen;
+    expect(g.move('e1', 'e2')).toBe('Ke2'); // normal king move clears rights
+    g.undo();
+    expect(g.fen).toBe(fen0);
+    expect(g.history()).toEqual([]);
+    expect(g.dests().get('e1') ?? []).toContain('h1'); // right back after undo
+  });
+});
+
+describe('Chess960 — king step onto a vacated rook-home file (audit v2 P1-16)', () => {
+  it('lets the king step onto its short rook file once that rook has left (normal move, not a dead castle)', () => {
+    const g = game('k7/8/8/8/8/8/8/5RKR w - - 0 1', 6, [5, 7]); // king g1, rooks f1/h1; black Ka8
+    expect(g.move('h1', 'h4')).toBe('Rh4'); // kingside rook leaves home → short right cleared
+    expect(g.move('a8', 'a7')).toBe('Ka7'); // black waits (far from the action)
+    // g1->h1 is now a legal ONE-STEP king move onto the vacated h-file; before the fix it was
+    // wrongly intercepted as a (now-dead) castle and rejected.
+    expect(g.move('g1', 'h1')).toBe('Kh1');
+  });
+});
+
+describe('resolveMove — keyboard move entry (audit v2 C-4 / P0-04)', () => {
+  it('resolves SAN, UCI and coordinate forms without mutating', () => {
+    const g = new ChessGame();
+    const fen0 = g.fen;
+    expect(g.resolveMove('Nf3')).toMatchObject({ from: 'g1', to: 'f3' });
+    expect(g.resolveMove('g1f3')).toMatchObject({ from: 'g1', to: 'f3' });
+    expect(g.resolveMove('e2-e4')).toMatchObject({ from: 'e2', to: 'e4' });
+    expect(g.resolveMove('e2 e4')).toMatchObject({ from: 'e2', to: 'e4' });
+    expect(g.resolveMove('nonsense')).toBeNull();
+    expect(g.fen).toBe(fen0); // pure resolution, no side effects
+  });
+
+  it('resolves promotion via SAN and UCI', () => {
+    const g = new ChessGame('4k3/P7/8/8/8/8/8/4K3 w - - 0 1');
+    expect(g.resolveMove('a8=Q')).toMatchObject({ from: 'a7', to: 'a8', promo: 'q' });
+    expect(g.resolveMove('a7a8n')).toMatchObject({ from: 'a7', to: 'a8', promo: 'n' });
+  });
+
+  it('resolves a 960 castle word to king-onto-rook coordinates', () => {
+    const g = game('4k3/8/8/8/8/8/8/R3K2R w - - 0 1', 4, [0, 7]);
+    expect(g.resolveMove('O-O')).toEqual({ from: 'e1', to: 'h1' });
+    expect(g.resolveMove('O-O-O')).toEqual({ from: 'e1', to: 'a1' });
+  });
+});

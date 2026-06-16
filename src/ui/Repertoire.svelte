@@ -33,14 +33,28 @@
     if (mode === 'list') void refresh();
   });
 
+  /** Tiny stable string hash (djb2) — disambiguates repertoire-line ids by their moves. */
+  function shortHash(s: string): string {
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36);
+  }
+
   async function save() {
     buildError = '';
+    if (!name.trim()) {
+      buildError = 'Give this line a name.';
+      return;
+    }
     const sans = movesText.trim().split(/[\s,]+/).filter(Boolean)
       // strip move numbers like "1." or "1...".
       .filter((t) => !/^\d+\.+$/.test(t))
       .map((t) => t.replace(/^\d+\.+/, ''));
-    const id = `rep:${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}:${color}`;
-    const res = buildLine(id, name || 'Untitled line', color, sans, Date.now());
+    // Include a hash of the moves so two different lines with the same name+colour don't silently
+    // overwrite each other; re-saving the identical line stays idempotent (audit v2 P1-12).
+    const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const id = `rep:${slug}:${color}:${shortHash(sans.join(' '))}`;
+    const res = buildLine(id, name.trim(), color, sans, Date.now());
     if (!res.ok || !res.line) {
       buildError = res.error ?? 'Could not build line';
       return;
