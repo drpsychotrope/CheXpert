@@ -25,6 +25,7 @@
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
   import { applyGameResult, botMovetime, flagOutcome } from '../game/playSession';
+  import ConfirmDialog from './ConfirmDialog.svelte';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   let game = $state(new ChessGame());
@@ -33,6 +34,9 @@
   let status = $state<'idle' | 'playing' | 'thinking' | 'over'>('idle');
   let result = $state('');
   let thinking = $state(false);
+  // Non-blocking coached take-back prompt (audit v2 W12/F5). While it's open the player's own clock
+  // keeps running — fair, it's their decision time — and the opponent isn't charged (F6).
+  let coachOpen = $state(false);
   let steerNote = $state('');
   let opponent: AdaptiveOpponent | null = null;
   let colorChoice = $state<ColorChoice>('white');
@@ -125,6 +129,7 @@
     lastMove = null;
     playedUci = [];
     gameFinished = false;
+    coachOpen = false;
 
     if (variant === 'chess960') {
       // Distinguish an invalid entry from a deliberate 0: NaN → random, not silently SP 0 (audit W6).
@@ -260,12 +265,52 @@
     playedUci.push(uci);
     fen = game.fen;
     lastMove = [from, to];
+
+    // Coached mode: shallow-eval the move BEFORE pressing the clock to the opponent. If it looks
+    // like a blunder, pause on a non-blocking dialog — the player's own clock keeps running while
+    // they decide, and the opponent isn't charged for the deliberation (audit v2 W12/F5+F6).
+    if (coached && (await coachEvalBad())) {
+      coachOpen = true;
+      return;
+    }
+    await commitPlayerMove();
+  }
+
+  /** Finalize the player's move: press the clock to the opponent, then end-check / engine reply. */
+  async function commitPlayerMove() {
     if (clock) clock = press(clock, playerSideClock);
-
-    if (coached) await coachCheck();
-
     if (checkEnd()) return;
     await engineMove();
+  }
+
+  /** Coached take-back (non-blocking): undo the move; the player stays on move, on their own clock. */
+  function coachTakeBack() {
+    coachOpen = false;
+    game.undo();
+    fen = game.fen;
+    lastMove = null;
+    playedUci.pop();
+  }
+
+  /** Coached keep: dismiss the warning and play on. */
+  function coachKeep() {
+    coachOpen = false;
+    void commitPlayerMove();
+  }
+
+  /** Quick shallow eval (coached mode, best-effort): true if the move looks like a blunder. Does
+   *  NOT block or touch the clock — onMove decides what to do with the verdict (audit v2 W12). */
+  async function coachEvalBad(): Promise<boolean> {
+    try {
+      const evalRes = await app.engine.evaluate(
+        variant === 'chess960' ? game.fenForEngine() : game.fen,
+        { depth: 8, fullStrength: true },
+      );
+      const cp = evalRes.whiteCp;
+      return playerColor === 'white' ? cp < -250 : cp > 250;
+    } catch {
+      return false; // an eval failure must never block play
+    }
   }
 
   async function engineMove() {
@@ -313,30 +358,6 @@
     }
     thinking = false;
     if (!checkEnd()) status = 'playing';
-  }
-
-  /** Coached mode (Phase 1, best-effort): quick shallow eval; warn on a big drop. */
-  async function coachCheck() {
-    try {
-      const evalRes = await app.engine.evaluate(variant === 'chess960' ? game.fenForEngine() : game.fen, { depth: 8, fullStrength: true });
-      // After the player's move it is the opponent's turn; a very negative
-      // White-POV score (for a white player) means the move likely blundered.
-      const cp = evalRes.whiteCp;
-      const bad = playerColor === 'white' ? cp < -250 : cp > 250;
-      if (bad) {
-        const undo = confirm('Coach: that move looks like it loses material or worse. Take it back?');
-        if (undo) {
-          game.undo();
-          fen = game.fen;
-          lastMove = null;
-          status = 'playing';
-          throw new Error('__takeback__');
-        }
-      }
-    } catch (e) {
-      if (e instanceof Error && e.message === '__takeback__') throw e;
-      // eval failure shouldn't block play
-    }
   }
 
   function checkEnd(): boolean {
@@ -421,10 +442,8 @@
         aStatus = 'done';
         return;
       }
-      // The opponent left the engine at a limited Elo — restore full strength to analyse.
-      // Also reset UCI_Chess960 so analysis never runs in 960 mode (AP-960-4).
-      await app.engine.init();
-      app.engine.setOption('UCI_LimitStrength', false);
+      // Analysis forces full strength per call (the fullStrength flag, audit v2 W1/F4); here we
+      // only clear 960 mode so analysis never runs in 960 (AP-960-4). resetVariant boots if needed.
       await app.engine.resetVariant();
 
       const res = await runAnalysis(app.engine, app.puzzles, {
@@ -602,6 +621,16 @@
     mistakes into puzzles and updates your weakness dashboard (nothing to paste). The bot then steers
     future openings toward whatever you're weakest at.
   </p>
+
+  <ConfirmDialog
+    open={coachOpen && status === 'playing'}
+    title="Coach"
+    body="That move looks like it loses material or worse."
+    confirmLabel="Take it back"
+    cancelLabel="Keep playing"
+    onConfirm={coachTakeBack}
+    onCancel={coachKeep}
+  />
 </section>
 
 <style>
