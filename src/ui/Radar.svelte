@@ -1,6 +1,7 @@
 <script lang="ts">
   // Minimal dependency-free SVG radar chart for the weakness dimensions.
   import type { DimensionScore } from '../analysis/weakness';
+  import { t } from '../i18n';
 
   interface Props {
     dimensions: DimensionScore[];
@@ -12,14 +13,8 @@
   const cy = $derived(size / 2);
   const r = $derived(size * 0.36);
 
-  const labels: Record<string, string> = {
-    tactics: 'Tactics',
-    openingAccuracy: 'Opening',
-    endgameConversion: 'Endgame',
-    timeManagement: 'Time',
-    resilience: 'Resilience',
-  };
-
+  // Dimension labels resolve through the bilingual catalogue (dimShort.* — abbreviated for
+  // the chart), so the radar follows the language switch and stays single-sourced (V2-W18).
   function point(i: number, value01: number): [number, number] {
     const n = dimensions.length;
     const angle = -Math.PI / 2 + (i / n) * 2 * Math.PI;
@@ -51,7 +46,7 @@
     {@const na = d.sampleSize === 0}
     {@const [lx, ly] = point(i, 1.18)}
     <text x={lx} y={ly} class="label" class:na text-anchor="middle" dominant-baseline="middle">
-      {labels[d.dimension] ?? d.dimension}
+      {t('dimShort.' + d.dimension)}
       {#if na}<tspan x={lx} dy="1.15em" class="na-tag">n/a</tspan>{/if}
     </text>
     {@const [dx, dy] = point(i, na ? 0.02 : d.score / 100)}

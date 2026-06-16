@@ -7,6 +7,7 @@ import { loadPlayerModel, savePlayerModel, loadSettings, saveSettings } from '..
 import { dueCount } from '../srs/SrsStore';
 import type { PlayerModel, SettingsRecord } from '../store/db';
 import type { SessionPlan } from '../analysis/session';
+import { setLocaleState, type Locale } from '../i18n';
 
 export type View =
   | 'home'
@@ -69,6 +70,8 @@ class AppState {
     try {
       this.model = await loadPlayerModel(now);
       this.settings = await loadSettings();
+      // Apply the persisted UI language before the first render (V2-W18). Default FR.
+      setLocaleState(this.settings.locale ?? 'fr');
       await this.puzzles.init();
       await this.refreshDue(now);
       // First run → route to onboarding (launch-time skill evaluation).
@@ -101,6 +104,15 @@ class AppState {
 
   async persistSettings(): Promise<void> {
     if (this.settings) await saveSettings($state.snapshot(this.settings));
+  }
+
+  /** Switch UI language (V2-W18): update the live locale + <html lang>, then persist. */
+  async setLocale(locale: Locale): Promise<void> {
+    setLocaleState(locale);
+    if (this.settings) {
+      this.settings.locale = locale;
+      await this.persistSettings();
+    }
   }
 }
 

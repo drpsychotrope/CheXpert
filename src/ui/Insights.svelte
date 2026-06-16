@@ -10,15 +10,18 @@
   import { motifEfficacy, type EfficacyReadout } from '../analysis/efficacy';
   import { poolRating } from '../store/playerModel';
   import { allAttempts } from '../store/attemptsRepo';
-  import { calibration, SELF_TAG_LABELS, type Calibration, type MetacogAttempt } from '../metacog/metacog';
+  import { calibration, type MetacogAttempt } from '../metacog/metacog';
+  import { t, fmtPct, getLocale } from '../i18n';
 
   let loading = $state(true);
   let leaks = $state<Leak[]>([]);
   let trend = $state<TrendPoint[]>([]);
   let weakest = $state<Dimension | null>(null);
   let minutes = $state(30);
-  let cal = $state<Calibration | null>(null);
+  let attempts = $state<MetacogAttempt[]>([]);
   let analysesAll = $state<import('../analysis/types').GameAnalysis[]>([]);
+  // Derived so the calibration readout follows the language switch (recomputes on locale change).
+  const cal = $derived(calibration(attempts, { locale: getLocale() }));
 
   // Descriptive before/after miss-rate for the top ~3 leaks (Q-D windows + minMoves gate).
   const efficacy = $derived<EfficacyReadout[]>(
@@ -30,9 +33,6 @@
   const plan = $derived(buildStudyPlan(leaks, weakest, minutes));
 
   const DIMS: Dimension[] = ['tactics', 'openingAccuracy', 'endgameConversion', 'timeManagement', 'resilience'];
-  const dimLabel: Record<Dimension, string> = {
-    tactics: 'Tactics', openingAccuracy: 'Opening', endgameConversion: 'Endgame', timeManagement: 'Time', resilience: 'Resilience',
-  };
 
   onMount(async () => {
     const analyses = await loadAllAnalyses();
@@ -42,8 +42,7 @@
       trend = weaknessTrend(analyses, { window: 5, rating: model ? poolRating(model, 'classical').rating : 1200 });
       weakest = buildWeaknessProfile(analyses, model ? poolRating(model, 'classical').rating : 1200).weakest;
     }
-    const attempts = (await allAttempts()) as MetacogAttempt[];
-    cal = calibration(attempts);
+    attempts = (await allAttempts()) as MetacogAttempt[];
     loading = false;
   });
 
@@ -68,41 +67,39 @@
 </script>
 
 <section class="col" style="max-width:680px;margin:0 auto">
-  <h2>Insights</h2>
+  <h2>{t('insights.title')}</h2>
   {#if loading}
-    <p class="muted">Loading…</p>
+    <p class="muted">{t('insights.loading')}</p>
   {:else if leaks.length === 0 && trend.length === 0}
     <div class="panel col center">
-      <p>No analysed games yet.</p>
-      <p class="muted">Play and analyse games — your recurring leaks, a study plan, and your progress appear here.</p>
-      <button onclick={() => app.go('play')}>Play a game →</button>
+      <p>{t('insights.noGamesTitle')}</p>
+      <p class="muted">{t('insights.noGamesBody')}</p>
+      <button onclick={() => app.go('play')}>{t('insights.playGame')}</button>
     </div>
   {:else}
-    <button onclick={() => app.go('session')} style="align-self:flex-start">▶ Start session</button>
-    <button onclick={() => app.go('coach')} style="align-self:flex-start">▶ Coaching assessment</button>
-    <h3>Your top leaks</h3>
+    <button onclick={() => app.go('session')} style="align-self:flex-start">{t('insights.startSession')}</button>
+    <button onclick={() => app.go('coach')} style="align-self:flex-start">{t('insights.coachingAssessment')}</button>
+    <h3>{t('insights.topLeaks')}</h3>
     {#if leaks.length}
       <div class="col" style="gap:0.3rem">
         {#each leaks as l (l.key)}
           <div class="row panel" style="justify-content:space-between;align-items:center;gap:1rem">
             <div>
               <b>{l.motif}</b> <span class="muted" style="font-size:0.8rem">{l.phase}</span><br />
-              <span class="muted" style="font-size:0.82rem">{l.count}× · avg −{Math.round(l.avgWpl)}% win</span>
+              <span class="muted" style="font-size:0.82rem">{t('insights.leakStat', { count: l.count, pct: fmtPct(l.avgWpl) })}</span>
             </div>
-            <button onclick={() => drillLeak(l)}>Drill</button>
+            <button onclick={() => drillLeak(l)}>{t('insights.drill')}</button>
           </div>
         {/each}
       </div>
     {:else}
-      <p class="muted">Not enough flagged mistakes yet.</p>
+      <p class="muted">{t('insights.notEnoughMistakes')}</p>
     {/if}
 
     {#if efficacy.length}
-      <h3>Did it move?</h3>
+      <h3>{t('insights.didItMove')}</h3>
       <p class="muted" style="font-size:0.75rem">
-        Descriptive, not proof. This shows your before/after miss-rate; it does not prove the training
-        caused the change. "Personalised beats generic" stays plausible, not proven — the data is local so
-        you can watch it for yourself.
+        {t('insights.didItMoveBody')}
       </p>
       <div class="col" style="gap:0.3rem">
         {#each efficacy as e (e.motifKey)}
@@ -110,9 +107,9 @@
             <b>{e.label}</b>
             {#if e.enoughData}
               <span style="font-size:0.85rem">
-                miss rate {Math.round(e.early.missRate * 100)}% → {Math.round(e.recent.missRate * 100)}%
+                {t('insights.missRate', { early: fmtPct(e.early.missRate * 100), recent: fmtPct(e.recent.missRate * 100) })}
                 <span style="color:{e.deltaPct <= 0 ? 'var(--good)' : 'var(--bad)'}">
-                  ({e.deltaPct <= 0 ? '' : '+'}{Math.round(e.deltaPct * 100)} pts)
+                  {t('insights.deltaPts', { sign: e.deltaPct <= 0 ? '' : '+', pts: Math.round(e.deltaPct * 100) })}
                 </span>
               </span>
               <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:80px;height:20px;background:var(--panel-2);border-radius:3px;vertical-align:middle">
@@ -121,10 +118,10 @@
                   fill="none" stroke="var(--accent)" stroke-width="3" vector-effect="non-scaling-stroke" />
               </svg>
               <br /><span class="muted" style="font-size:0.75rem">
-                {e.early.misses}/{e.early.playerMoves} early · {e.recent.misses}/{e.recent.playerMoves} recent
+                {t('insights.earlyRecent', { earlyMisses: e.early.misses, earlyMoves: e.early.playerMoves, recentMisses: e.recent.misses, recentMoves: e.recent.playerMoves })}
               </span>
             {:else}
-              <span class="muted" style="font-size:0.8rem">too little data to read a trend</span>
+              <span class="muted" style="font-size:0.8rem">{t('insights.tooLittleData')}</span>
             {/if}
           </div>
         {/each}
@@ -132,68 +129,68 @@
     {/if}
 
     <h3>
-      Study plan
+      {t('insights.studyPlan')}
       <select bind:value={minutes} style="margin-left:0.5rem">
-        <option value={15}>15 min</option>
-        <option value={30}>30 min</option>
-        <option value={60}>60 min</option>
+        <option value={15}>{t('insights.min15')}</option>
+        <option value={30}>{t('insights.min30')}</option>
+        <option value={60}>{t('insights.min60')}</option>
       </select>
     </h3>
     <div class="col" style="gap:0.2rem">
       {#each plan as item}
         <div class="panel">
-          <b>{item.minutes}m · {item.activity}</b> — {item.focus}<br />
+          <b>{t('insights.planItem', { minutes: item.minutes, activity: item.activity })}</b> — {item.focus}<br />
           <span class="muted" style="font-size:0.8rem">{item.reason}</span>
         </div>
       {/each}
     </div>
 
     {#if trend.length >= 2}
-      <h3>Progress <span class="muted" style="font-size:0.8rem">({trend.length} windows of games)</span></h3>
+      <h3>{t('insights.progress')} <span class="muted" style="font-size:0.8rem">{t('insights.windowsOfGames', { n: trend.length })}</span></h3>
       <div class="col" style="gap:0.3rem">
         {#each DIMS as d}
           <div class="row" style="align-items:center;gap:0.6rem">
-            <span style="width:90px;font-size:0.82rem">{dimLabel[d]}</span>
+            <span style="width:90px;font-size:0.82rem">{t('dimShort.' + d)}</span>
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:120px;height:24px;background:var(--panel-2);border-radius:3px">
               <polyline points={spark(d)} fill="none" stroke="var(--accent)" stroke-width="3" vector-effect="non-scaling-stroke" />
             </svg>
             <span style="font-size:0.82rem;color:{delta(d) >= 0 ? 'var(--good)' : 'var(--bad)'}">{delta(d) >= 0 ? '+' : ''}{delta(d)}</span>
           </div>
         {/each}
-        <p class="muted" style="font-size:0.75rem">Score per window (higher = stronger). Directional, not a grade.</p>
+        <p class="muted" style="font-size:0.75rem">{t('insights.scorePerWindow')}</p>
       </div>
     {/if}
 
     {#if metacog && cal && cal.reportedAttempts > 0}
-      <h3>Calibration</h3>
+      <h3>{t('insights.calibration')}</h3>
       {#if cal.readout}
         <div class="panel col" style="gap:0.4rem">
           <p>{cal.readout.sentence}</p>
           <div class="col" style="gap:0.15rem">
             {#each cal.byConfidence as r}
               <div class="row" style="align-items:center;gap:0.6rem">
-                <span style="width:80px;font-size:0.82rem;text-transform:capitalize">{r.confidence}</span>
-                <span style="font-size:0.82rem">{r.n ? Math.round(r.accuracy * 100) + '%' : '—'}</span>
+                <span style="width:80px;font-size:0.82rem;text-transform:capitalize">{t(r.confidence === 'sure' ? 'metacog.wordSure' : r.confidence === 'unsure' ? 'metacog.wordUnsure' : 'metacog.wordGuess')}</span>
+                <span style="font-size:0.82rem">{r.n ? fmtPct(r.accuracy * 100) : '—'}</span>
                 <span class="muted" style="font-size:0.78rem">({r.correct}/{r.n})</span>
               </div>
             {/each}
           </div>
           {#if cal.readout.topCause}
-            <p style="font-size:0.85rem">Most common self-diagnosed cause:
-              <b>{SELF_TAG_LABELS[cal.readout.topCause.tag]}</b> ({Math.round(cal.readout.topCause.pct * 100)}% of tagged misses).
+            <p style="font-size:0.85rem">{t('insights.topCause')}
+              <b>{t('selfTag.' + cal.readout.topCause.tag)}</b> {t('insights.topCausePct', { pct: fmtPct(cal.readout.topCause.pct * 100) })}
             </p>
           {/if}
           {#if cal.selfTags.length}
             <div class="col" style="gap:0.1rem">
-              {#each cal.selfTags as t}
-                <span class="muted" style="font-size:0.8rem">{SELF_TAG_LABELS[t.tag]} — {t.n} ({Math.round(t.pct * 100)}%)</span>
+              {#each cal.selfTags as tag}
+                <span class="muted" style="font-size:0.8rem">{t('insights.selfTagLine', { label: t('selfTag.' + tag.tag), n: tag.n, pct: fmtPct(tag.pct * 100) })}</span>
               {/each}
             </div>
           {/if}
-          <p class="muted" style="font-size:0.75rem">Descriptive, not a grade — this reflects how your confidence lines up with your results.</p>
+          <p class="muted" style="font-size:0.75rem">{t('insights.calibrationDescriptive')}</p>
         </div>
       {:else}
-        <p class="muted">Calibration needs a few more reported attempts ({cal.reportedAttempts}/10 so far).</p>
+        <p class="muted">{t('insights.calibrationNeedsMore', { reported: cal.reportedAttempts })}</p>
       {/if}
     {/if}
   {/if}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import Board from './Board.svelte';
   import type { ConceptCard } from '../concepts/concepts';
+  import { t } from '../i18n';
 
   interface Props {
     card: ConceptCard;
@@ -22,7 +23,7 @@
   <header class="row">
     <h3>{card.title}</h3>
     {#if onClose}
-      <button class="link" onclick={onClose}>dismiss</button>
+      <button class="link" onclick={onClose}>{t('concepts.dismiss')}</button>
     {/if}
   </header>
   <p class="idea">{card.idea}</p>

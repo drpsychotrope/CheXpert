@@ -4,6 +4,7 @@
   // opponent distinguished; click/Enter selects a ply. NO global accuracy grade.
   import type { GameAnalysis } from '../analysis/types';
   import { winCurve } from '../analysis/criticalMoments';
+  import { t, fmtPct } from '../i18n';
 
   interface Props {
     analysis: GameAnalysis;
@@ -40,7 +41,7 @@
         cy: y(curve[i].winPct),
         severity: p.severity,
         side: p.color === analysis.playerColor ? 'player' : 'opponent',
-        label: `Move ${p.moveNumber} ${p.san}: ${p.severity}, −${Math.round(p.winProbLoss)}% win`,
+        label: t('evalGraph.markerLabel', { move: p.moveNumber, san: p.san, severity: p.severity, pct: fmtPct(p.winProbLoss) }),
       })),
   );
 
@@ -50,7 +51,7 @@
 </script>
 
 <figure class="eval-graph">
-  <svg viewBox="0 0 {W} {H}" role="img" aria-label="Your winning chances across the game">
+  <svg viewBox="0 0 {W} {H}" role="img" aria-label={t('evalGraph.ariaLabel')}>
     <!-- 50% reference line -->
     <line x1={PAD} y1={y(50)} x2={W - PAD} y2={y(50)} class="mid" />
     {#if n > 1}
@@ -71,8 +72,7 @@
     {/each}
   </svg>
   <figcaption class="muted">
-    Your winning chances over the game. Dots are your (filled) and the opponent's (hollow)
-    mistakes — click one. No single "accuracy" grade: these are directional pointers.
+    {t('evalGraph.caption')}
   </figcaption>
 </figure>
 

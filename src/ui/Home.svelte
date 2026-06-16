@@ -1,47 +1,48 @@
 <script lang="ts">
   import { app } from '../state/app.svelte';
   import { poolRating } from '../store/playerModel';
+  import { t } from '../i18n';
 
   const model = $derived(app.model);
   const classical = $derived(model ? poolRating(model, 'classical') : null);
 </script>
 
 <section class="home">
-  <h1>Chess Trainer</h1>
-  <p class="tagline">One job: make you stronger. Play slow, analyse, drill your real weaknesses.</p>
+  <h1>{t('home.title')}</h1>
+  <p class="tagline">{t('home.tagline')}</p>
 
   {#if model}
     <div class="ratings">
       <div class="rating-card">
-        <span class="label">Game rating</span>
+        <span class="label">{t('home.gameRating')}</span>
         <span class="val">{classical ? Math.round(classical.rating) : '—'}</span>
         <span class="rd">±{classical ? Math.round(classical.rd) : '—'}</span>
       </div>
       <div class="rating-card">
-        <span class="label">Puzzle rating</span>
+        <span class="label">{t('home.puzzleRating')}</span>
         <span class="val">{Math.round(model.puzzleRating.rating)}</span>
         <span class="rd">±{Math.round(model.puzzleRating.rd)}</span>
       </div>
     </div>
-    <p class="note">Puzzle rating measures pattern recognition, not playing strength — they differ.</p>
+    <p class="note">{t('home.puzzleNote')}</p>
   {/if}
 
   <div class="actions">
-    <button onclick={() => app.go('play')}>Play the adaptive bot</button>
-    <button onclick={() => app.go('session')}>Today's session</button>
-    <button onclick={() => app.go('insights')}>Insights</button>
-    <button onclick={() => app.go('tactics')}>Train tactics</button>
-    <button onclick={() => app.go('review')}>Review (spaced repetition){#if app.dueReview > 0} · {app.dueReview} due{/if}</button>
-    <button onclick={() => app.go('woodpecker')}>Woodpecker (speed drills)</button>
-    <button onclick={() => app.go('import')}>Analyse a game</button>
-    <button onclick={() => app.go('dashboard')}>Weakness dashboard</button>
-    <button onclick={() => app.go('coach')}>Personal coaching</button>
-    <button onclick={() => app.go('endgames')}>Endgame trainer</button>
-    <button onclick={() => app.go('repertoire')}>Opening repertoire</button>
-    <button onclick={() => app.go('guess')}>Guess the move</button>
-    <button onclick={() => app.go('vision')}>Calculation & vision</button>
-    <button class="ghost" onclick={() => app.go('onboarding')}>Re-run skill evaluation</button>
-    <button class="ghost" onclick={() => app.go('settings')}>Settings</button>
+    <button onclick={() => app.go('play')}>{t('home.playBot')}</button>
+    <button onclick={() => app.go('session')}>{t('home.todaysSession')}</button>
+    <button onclick={() => app.go('insights')}>{t('home.insights')}</button>
+    <button onclick={() => app.go('tactics')}>{t('home.trainTactics')}</button>
+    <button onclick={() => app.go('review')}>{t('home.review')}{#if app.dueReview > 0} · {t('home.reviewDue', { n: app.dueReview })}{/if}</button>
+    <button onclick={() => app.go('woodpecker')}>{t('home.woodpecker')}</button>
+    <button onclick={() => app.go('import')}>{t('home.analyseGame')}</button>
+    <button onclick={() => app.go('dashboard')}>{t('home.weaknessDashboard')}</button>
+    <button onclick={() => app.go('coach')}>{t('home.personalCoaching')}</button>
+    <button onclick={() => app.go('endgames')}>{t('home.endgameTrainer')}</button>
+    <button onclick={() => app.go('repertoire')}>{t('home.openingRepertoire')}</button>
+    <button onclick={() => app.go('guess')}>{t('home.guessMove')}</button>
+    <button onclick={() => app.go('vision')}>{t('home.calcVision')}</button>
+    <button class="ghost" onclick={() => app.go('onboarding')}>{t('home.rerunEval')}</button>
+    <button class="ghost" onclick={() => app.go('settings')}>{t('home.settings')}</button>
   </div>
 </section>
 

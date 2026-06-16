@@ -4,6 +4,7 @@
   import { parsePgn, inferPlayerColor } from '../analysis/pgn';
   import { runAnalysis } from '../analysis/runAnalysis';
   import type { GameAnalysis } from '../analysis/types';
+  import { t, fmtNum } from '../i18n';
 
   let pgn = $state('');
   let playerName = $state('');
@@ -46,12 +47,12 @@
       const games = pgn.split(/\n\s*\n(?=\[Event\s)/i).map((s) => s.trim()).filter(Boolean);
       const source = games.length > 1 ? games[0] : pgn;
       if (games.length > 1) {
-        notice = `Detected ${games.length} games — analysing the first. Paste one game at a time for the rest.`;
+        notice = t('import.detectedGames', { n: games.length });
       }
       const parsed = parsePgn(source); // throws on malformed
       if (parsed.plies.length === 0) {
         // Headers-only / move-less PGN — don't persist an all-zeros junk analysis (audit v2 L21).
-        error = 'No moves found in this PGN.';
+        error = t('import.noMoves');
         status = 'error';
         return;
       }
@@ -62,10 +63,10 @@
         if (!detected) {
           // Don't silently default to White — a Black-side game analysed from White's POV
           // corrupts every player-attributed metric and the weakness profile (audit v2 C-3 / P0-02).
-          error =
-            `Couldn't auto-detect your colour (White: "${parsed.headers.White ?? '?'}", ` +
-            `Black: "${parsed.headers.Black ?? '?'}"). Type your name as it appears in the PGN, ` +
-            `or pick White/Black above, then Analyse again.`;
+          error = t('import.colorNotDetected', {
+            white: parsed.headers.White ?? '?',
+            black: parsed.headers.Black ?? '?',
+          });
           status = 'error';
           return;
         }
@@ -127,54 +128,51 @@
 </script>
 
 <section class="col" style="max-width:680px;margin:0 auto">
-  <h2>Analyse a game</h2>
+  <h2>{t('import.title')}</h2>
   <p class="muted">
-    Paste a PGN from an external game. We run the engine locally over every move, flag your
-    inaccuracies / mistakes / blunders, tag the missed idea, and turn your real mistakes into
-    personalised puzzles. Nothing leaves your device. (Games you play in <b>Play</b> can be analysed
-    in one click — no paste needed.)
+    {t('import.introBefore')}<b>{t('import.playTab')}</b>{t('import.introAfter')}
   </p>
 
   <textarea
     bind:value={pgn}
     rows="8"
-    placeholder="Paste PGN here…"
+    placeholder={t('import.pgnPlaceholder')}
     style="width:100%;font-family:monospace;font-size:0.85rem"
   ></textarea>
 
   <div class="row">
     <label style="flex:1">
-      Your name in the PGN (optional)
-      <input bind:value={playerName} placeholder="e.g. You" />
+      {t('import.nameLabel')}
+      <input bind:value={playerName} placeholder={t('import.namePlaceholder')} />
     </label>
     <label>
-      You played
+      {t('import.youPlayed')}
       <select bind:value={colorChoice}>
-        <option value="auto">Auto-detect</option>
-        <option value="w">White</option>
-        <option value="b">Black</option>
+        <option value="auto">{t('import.autoDetect')}</option>
+        <option value="w">{t('import.white')}</option>
+        <option value="b">{t('import.black')}</option>
       </select>
     </label>
   </div>
 
   <div class="row">
     <button onclick={analyze} disabled={status === 'analyzing' || pgn.trim().length === 0}>
-      {status === 'analyzing' ? 'Analysing…' : 'Analyse'}
+      {status === 'analyzing' ? t('import.analysing') : t('import.analyse')}
     </button>
     <button class="ghost" onclick={() => (pgn = SAMPLE)} disabled={status === 'analyzing'}>
-      Load sample
+      {t('import.loadSample')}
     </button>
   </div>
 
   {#if status === 'analyzing'}
     <div class="panel">
-      <p>Analysing position {progress} / {total}…</p>
+      <p>{t('import.progress', { progress, total })}</p>
       <div class="bar"><div class="bar-fill" style="width:{total ? (progress / total) * 100 : 0}%"></div></div>
     </div>
   {/if}
 
   {#if status === 'error'}
-    <p class="feedback bad">Could not analyse: {error}</p>
+    <p class="feedback bad">{t('import.couldNotAnalyse', { error })}</p>
   {/if}
 
   {#if notice}
@@ -183,8 +181,8 @@
 
   {#if status === 'done' && result}
     <div class="panel col">
-      <h3>Result</h3>
-      <p class="muted">Analysed in {(elapsedMs / 1000).toFixed(1)}s ({result.movetimeMs}ms/ply)</p>
+      <h3>{t('import.resultTitle')}</h3>
+      <p class="muted">{t('import.analysedIn', { seconds: fmtNum(elapsedMs / 1000, 1), ms: result.movetimeMs })}</p>
       <AnalysisResult analysis={result} {puzzlesMade} />
     </div>
   {/if}

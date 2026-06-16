@@ -1,10 +1,16 @@
 // Coach program core (ADR-0045). PURE. Turns a CoachProfile into a worst-first,
 // budgeted PlanItem[] routed to drills AND game modes. Deliberately does NOT call
 // or mutate buildStudyPlan — Insights stays byte-identical (AP-COACH-1).
+//
+// V2-W18 (F3): the `reason` display strings are bilingual via an INJECTED `locale`.
+// `activity`/`focus` are STABLE routing keys (focus feeds tacticsFilterThemes) — never translated.
+// Fixes P3-19: the motif name in a reason now goes through the motif label, not the raw key.
 
 import type { PlanItem } from '../analysis/studyPlan';
 import type { Leak } from '../analysis/fingerprint';
 import type { CoachProfile } from './types';
+import { gt } from '../i18n/gen';
+import type { Locale } from '../i18n/translate';
 
 const WEAKNESS_DELTA = -40;
 const WEAKNESS_DIM = 35;
@@ -33,7 +39,7 @@ export function profileToLeaks(profile: CoachProfile): Leak[] {
     }));
 }
 
-export function buildCoachProgram(profile: CoachProfile, minutes = 30): PlanItem[] {
+export function buildCoachProgram(profile: CoachProfile, minutes = 30, locale: Locale = 'fr'): PlanItem[] {
   const plan: PlanItem[] = [];
   let used = 0;
   const take = (m: number) => Math.min(m, Math.max(0, minutes - used));
@@ -44,9 +50,14 @@ export function buildCoachProgram(profile: CoachProfile, minutes = 30): PlanItem
     const mins = take(8);
     if (mins <= 0) break;
     if (m.theme === 'endgame') {
-      plan.push({ activity: 'endgames', focus: 'endgame conversion', minutes: mins, reason: `Endgame puzzles −${-m.delta} vs your baseline — drill conversion.` });
+      plan.push({ activity: 'endgames', focus: 'endgame conversion', minutes: mins, reason: gt('program.endgameDrill', locale, { delta: -m.delta }) });
     } else {
-      plan.push({ activity: 'tactics', focus: m.theme, minutes: mins, reason: `${m.theme} −${-m.delta} vs your baseline — drill the pattern.` });
+      plan.push({
+        activity: 'tactics',
+        focus: m.theme,
+        minutes: mins,
+        reason: gt('program.motifDrill', locale, { motif: gt('motif.' + m.theme, locale), delta: -m.delta }),
+      });
     }
     used += mins;
   }
@@ -56,21 +67,21 @@ export function buildCoachProgram(profile: CoachProfile, minutes = 30): PlanItem
   for (const d of weakDims) {
     if (used >= minutes) break;
     if (d.dimension === 'endgameConversion') {
-      const m = take(8); if (m > 0) { plan.push({ activity: 'endgames', focus: 'endgame conversion', minutes: m, reason: `Endgame conversion is a weak spot (score ${d.score}).` }); used += m; }
+      const m = take(8); if (m > 0) { plan.push({ activity: 'endgames', focus: 'endgame conversion', minutes: m, reason: gt('program.endgameConversion', locale, { score: d.score }) }); used += m; }
     } else if (d.dimension === 'openingAccuracy') {
-      const m1 = take(6); if (m1 > 0) { plan.push({ activity: 'repertoire', focus: 'opening lines', minutes: m1, reason: `Opening accuracy is a weak spot (score ${d.score}).` }); used += m1; }
-      const m2 = take(8); if (m2 > 0) { plan.push({ activity: 'play-steered', focus: 'openingAccuracy', minutes: m2, reason: 'Play a game where the bot steers into your opening gap.' }); used += m2; }
+      const m1 = take(6); if (m1 > 0) { plan.push({ activity: 'repertoire', focus: 'opening lines', minutes: m1, reason: gt('program.openingAccuracy', locale, { score: d.score }) }); used += m1; }
+      const m2 = take(8); if (m2 > 0) { plan.push({ activity: 'play-steered', focus: 'openingAccuracy', minutes: m2, reason: gt('program.openingSteer', locale) }); used += m2; }
     } else if (d.dimension === 'timeManagement') {
-      const m = take(6); if (m > 0) { plan.push({ activity: 'tactics', focus: 'time', minutes: m, reason: `Time management is a weak spot (score ${d.score}) — solve under a clock.` }); used += m; }
+      const m = take(6); if (m > 0) { plan.push({ activity: 'tactics', focus: 'time', minutes: m, reason: gt('program.timeManagement', locale, { score: d.score }) }); used += m; }
     } else if (d.dimension === 'resilience') {
-      const m = take(8); if (m > 0) { plan.push({ activity: 'comeback', focus: 'defend & recover', minutes: m, reason: `Resilience is a weak spot (score ${d.score}) — practise worse positions.` }); used += m; }
+      const m = take(8); if (m > 0) { plan.push({ activity: 'comeback', focus: 'defend & recover', minutes: m, reason: gt('program.resilience', locale, { score: d.score }) }); used += m; }
     }
     // 'tactics' dim intentionally skipped — covered by per-motif steps.
   }
 
   // 3) Nothing flagged → light maintenance.
   if (plan.length === 0) {
-    plan.push({ activity: 'tactics', focus: 'mixed', minutes: Math.min(10, minutes), reason: 'No clear weakness surfaced — keep your pattern recognition sharp.' });
+    plan.push({ activity: 'tactics', focus: 'mixed', minutes: Math.min(10, minutes), reason: gt('program.maintenance', locale) });
   }
   return plan;
 }

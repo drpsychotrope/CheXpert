@@ -26,6 +26,7 @@
   import { resolveColor, type ColorChoice } from '../game/color';
   import { applyGameResult, botMovetime, flagOutcome } from '../game/playSession';
   import ConfirmDialog from './ConfirmDialog.svelte';
+  import { t } from '../i18n';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   let game = $state(new ChessGame());
@@ -150,7 +151,7 @@
       game = new ChessGame(startFen960, { variant: 'chess960', castle: castle960 });
       opening = null; // no opening book / steering for 960 (no theory)
       app.steerDimension = null; // discard any pending steer so it doesn't leak to a later standard game (M-1)
-      steerNote = `Chess960 · SP-ID ${pos.id} · drag the king onto its own rook to castle`;
+      steerNote = t('play.chess960Steer', { id: pos.id });
     } else {
       game = new ChessGame();
       // Read the weakness profile (from analysed games) and steer the opening.
@@ -196,7 +197,7 @@
       // If the player is Black, the engine (White) makes the first move.
       if (turnColor() !== playerColor) await engineMove();
     } catch (e) {
-      result = 'Engine failed to start: ' + String(e);
+      result = t('play.engineFailedStart') + String(e);
       status = 'idle';
     }
   }
@@ -244,10 +245,10 @@
     status = 'over';
     const { outcome, draw } = flagOutcome(flaggedSide, playerSideClock, game.fen);
     result = draw
-      ? 'Flag — but insufficient mating material: draw (FIDE Art. 6.9).'
+      ? t('play.flagDraw')
       : flaggedSide === playerSideClock
-        ? 'You flagged — out of time.'
-        : 'Opponent flagged — you win on time! ♚';
+        ? t('play.flagYouLost')
+        : t('play.flagYouWin');
     await finishGame(outcome);
   }
 
@@ -346,7 +347,7 @@
         if (!san) {
           // Engine returned a move the rules layer rejected (desync/illegal). Halt rather
           // than advance a phantom move and corrupt the board/last-move (audit W6).
-          result = 'Engine returned an illegal move — game halted.';
+          result = t('play.engineIllegal');
           status = 'over';
           stopClockLoop();
           if (clock) clock = stopClock(clock);
@@ -361,7 +362,7 @@
     } catch {
       // The bot's move threw (worker crash / timeout). Don't fall back to 'playing' on the bot's
       // turn — that strands the game on a frozen board. Offer an explicit Retry (audit v2 P1-05).
-      result = 'Engine error — the bot could not move. Retry, or start a new game.';
+      result = t('play.engineError');
       engineError = true;
       thinking = false;
       return;
@@ -383,18 +384,18 @@
   }
 
   function checkEnd(): boolean {
-    const t = game.terminal();
-    if (!t.over) return false;
+    const term = game.terminal();
+    if (!term.over) return false;
     status = 'over';
     stopClockLoop();
     if (clock) clock = stopClock(clock);
     let outcome: GameOutcome;
-    if (t.reason === 'checkmate') {
-      outcome = t.winner === playerColor[0] ? 'win' : 'loss';
-      result = outcome === 'win' ? 'Checkmate — you win! ♚' : 'Checkmate — you lost.';
+    if (term.reason === 'checkmate') {
+      outcome = term.winner === playerColor[0] ? 'win' : 'loss';
+      result = outcome === 'win' ? t('play.checkmateWin') : t('play.checkmateLost');
     } else {
       outcome = 'draw';
-      result = `Draw (${t.reason}).`;
+      result = t('play.drawReason', { reason: term.reason ?? '' });
     }
     void finishGame(outcome);
     return true;
@@ -485,7 +486,7 @@
       aPuzzles = res.puzzles.length;
       aStatus = 'done';
     } catch (e) {
-      result = 'Analysis failed: ' + String(e);
+      result = t('play.analysisFailed') + String(e);
       aStatus = 'idle';
     }
   }
@@ -495,36 +496,36 @@
       status = 'over';
       stopClockLoop();
       if (clock) clock = stopClock(clock);
-      result = 'You resigned.';
+      result = t('play.youResigned');
       void finishGame('loss');
     }
   }
 </script>
 
 <section class="col center">
-  <h2>Play the adaptive bot</h2>
+  <h2>{t('play.title')}</h2>
   {#if model}
     <p class="muted">
-      Your {displayPool} rating {Math.round(poolRating(model, displayPool).rating)} · bot ≈ {poolOpponent(model, displayPool).targetElo} Elo
-      {#if coached}· <span style="color:var(--accent)">coached on</span>{/if}
+      {t('play.ratingLine', { pool: displayPool, rating: Math.round(poolRating(model, displayPool).rating), elo: poolOpponent(model, displayPool).targetElo })}
+      {#if coached}· <span style="color:var(--accent)">{t('play.coachedOn')}</span>{/if}
     </p>
   {/if}
 
   <div class="row center" style="gap:1rem;flex-wrap:wrap">
     <label class="muted" style="font-size:0.85rem">
-      Opponent:
+      {t('play.opponentLabel')}
       <select value={opponentStyle} onchange={(e) => setOpponentStyle(e.currentTarget.value === 'engine' ? 'engine' : 'human')}>
-        <option value="human">Human-like (varied moves)</option>
-        <option value="engine">Engine (best moves)</option>
+        <option value="human">{t('play.opponentHuman')}</option>
+        <option value="engine">{t('play.opponentEngine')}</option>
       </select>
     </label>
 
     <label class="muted" style="font-size:0.85rem">
-      Mode:
+      {t('play.modeLabel')}
       <select value={variant} disabled={live}
               onchange={(e) => (variant = e.currentTarget.value === 'chess960' ? 'chess960' : 'standard')}>
-        <option value="standard">Standard</option>
-        <option value="chess960">Chess960 (Wild)</option>
+        <option value="standard">{t('play.modeStandard')}</option>
+        <option value="chess960">{t('play.modeChess960')}</option>
       </select>
     </label>
 
@@ -534,15 +535,15 @@
 
     {#if variant === 'chess960'}
       <label class="muted" style="font-size:0.85rem">
-        Start (blank = random 960):
-        <input type="number" min="0" max="959" placeholder="0–959" bind:value={sp960Input}
+        {t('play.startLabel')}
+        <input type="number" min="0" max="959" placeholder={t('play.startPlaceholder')} bind:value={sp960Input}
                disabled={live} style="width:6rem" />
       </label>
     {/if}
 
     {#if variant !== 'chess960'}
       <label class="muted" style="font-size:0.85rem">
-        Time:
+        {t('play.timeLabel')}
         <select
           value={selectedTC.id}
           disabled={live}
@@ -556,12 +557,12 @@
 
       {#if selectedTC.id === 'custom'}
         <label class="muted" style="font-size:0.85rem">
-          min <input type="number" min="0" style="width:3.5rem" disabled={live}
+          {t('play.customMin')} <input type="number" min="0" style="width:3.5rem" disabled={live}
             oninput={(e) => { customInitialSec = Math.max(0, Number(e.currentTarget.value) * 60); }}
             value={customInitialSec / 60} />
         </label>
         <label class="muted" style="font-size:0.85rem">
-          +sec <input type="number" min="0" style="width:3.5rem" bind:value={customIncrementSec} disabled={live} />
+          {t('play.customInc')} <input type="number" min="0" style="width:3.5rem" bind:value={customIncrementSec} disabled={live} />
         </label>
       {/if}
     {/if}
@@ -575,7 +576,7 @@
   {/if}
 
   {#if variant !== 'chess960'}
-    <p class="muted" style="font-size:0.82rem">You play {playerColor === 'white' ? 'White' : 'Black'}</p>
+    <p class="muted" style="font-size:0.82rem">{playerColor === 'white' ? t('play.youPlayWhite') : t('play.youPlayBlack')}</p>
   {/if}
 
   <div class="board-wrap">
@@ -599,7 +600,7 @@
   </div>
 
   <p class="feedback {status === 'over' ? 'good' : ''}">
-    {#if thinking}Bot is thinking…{:else}{result}{/if}
+    {#if thinking}{t('play.botThinking')}{:else}{result}{/if}
   </p>
 
   {#if steerNote && status !== 'idle'}
@@ -608,29 +609,28 @@
 
   <div class="row center">
     {#if engineError}
-      <button onclick={retryEngineMove}>↻ Retry the bot's move</button>
+      <button onclick={retryEngineMove}>{t('play.retryBotMove')}</button>
     {/if}
     {#if status === 'idle' || status === 'over'}
-      <button onclick={newGame}>New game</button>
+      <button onclick={newGame}>{t('play.newGame')}</button>
     {:else}
-      <button onclick={resign} style="background:var(--bad)">Resign</button>
+      <button onclick={resign} style="background:var(--bad)">{t('play.resign')}</button>
     {/if}
     {#if status === 'over' && lastGame && variant !== 'chess960'}
       <button class="ghost" onclick={analyzePlayed} disabled={aStatus === 'analyzing'}>
-        {aStatus === 'analyzing' ? 'Analysing…' : aResult ? 'Re-analyse' : 'Analyse this game'}
+        {aStatus === 'analyzing' ? t('play.analysing') : aResult ? t('play.reanalyse') : t('play.analyseThisGame')}
       </button>
     {/if}
   </div>
   {#if status === 'over' && variant === 'chess960'}
     <p class="muted" style="font-size:0.8rem; max-width:440px">
-      Chess960 games aren't auto-analysed yet — the analysis pipeline assumes standard rules
-      and opening theory, so it would mislead. (Tracked for a future 960-aware analyser.)
+      {t('play.chess960NoAnalysis')}
     </p>
   {/if}
 
   {#if aStatus === 'analyzing'}
     <div class="panel" style="max-width:420px">
-      <p>Analysing position {aProgress} / {aTotal}…</p>
+      <p>{t('play.analysingPosition', { progress: aProgress, total: aTotal })}</p>
       <div class="bar"><div class="bar-fill" style="width:{aTotal ? (aProgress / aTotal) * 100 : 0}%"></div></div>
     </div>
   {/if}
@@ -642,17 +642,15 @@
   {/if}
 
   <p class="muted" style="font-size:0.8rem; max-width:440px">
-    Tip: play slowly and think. After the game, hit <b>Analyse this game</b> — one click turns your
-    mistakes into puzzles and updates your weakness dashboard (nothing to paste). The bot then steers
-    future openings toward whatever you're weakest at.
+    {@html t('play.tip')}
   </p>
 
   <ConfirmDialog
     open={coachOpen && status === 'playing'}
-    title="Coach"
-    body="That move looks like it loses material or worse."
-    confirmLabel="Take it back"
-    cancelLabel="Keep playing"
+    title={t('play.coachTitle')}
+    body={t('play.coachBody')}
+    confirmLabel={t('play.coachTakeBack')}
+    cancelLabel={t('play.coachKeep')}
     onConfirm={coachTakeBack}
     onCancel={coachKeep}
   />

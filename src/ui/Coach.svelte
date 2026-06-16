@@ -15,6 +15,7 @@
   import type { TacticalTrainer } from '../trainer/TacticalTrainer';
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
+  import { t, getLocale } from '../i18n';
 
   type Step = 'intro' | 'ladders' | 'offer-game' | 'game' | 'analysing' | 'result';
   let step = $state<Step>('intro');
@@ -89,11 +90,11 @@
     const res = trainer.playUserMove(uci);
     if (res === 'wrong') {
       ladder.report(false);
-      feedback = 'Missed.';
+      feedback = t('coach.missed');
       setTimeout(nextProbePuzzle, 450);
     } else if (res === 'solved') {
       ladder.report(true);
-      feedback = 'Solved ✔';
+      feedback = t('coach.solved');
       setTimeout(nextProbePuzzle, 400);
     } else {
       display = new ChessGame(trainer.getFen());
@@ -133,10 +134,10 @@
     gameFen = game.fen;
     opponent = new AdaptiveOpponent(app.engine, initOpponentState(baseline()));
     thinking = true;
-    info = 'Starting engine…';
+    info = t('coach.startingEngine');
     try {
       await opponent.applyStrength();
-      info = 'Your move — play naturally.';
+      info = t('coach.yourMove');
       thinking = false;
       if (coachSide === 'b') await botReply(); // engine (White) opens
     } catch {
@@ -157,7 +158,7 @@
 
   async function finishGame() {
     step = 'analysing';
-    info = 'Analysing your game…';
+    info = t('coach.analysingGame');
     let gameDimensions: DimensionScore[] | null = null;
     try {
       const { analysis } = await runAnalysis(app.engine, app.puzzles, {
@@ -178,9 +179,9 @@
   }
 
   async function commit(gameDimensions: DimensionScore[] | null) {
-    const p = buildCoachProfile({ puzzleRating: baseline(), probes, gameDimensions, assessedAt: Date.now() });
+    const p = buildCoachProfile({ puzzleRating: baseline(), probes, gameDimensions, assessedAt: Date.now(), locale: getLocale() });
     profile = p;
-    programPreview = buildCoachProgram(p, 30);
+    programPreview = buildCoachProgram(p, 30, getLocale());
     if (app.model) {
       // Reload from DB so any weaknessCounters fold written by runAnalysis(source:'played')
       // in finishGame() is preserved — persisting the stale boot snapshot would discard it (I-1).
@@ -201,17 +202,15 @@
 </script>
 
 <section class="col center" style="max-width:680px;margin:0 auto">
-  <h2>Personal coaching</h2>
+  <h2>{t('coach.title')}</h2>
 
   {#if step === 'intro'}
-    <p class="muted">A quick assessment — two puzzles per tactical motif (about 14) plus an optional short game —
-      then a program of drills and game modes aimed at your weak spots. Just play your best move on each:
-      solved or not, we read the attempt and move on. Directional, not a grade.</p>
-    <button onclick={startLadders} disabled={app.puzzles.size === 0}>Start the assessment →</button>
-    {#if app.puzzles.size === 0}<p class="muted">Loading puzzles…</p>{/if}
+    <p class="muted">{t('coach.intro')}</p>
+    <button onclick={startLadders} disabled={app.puzzles.size === 0}>{t('coach.startAssessment')}</button>
+    {#if app.puzzles.size === 0}<p class="muted">{t('coach.loadingPuzzles')}</p>{/if}
 
   {:else if step === 'ladders'}
-    <p class="muted">Theme {themeIdx + 1}/{THEMES.length} — <b>{THEMES[themeIdx].theme}</b> (2 puzzles). Play your best move; solved or not, we move on.</p>
+    <p class="muted">{t('coach.themeProgress', { current: themeIdx + 1, total: THEMES.length })}<b>{t('motif.' + THEMES[themeIdx].theme)}</b>{t('coach.themeProgressSuffix')}</p>
     <div class="board-wrap">
       <Board {fen} {orientation}
         turnColor={display.turn === 'w' ? 'white' : 'black'}
@@ -222,19 +221,18 @@
 
   {:else if step === 'offer-game'}
     <div class="panel col center">
-      <h3>Assessment puzzles done</h3>
-      <p class="muted">Optional: play a game (~24 moves) for a read on your opening, middlegame, and general play.
-        Endgame conversion, time, and resilience need full games — they show as “n/a” until you play more.</p>
+      <h3>{t('coach.assessmentDone')}</h3>
+      <p class="muted">{t('coach.offerGameBody')}</p>
       <ColorPicker bind:value={coachColorChoice} />
       <div class="row center">
-        <button onclick={startGame}>Play the game →</button>
-        <button style="background:transparent;border:1px solid var(--border)" onclick={finishWithoutGame}>Skip</button>
+        <button onclick={startGame}>{t('coach.playGame')}</button>
+        <button style="background:transparent;border:1px solid var(--border)" onclick={finishWithoutGame}>{t('coach.skip')}</button>
       </div>
     </div>
 
   {:else if step === 'game'}
     <p class="muted">{info}</p>
-    <p class="muted" style="font-size:0.82rem">You play {coachSide === 'w' ? 'White' : 'Black'}</p>
+    <p class="muted" style="font-size:0.82rem">{coachSide === 'w' ? t('coach.youPlayWhite') : t('coach.youPlayBlack')}</p>
     <div class="board-wrap">
       <Board fen={gameFen} orientation={coachSide === 'w' ? 'white' : 'black'}
         turnColor={game.turn === 'w' ? 'white' : 'black'}
@@ -242,29 +240,29 @@
         dests={!thinking && game.turn === coachSide ? game.dests() : new Map()}
         check={gameInCheck} onMove={onGameMove} />
     </div>
-    {#if thinking}<p class="feedback">Bot thinking…</p>{/if}
+    {#if thinking}<p class="feedback">{t('coach.botThinking')}</p>{/if}
 
   {:else if step === 'analysing'}
     <p class="muted">{info}</p>
 
   {:else if step === 'result' && profile}
     <div class="panel col center" style="gap:0.75rem;width:100%">
-      <h3>Your coaching profile</h3>
+      <h3>{t('coach.profileTitle')}</h3>
       <Radar dimensions={profile.dimensions} />
-      <p class="muted" style="font-size:0.8rem">Directional — built from {profile.source.ladders ? 'two puzzles per motif' : 'no puzzle data'}{profile.source.game ? ' + one short game' : ''}. Small samples; treat as "where to focus". Greyed “n/a” axes weren't measured by this assessment.</p>
+      <p class="muted" style="font-size:0.8rem">{t('coach.directional', { source: (profile.source.ladders ? t('coach.sourceLadders') : t('coach.sourceNoData')) + (profile.source.game ? t('coach.sourceGameSuffix') : '') })}</p>
       <div class="row" style="gap:1.5rem;align-items:flex-start">
-        <div class="col"><b>Strengths</b>{#each profile.strengths as s}<span>✔ {s}</span>{:else}<span class="muted">—</span>{/each}</div>
-        <div class="col"><b>Focus on</b>{#each profile.weaknesses as w}<span>△ {w}</span>{:else}<span class="muted">—</span>{/each}</div>
+        <div class="col"><b>{t('coach.strengths')}</b>{#each profile.strengths as s}<span>✔ {s}</span>{:else}<span class="muted">—</span>{/each}</div>
+        <div class="col"><b>{t('coach.focusOn')}</b>{#each profile.weaknesses as w}<span>△ {w}</span>{:else}<span class="muted">—</span>{/each}</div>
       </div>
-      <h4>Your program</h4>
+      <h4>{t('coach.yourProgram')}</h4>
       <ol style="text-align:left">
         {#each programPreview as item}
-          <li><b>{item.activity}</b> — {item.focus} <span class="muted">({item.minutes}m · {item.reason})</span></li>
+          <li><b>{item.activity}</b> — {item.focus} <span class="muted">{t('coach.programItemMeta', { minutes: item.minutes, reason: item.reason })}</span></li>
         {/each}
       </ol>
       <div class="row center">
-        <button onclick={startCoaching}>▶ Start coaching session</button>
-        <button style="background:transparent;border:1px solid var(--border)" onclick={() => app.go('home')}>Later</button>
+        <button onclick={startCoaching}>{t('coach.startSession')}</button>
+        <button style="background:transparent;border:1px solid var(--border)" onclick={() => app.go('home')}>{t('coach.later')}</button>
       </div>
     </div>
   {/if}

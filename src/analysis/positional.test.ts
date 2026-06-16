@@ -21,8 +21,10 @@ describe('positionalFeatures', () => {
 
 describe('explainPositional', () => {
   it('names present features honestly (and nothing on a clean position)', () => {
-    const phrases = explainPositional('7k/8/8/8/8/2P5/2P5/7K w - - 0 1', 'w');
+    const phrases = explainPositional('7k/8/8/8/8/2P5/2P5/7K w - - 0 1', 'w', 'en');
     expect(phrases.join(' ')).toMatch(/isolated|doubled|passed/i);
-    expect(explainPositional('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 'w')).toHaveLength(0);
+    expect(explainPositional('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 'w', 'en')).toHaveLength(0);
+    // FR: the same feature, localized (verb agreement baked per-locale).
+    expect(explainPositional('7k/8/8/8/8/2P5/2P5/7K w - - 0 1', 'w', 'fr').join(' ')).toMatch(/isolé|doublés|passé/i);
   });
 });

@@ -11,6 +11,7 @@
   import { poolOpponent } from '../store/playerModel';
   import { loadAllAnalyses } from '../analysis/runAnalysis';
   import { comebackPositions, type ComebackPosition } from '../analysis/comeback';
+  import { t } from '../i18n';
 
   let positions = $state<ComebackPosition[]>([]);
   let idx = $state(0);
@@ -57,7 +58,7 @@
       await opponent.applyStrength();
       status = 'playing';
     } catch (e) {
-      result = 'Engine failed to start: ' + String(e);
+      result = t('comeback.engineFailedToStart', { error: String(e) });
       status = 'over';
     }
   }
@@ -91,7 +92,7 @@
       if (uci) {
         const san = game.moveUci(uci); // halt on an illegal engine move instead of desyncing (P1-17)
         if (!san) {
-          result = 'Engine returned an illegal move — game halted.';
+          result = t('comeback.engineIllegalMove');
           status = 'over';
           return;
         }
@@ -99,21 +100,21 @@
         lastMove = [uci.slice(0, 2), uci.slice(2, 4)];
       }
     } catch (e) {
-      result = 'Engine error: ' + String(e);
+      result = t('comeback.engineError', { error: String(e) });
     }
     if (!checkEnd()) status = 'playing';
   }
 
   function checkEnd(): boolean {
-    const t = game.terminal();
-    if (!t.over) return false;
+    const term = game.terminal();
+    if (!term.over) return false;
     status = 'over';
-    if (t.reason === 'checkmate') {
-      const youWin = t.winner === playerSide;
-      result = youWin ? 'You turned it around — win! ♚' : 'Checkmated — tough spot. Try the next one.';
+    if (term.reason === 'checkmate') {
+      const youWin = term.winner === playerSide;
+      result = youWin ? t('comeback.youWin') : t('comeback.checkmated');
       resultKind = youWin ? 'good' : 'bad';
     } else {
-      result = 'Held the draw — comeback complete. ✔';
+      result = t('comeback.heldDraw');
       resultKind = 'good';
     }
     return true;
@@ -121,35 +122,33 @@
 
   function resign() {
     status = 'over';
-    result = 'Resigned — couldn’t hold this one.';
+    result = t('comeback.resigned');
     resultKind = 'bad';
   }
 </script>
 
 <section class="col center">
-  <h2>Comeback drills</h2>
+  <h2>{t('comeback.title')}</h2>
   {#if status === 'loading'}
-    <p class="muted">Loading positions from your games…</p>
+    <p class="muted">{t('comeback.loadingPositions')}</p>
   {:else if status === 'empty'}
     <div class="panel col center">
-      <p>No comeback positions yet.</p>
+      <p>{t('comeback.emptyTitle')}</p>
       <p class="muted">
-        Play and analyse some games — the moments where you fell behind show up here to practise
-        defending and fighting back.
+        {t('comeback.emptyBody')}
       </p>
-      <button onclick={() => app.go('play')}>Play a game →</button>
+      <button onclick={() => app.go('play')}>{t('comeback.playAGame')}</button>
       <button onclick={() => { app.sparringScenarioId = 'opp-castle'; app.go('sparring'); }}>
-        Defensive sparring instead →
+        {t('comeback.defensiveSparring')}
       </button>
     </div>
   {:else}
     {#if current}
       <p class="muted">
-        Position {idx + 1} / {positions.length} · you were losing by ~{Math.round(-current.cpAtEntry / 100)}
-        pawns here. Hold the draw or turn it around against a bot at your level.
+        {t('comeback.positionIntro', { idx: idx + 1, total: positions.length, pawns: Math.round(-current.cpAtEntry / 100) })}
       </p>
     {/if}
-    <p class="muted" style="font-size:0.82rem">You play {orientation === 'white' ? 'White' : 'Black'}</p>
+    <p class="muted" style="font-size:0.82rem">{t('comeback.youPlay', { color: orientation === 'white' ? t('color.white') : t('color.black') })}</p>
     <div class="board-wrap">
       <Board
         {fen}
@@ -162,14 +161,14 @@
         {onMove}
       />
     </div>
-    <p class="feedback {resultKind}">{status === 'thinking' ? 'Opponent thinking…' : result}</p>
+    <p class="feedback {resultKind}">{status === 'thinking' ? t('comeback.opponentThinking') : result}</p>
     <div class="row center">
       {#if status === 'over'}
-        {#if hasNext}<button onclick={() => loadPosition(idx + 1)}>Next position →</button>{/if}
-        <button class="ghost" onclick={() => loadPosition(idx)}>Try again</button>
-        <button class="ghost" onclick={() => app.go('dashboard')}>Back to dashboard</button>
+        {#if hasNext}<button onclick={() => loadPosition(idx + 1)}>{t('comeback.nextPosition')}</button>{/if}
+        <button class="ghost" onclick={() => loadPosition(idx)}>{t('comeback.tryAgain')}</button>
+        <button class="ghost" onclick={() => app.go('dashboard')}>{t('comeback.backToDashboard')}</button>
       {:else}
-        <button onclick={resign} style="background:var(--bad)">Resign</button>
+        <button onclick={resign} style="background:var(--bad)">{t('comeback.resign')}</button>
       {/if}
     </div>
   {/if}

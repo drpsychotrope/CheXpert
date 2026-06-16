@@ -3,6 +3,7 @@
   import { ChessGame } from '../game/ChessGame';
   import { MASTER_GAMES, type MasterGame } from '../guess/games';
   import { GuessGame } from '../guess/guess';
+  import { t, fmtPct } from '../i18n';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -19,7 +20,7 @@
     chosen = g;
     guess = new GuessGame(g.pgn, g.guessColor);
     sync();
-    feedback = `You are ${g.guessColor === 'w' ? 'White' : 'Black'}. Find each move.`;
+    feedback = g.guessColor === 'w' ? t('guess.youAreWhite') : t('guess.youAreBlack');
     feedbackKind = '';
     mode = 'play';
   }
@@ -40,7 +41,7 @@
     const before = guess.fen();
     const res = guess.guess(uci);
     if (res === 'wrong') {
-      feedback = 'Not the move that was played — try again, or Reveal.';
+      feedback = t('guess.wrong');
       feedbackKind = 'bad';
       display = new ChessGame(before); // no advance
       fen = display.fen;
@@ -49,8 +50,8 @@
     sync();
     lastMove = [from, to];
     feedback = guess.done
-      ? `Game over — you matched ${guess.score}/${guess.guesses} (${Math.round(guess.accuracy() * 100)}%).`
-      : 'Correct! ✔';
+      ? t('guess.gameOverScored', { score: guess.score, guesses: guess.guesses, pct: fmtPct(guess.accuracy() * 100) })
+      : t('guess.correct');
     feedbackKind = 'good';
   }
 
@@ -60,18 +61,17 @@
     sync();
     if (shown) {
       lastMove = [shown.uci.slice(0, 2), shown.uci.slice(2, 4)];
-      feedback = `The move was ${shown.san}.`;
+      feedback = t('guess.theMoveWas', { san: shown.san });
       feedbackKind = '';
     }
-    if (guess.done) feedback = `Game over — you matched ${guess.score}/${guess.guesses}.`;
+    if (guess.done) feedback = t('guess.gameOver', { score: guess.score, guesses: guess.guesses });
   }
 </script>
 
 <section class="col center">
-  <h2>Guess the move</h2>
+  <h2>{t('guess.title')}</h2>
   <p class="muted" style="max-width:560px">
-    Step through a master game and find the move that was actually played. Active recall on real
-    brilliancies — guessing trains the same prediction you do over the board.
+    {t('guess.intro')}
   </p>
 
   {#if mode === 'pick'}
@@ -79,14 +79,14 @@
       {#each MASTER_GAMES as g}
         <button class="game-card" onclick={() => start(g)}>
           <b>{g.name}</b>
-          <span class="muted">{g.white} vs {g.black}</span>
+          <span class="muted">{t('guess.versus', { white: g.white, black: g.black })}</span>
           <span class="muted note">{g.note}</span>
         </button>
       {/each}
     </div>
   {:else if mode === 'play' && guess && chosen}
     <p class="muted">
-      {chosen.name} — {chosen.white} vs {chosen.black} · matched {guess.score}/{guess.guesses}
+      {t('guess.header', { name: chosen.name, white: chosen.white, black: chosen.black, score: guess.score, guesses: guess.guesses })}
     </p>
     <div class="board-wrap">
       <Board
@@ -105,9 +105,9 @@
     <p class="feedback {feedbackKind}">{feedback}</p>
     <div class="row center">
       {#if !guess.done}
-        <button class="ghost" onclick={reveal}>Reveal move</button>
+        <button class="ghost" onclick={reveal}>{t('guess.revealMove')}</button>
       {/if}
-      <button class="ghost" onclick={() => (mode = 'pick')}>← Games</button>
+      <button class="ghost" onclick={() => (mode = 'pick')}>{t('guess.backToGames')}</button>
     </div>
   {/if}
 </section>

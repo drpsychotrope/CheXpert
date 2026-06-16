@@ -5,6 +5,7 @@
   import { ENDGAME_DRILLS, type EndgameDrill } from '../endgame/drills';
   import { TablebaseClient, withinTablebase, NetworkNotAllowedError, type TablebaseResult } from '../endgame/syzygy';
   import { tbCacheGet, tbCacheSet } from '../endgame/tablebaseCache';
+  import { t } from '../i18n';
 
   let drill = $state<EndgameDrill | null>(null);
   let game = $state(new ChessGame());
@@ -54,7 +55,7 @@
       tbError =
         e instanceof NetworkNotAllowedError
           ? e.message
-          : `Tablebase lookup failed (${e instanceof Error ? e.message : 'unknown'}).`;
+          : t('endgames.lookupFailed', { error: e instanceof Error ? e.message : 'unknown' });
     }
   }
 
@@ -83,21 +84,25 @@
       const best = truth.moves[0];
       const played = truth.moves.find((m) => m.uci === uci);
       if (played && best && played.category === best.category && played.dtz === best.dtz) {
-        feedback = `Perfect — keeps the ${best.category}.`;
+        feedback = t('endgames.perfectKeeps', { category: best.category });
         feedbackKind = 'good';
       } else if (played) {
-        feedback = `Tablebase: that move is "${played.category}". Best was ${best.san ?? best.uci} (keeps the ${best.category}).`;
+        feedback = t('endgames.moveCategory', {
+          category: played.category,
+          best: best.san ?? best.uci,
+          bestCategory: best.category,
+        });
         feedbackKind = 'bad';
       } else {
-        feedback = `Best by tablebase was ${best.san ?? best.uci}.`;
+        feedback = t('endgames.bestByTablebase', { best: best.san ?? best.uci });
         feedbackKind = '';
       }
     } else if (tbError) {
       // Distinguish "consent off" from an actual lookup failure (don't claim the
       // network is off when it's on and the request simply failed).
       feedback = networkOff
-        ? 'Playing without tablebase feedback (network off — enable it in Settings).'
-        : 'Playing without tablebase feedback (tablebase lookup failed).';
+        ? t('endgames.playingNoFeedbackNetwork')
+        : t('endgames.playingNoFeedbackFailed');
       feedbackKind = '';
     }
 
@@ -136,15 +141,15 @@
   }
 
   function checkEnd(): boolean {
-    const t = game.terminal();
-    if (!t.over) return false;
+    const term = game.terminal();
+    if (!term.over) return false;
     status = 'over';
-    if (t.reason === 'checkmate') {
-      const winner = t.winner === playerColor[0] ? 'You' : 'Engine';
-      feedback = `Checkmate — ${winner} win${winner === 'You' ? '' : 's'}.`;
-      feedbackKind = winner === 'You' ? 'good' : 'bad';
+    if (term.reason === 'checkmate') {
+      const youWin = term.winner === playerColor[0];
+      feedback = youWin ? t('endgames.checkmateYouWin') : t('endgames.checkmateEngineWins');
+      feedbackKind = youWin ? 'good' : 'bad';
     } else {
-      feedback = `Draw (${t.reason}).`;
+      feedback = t('endgames.draw', { reason: term.reason ?? '' });
       feedbackKind = '';
     }
     return true;
@@ -152,14 +157,12 @@
 </script>
 
 <section class="col center">
-  <h2>Endgame trainer</h2>
-  <p class="muted">Play out fundamental endgames against the engine with perfect feedback from the Syzygy tablebase (≤7 pieces).</p>
+  <h2>{t('endgames.title')}</h2>
+  <p class="muted">{t('endgames.intro')}</p>
 
   {#if settings && !settings.allowNetwork}
     <p class="muted" style="font-size:0.85rem;max-width:520px">
-      Tablebase feedback needs network access (off by default). Enable it in
-      <button class="link" onclick={() => app.go('settings')}>Settings</button> for perfect move grading.
-      Drills still work against the engine without it.
+      {t('endgames.networkHintBefore')}<button class="link" onclick={() => app.go('settings')}>{t('endgames.settingsLink')}</button>{t('endgames.networkHintAfter')}
     </p>
   {/if}
 
@@ -187,19 +190,19 @@
       />
     </div>
 
-    <p class="feedback {feedbackKind}">{status === 'thinking' ? 'Engine thinking…' : feedback}</p>
+    <p class="feedback {feedbackKind}">{status === 'thinking' ? t('endgames.engineThinking') : feedback}</p>
 
     {#if tb}
       <p class="muted" style="font-size:0.82rem">
-        Tablebase: position is <b>{tb.category}</b>{tb.dtz != null ? ` (DTZ ${tb.dtz})` : ''}{tb.cached ? ' · cached' : ''}.
+        {t('endgames.tablebasePosition')}<b>{tb.category}</b>{tb.dtz != null ? ` (DTZ ${tb.dtz})` : ''}{tb.cached ? t('endgames.cached') : ''}.
       </p>
     {:else if tbError}
       <p class="muted" style="font-size:0.82rem">{tbError}</p>
     {/if}
 
     <div class="row center">
-      <button onclick={() => drill && start(drill)}>Restart</button>
-      <button class="ghost" onclick={() => (drill = null)}>← All drills</button>
+      <button onclick={() => drill && start(drill)}>{t('endgames.restart')}</button>
+      <button class="ghost" onclick={() => (drill = null)}>{t('endgames.allDrills')}</button>
     </div>
   {/if}
 </section>

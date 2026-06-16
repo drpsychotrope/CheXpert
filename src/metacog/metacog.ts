@@ -5,6 +5,9 @@
 // Honesty doctrine (AP-META-1): the readout is DESCRIPTIVE, never a grade — a
 // fact-sentence + a descriptive verdict word, no letter/number score.
 
+import { gt } from '../i18n/gen';
+import type { Locale } from '../i18n/translate';
+
 export type Confidence = 'sure' | 'unsure' | 'guess';
 
 /** Fixed self-tag taxonomy (closed set — AP-META-2). 'other' is the escape hatch. */
@@ -115,19 +118,21 @@ function pct(x: number): number {
   return Math.round(x * 100);
 }
 
-function buildSentence(rows: ConfidenceRow[]): string {
+function buildSentence(rows: ConfidenceRow[], locale: Locale): string {
   // Prefer the 'sure' row when it has data; else the bucket with the most data.
   const sure = rows[0];
   const chosen = sure.n > 0 ? sure : [...rows].sort((a, b) => b.n - a.n)[0];
-  const word = chosen.confidence === 'sure' ? 'sure' : chosen.confidence === 'unsure' ? 'unsure' : 'just guessing';
-  return `When you said you were ${word}, you were right ${pct(chosen.accuracy)}% of the time.`;
+  const wordKey =
+    chosen.confidence === 'sure' ? 'metacog.wordSure' : chosen.confidence === 'unsure' ? 'metacog.wordUnsure' : 'metacog.wordGuess';
+  return gt('metacog.sentence', locale, { word: gt(wordKey, locale), pct: pct(chosen.accuracy) });
 }
 
 export function calibration(
   attempts: MetacogAttempt[],
-  opts?: { minReported?: number },
+  opts?: { minReported?: number; locale?: Locale },
 ): Calibration {
   const minReported = opts?.minReported ?? 10;
+  const locale = opts?.locale ?? 'fr';
   const byConfidence = buildByConfidence(attempts);
   const reportedAttempts = byConfidence.reduce((s, r) => s + r.n, 0);
   const { rows: selfTags, taggedMisses } = buildSelfTags(attempts);
@@ -135,7 +140,7 @@ export function calibration(
   let readout: CalibrationReadout | null = null;
   if (reportedAttempts >= minReported) {
     readout = {
-      sentence: buildSentence(byConfidence),
+      sentence: buildSentence(byConfidence, locale),
       verdict: deriveVerdict(byConfidence, minReported),
       topCause: selfTags.length ? { tag: selfTags[0].tag, pct: selfTags[0].pct } : null,
     };

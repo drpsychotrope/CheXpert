@@ -9,6 +9,7 @@
   import { poolOpponent } from '../store/playerModel';
   import { loadAllAnalyses } from '../analysis/runAnalysis';
   import { IMBALANCE_LIBRARY, scenariosFromWeakness, type Scenario } from '../analysis/scenarios';
+  import { t } from '../i18n';
 
   let scenarios = $state<Scenario[]>([...IMBALANCE_LIBRARY]);
   let current = $state<Scenario | null>(null);
@@ -53,7 +54,7 @@
       await opponent.applyStrength();
       status = 'playing';
     } catch (e) {
-      result = 'Engine failed to start: ' + String(e);
+      result = t('sparring.engineFailedToStart', { error: String(e) });
       status = 'over';
     }
   }
@@ -86,7 +87,7 @@
       if (uci) {
         const san = game.moveUci(uci); // halt on an illegal engine move instead of desyncing (P1-17)
         if (!san) {
-          result = 'Engine returned an illegal move — game halted.';
+          result = t('sparring.engineIllegalMove');
           status = 'over';
           return;
         }
@@ -94,21 +95,21 @@
         lastMove = [uci.slice(0, 2), uci.slice(2, 4)];
       }
     } catch (e) {
-      result = 'Engine error: ' + String(e);
+      result = t('sparring.engineError', { error: String(e) });
     }
     if (!checkEnd()) status = 'playing';
   }
 
   function checkEnd(): boolean {
-    const t = game.terminal();
-    if (!t.over) return false;
+    const term = game.terminal();
+    if (!term.over) return false;
     status = 'over';
-    if (t.reason === 'checkmate') {
-      const win = t.winner === playerSide;
-      result = win ? 'You won the scenario! ♚' : 'Checkmated — try again, or pick another.';
+    if (term.reason === 'checkmate') {
+      const win = term.winner === playerSide;
+      result = win ? t('sparring.youWon') : t('sparring.checkmated');
       resultKind = win ? 'good' : 'bad';
     } else {
-      result = 'Drawn — a fine result from a tough scenario. ✔';
+      result = t('sparring.drawn');
       resultKind = 'good';
     }
     return true;
@@ -116,17 +117,16 @@
 
   function resign() {
     status = 'over';
-    result = 'Resigned.';
+    result = t('sparring.resigned');
     resultKind = 'bad';
   }
 </script>
 
 <section class="col center">
-  <h2>Scenario sparring</h2>
+  <h2>{t('sparring.title')}</h2>
   {#if status === 'pick'}
     <p class="muted" style="max-width:520px">
-      Play out a targeted position vs a bot at your level. Train an imbalance, or one of your own
-      recurring leaks.
+      {t('sparring.pickIntro')}
     </p>
     <div class="col" style="gap:0.3rem;width:100%;max-width:560px">
       {#each scenarios as s (s.id)}
@@ -137,7 +137,7 @@
     </div>
   {:else if current}
     <p class="muted" style="max-width:480px">{current.name} — {current.goal}</p>
-    <p class="muted" style="font-size:0.82rem">You play {orientation === 'white' ? 'White' : 'Black'}</p>
+    <p class="muted" style="font-size:0.82rem">{t('sparring.youPlay', { color: orientation === 'white' ? t('color.white') : t('color.black') })}</p>
     <div class="board-wrap">
       <Board
         {fen}
@@ -150,14 +150,14 @@
         {onMove}
       />
     </div>
-    <p class="feedback {resultKind}">{status === 'thinking' ? 'Opponent thinking…' : result}</p>
+    <p class="feedback {resultKind}">{status === 'thinking' ? t('sparring.opponentThinking') : result}</p>
     <div class="row center">
       {#if status === 'over'}
-        <button onclick={() => current && start(current)}>Try again</button>
-        <button class="ghost" onclick={() => (status = 'pick')}>← Scenarios</button>
+        <button onclick={() => current && start(current)}>{t('sparring.tryAgain')}</button>
+        <button class="ghost" onclick={() => (status = 'pick')}>{t('sparring.backToScenarios')}</button>
       {:else}
-        <button onclick={resign} style="background:var(--bad)">Resign</button>
-        <button class="ghost" onclick={() => (status = 'pick')}>← Scenarios</button>
+        <button onclick={resign} style="background:var(--bad)">{t('sparring.resign')}</button>
+        <button class="ghost" onclick={() => (status = 'pick')}>{t('sparring.backToScenarios')}</button>
       {/if}
     </div>
   {/if}

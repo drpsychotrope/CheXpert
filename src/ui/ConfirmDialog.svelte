@@ -3,6 +3,7 @@
   // confirm() — which blocks the JS event loop (freezing the rAF clock) and can't be themed or
   // translated. role=dialog + aria-modal, Escape cancels, focus is trapped and restored, the
   // primary action is autofocused. W14 will reuse this for the other confirm() sites + the promo picker.
+  import { t } from '../i18n';
   interface Props {
     open: boolean;
     title: string;
@@ -18,12 +19,15 @@
     open,
     title,
     body = '',
-    confirmLabel = 'OK',
-    cancelLabel = 'Cancel',
+    confirmLabel,
+    cancelLabel,
     danger = false,
     onConfirm,
     onCancel,
   }: Props = $props();
+  // Defaults resolve through t() at render so they follow the live locale (W18).
+  const confirmText = $derived(confirmLabel ?? t('common.ok'));
+  const cancelText = $derived(cancelLabel ?? t('common.cancel'));
 
   let card = $state<HTMLDivElement | undefined>(undefined);
   let confirmBtn = $state<HTMLButtonElement | undefined>(undefined);
@@ -82,9 +86,9 @@
       <h3 class="cd-title">{title}</h3>
       {#if body}<p class="cd-body">{body}</p>{/if}
       <div class="cd-actions">
-        <button type="button" class="ghost" onclick={onCancel}>{cancelLabel}</button>
+        <button type="button" class="ghost" onclick={onCancel}>{cancelText}</button>
         <button type="button" class="cd-confirm" class:danger bind:this={confirmBtn} onclick={onConfirm}>
-          {confirmLabel}
+          {confirmText}
         </button>
       </div>
     </div>

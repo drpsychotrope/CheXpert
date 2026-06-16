@@ -14,6 +14,7 @@
   import { STANDARD_POOLS } from '../rating/pools';
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
+  import { t } from '../i18n';
 
   type Step = 'declare' | 'ladder' | 'offer-game' | 'game' | 'done';
   let step = $state<Step>('declare');
@@ -88,11 +89,11 @@
     const res = trainer.playUserMove(uci);
     if (res === 'wrong') {
       ladder.report(false);
-      ladderFeedback = 'Missed.';
+      ladderFeedback = t('onboarding.ladderMissed');
       setTimeout(nextLadderPuzzle, 500);
     } else if (res === 'solved') {
       ladder.report(true);
-      ladderFeedback = 'Solved ✔';
+      ladderFeedback = t('onboarding.ladderSolved');
       setTimeout(nextLadderPuzzle, 400);
     } else {
       display = new ChessGame(trainer.getFen());
@@ -116,12 +117,12 @@
     const seed = ladder ? ladder.rating.rating : 1200;
     opponent = new AdaptiveOpponent(app.engine, initOpponentState(seed));
     gameThinking = true;
-    gameInfo = 'Starting engine…';
+    gameInfo = t('onboarding.startingEngine');
     try {
       await opponent.applyStrength();
-      gameInfo = 'Your move. Play naturally — this calibrates your game rating.';
+      gameInfo = t('onboarding.yourMovePlayNaturally');
     } catch (e) {
-      gameInfo = 'Engine failed; skipping to results.';
+      gameInfo = t('onboarding.engineFailedSkipping');
       finishWithoutGame();
       return;
     }
@@ -197,7 +198,7 @@
     const botElo = opponent?.state.targetElo ?? 1200;
     const gameRating = seedGameRating(puzzleR, prior, acpl, currentOutcome(), botElo);
     resultGameRating = Math.round(gameRating.rating);
-    gameInfo = acpl != null ? `Average centipawn loss: ${Math.round(acpl)} (~${acplToElo(acpl)} Elo)` : '';
+    gameInfo = acpl != null ? t('onboarding.acplReadout', { acpl: Math.round(acpl), elo: acplToElo(acpl) }) : '';
     await commit(puzzleR, gameRating);
   }
 
@@ -238,37 +239,36 @@
 </script>
 
 <section class="col center" style="max-width:640px;margin:0 auto">
-  <h2>Skill evaluation</h2>
+  <h2>{t('onboarding.title')}</h2>
 
   {#if step === 'declare'}
-    <p class="muted">A few quick questions, then a short adaptive puzzle ladder to find your level.</p>
+    <p class="muted">{t('onboarding.declareIntro')}</p>
     <div class="panel col" style="width:100%;max-width:380px">
       <label>
-        How would you rate yourself?
+        {t('onboarding.rateYourself')}
         <select bind:value={selfLevel}>
-          <option value="new">Brand new to chess</option>
-          <option value="beginner">Beginner (casual)</option>
-          <option value="intermediate">Intermediate (club level)</option>
-          <option value="advanced">Advanced (1800+)</option>
+          <option value="new">{t('onboarding.levelNew')}</option>
+          <option value="beginner">{t('onboarding.levelBeginner')}</option>
+          <option value="intermediate">{t('onboarding.levelIntermediate')}</option>
+          <option value="advanced">{t('onboarding.levelAdvanced')}</option>
         </select>
       </label>
       <label>
-        Rating on another site? (optional)
-        <input type="number" bind:value={priorRating} placeholder="e.g. 1450" />
+        {t('onboarding.priorRatingLabel')}
+        <input type="number" bind:value={priorRating} placeholder={t('onboarding.priorRatingPlaceholder')} />
       </label>
       <div class="row center">
-        <button onclick={startLadder} disabled={app.puzzles.size === 0}>Start the ladder →</button>
-        <button style="background:transparent;border:1px solid var(--border)" onclick={skipEvaluation}>Skip</button>
+        <button onclick={startLadder} disabled={app.puzzles.size === 0}>{t('onboarding.startLadder')}</button>
+        <button style="background:transparent;border:1px solid var(--border)" onclick={skipEvaluation}>{t('onboarding.skip')}</button>
       </div>
-      {#if app.puzzles.size === 0}<p class="muted">Loading puzzles…</p>{/if}
+      {#if app.puzzles.size === 0}<p class="muted">{t('onboarding.loadingPuzzles')}</p>{/if}
       <p class="muted" style="font-size:0.8rem">
-        Skip to seed a rough rating from your self-assessment above — it sharpens as you play. Re-run
-        anytime from Settings.
+        {t('onboarding.skipHint')}
       </p>
     </div>
 
   {:else if step === 'ladder'}
-    <p class="muted">Puzzle {ladderProgress + 1} — solve it. The difficulty adapts to you.</p>
+    <p class="muted">{t('onboarding.ladderPrompt', { n: ladderProgress + 1 })}</p>
     <div class="board-wrap">
       <Board
         {fen}
@@ -281,25 +281,24 @@
       />
     </div>
     <p class="feedback">{ladderFeedback}</p>
-    <button style="background:transparent;border:1px solid var(--border)" onclick={skipEvaluation}>Skip the rest →</button>
+    <button style="background:transparent;border:1px solid var(--border)" onclick={skipEvaluation}>{t('onboarding.skipTheRest')}</button>
 
   {:else if step === 'offer-game'}
     <div class="panel col center">
-      <h3>Puzzle rating ≈ {resultPuzzleRating}</h3>
+      <h3>{t('onboarding.puzzleRatingApprox', { r: resultPuzzleRating })}</h3>
       <p class="muted">
-        Optional: play a short game vs the engine so we can also estimate your <b>game</b> rating
-        (puzzle skill and playing strength differ). About 12 moves.
+        {@html t('onboarding.offerGameBody')}
       </p>
       <ColorPicker bind:value={gameColorChoice} />
       <div class="row center">
-        <button onclick={startCalibrationGame}>Play the calibration game →</button>
-        <button style="background:transparent;border:1px solid var(--border)" onclick={skipGame}>Skip</button>
+        <button onclick={startCalibrationGame}>{t('onboarding.playCalibrationGame')}</button>
+        <button style="background:transparent;border:1px solid var(--border)" onclick={skipGame}>{t('onboarding.skip')}</button>
       </div>
     </div>
 
   {:else if step === 'game'}
     <p class="muted">{gameInfo}</p>
-    <p class="muted" style="font-size:0.82rem">You play {gameSide === 'w' ? 'White' : 'Black'}</p>
+    <p class="muted" style="font-size:0.82rem">{t('onboarding.youPlay', { color: gameSide === 'w' ? t('color.white') : t('color.black') })}</p>
     <div class="board-wrap">
       <Board
         fen={gameFen}
@@ -311,16 +310,16 @@
         onMove={onGameMove}
       />
     </div>
-    {#if gameThinking}<p class="feedback">Thinking…</p>{/if}
-    <button style="background:transparent;border:1px solid var(--border)" onclick={finishWithoutGame} disabled={gameThinking}>End game &amp; skip →</button>
+    {#if gameThinking}<p class="feedback">{t('onboarding.thinking')}</p>{/if}
+    <button style="background:transparent;border:1px solid var(--border)" onclick={finishWithoutGame} disabled={gameThinking}>{t('onboarding.endGameSkip')}</button>
 
   {:else if step === 'done'}
     <div class="panel col center">
-      <h3>You're calibrated</h3>
-      <p>Puzzle rating ≈ <b>{resultPuzzleRating}</b></p>
-      <p>Game rating ≈ <b>{resultGameRating}</b> <span class="muted">(rough seed — it sharpens as you play)</span></p>
+      <h3>{t('onboarding.calibratedTitle')}</h3>
+      <p>{@html t('onboarding.puzzleRatingDone', { r: resultPuzzleRating })}</p>
+      <p>{@html t('onboarding.gameRatingDone', { r: resultGameRating })} <span class="muted">{t('onboarding.roughSeed')}</span></p>
       {#if gameInfo}<p class="muted" style="font-size:0.85rem">{gameInfo}</p>{/if}
-      <button onclick={() => app.go('home')}>Go to home →</button>
+      <button onclick={() => app.go('home')}>{t('onboarding.goToHome')}</button>
     </div>
   {/if}
 </section>

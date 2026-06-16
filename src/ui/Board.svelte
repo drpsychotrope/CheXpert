@@ -11,10 +11,10 @@
   import {
     isPromotionMove,
     PROMOTION_ORDER,
-    PROMOTION_NAME,
     PROMOTION_GLYPH,
     type PromotionPiece,
   } from './promotion';
+  import { t } from '../i18n';
 
   interface Props {
     fen: string;
@@ -77,8 +77,10 @@
   const sideToMove = $derived<'white' | 'black'>(
     fen.split(' ')[1] === 'b' ? 'black' : fen.split(' ')[1] === 'w' ? 'white' : turnColor,
   );
-  const colorName = $derived(sideToMove === 'white' ? 'White' : 'Black');
-  const turnText = $derived(turnLabel === 'play' ? `You play ${colorName}` : `${colorName} to move`);
+  const colorName = $derived(sideToMove === 'white' ? t('color.white') : t('color.black'));
+  const turnText = $derived(
+    turnLabel === 'play' ? t('board.youPlay', { color: colorName }) : t('board.toMove', { color: colorName }),
+  );
 
   let el: HTMLDivElement;
   let cg: Api | null = null;
@@ -117,7 +119,7 @@
       kbMove = '';
       kbError = '';
     } else {
-      kbError = `"${text}" is not a legal move here`;
+      kbError = t('board.notLegal', { move: text });
     }
   }
 
@@ -203,32 +205,32 @@
   </div>
   {#if onMoveText && !viewOnly}
     <form class="kbmove" onsubmit={submitKbMove}>
-      <label class="kbmove-label" for="kbmove-input">Move (keyboard):</label>
+      <label class="kbmove-label" for="kbmove-input">{t('board.kbMove')}</label>
       <input
         id="kbmove-input"
         class="kbmove-input"
         bind:value={kbMove}
-        placeholder="e.g. Nf3 or g1f3"
+        placeholder={t('board.kbPlaceholder')}
         autocomplete="off"
         autocapitalize="off"
         spellcheck="false"
         aria-describedby="kbmove-err"
       />
-      <button type="submit">Play</button>
+      <button type="submit">{t('board.kbPlay')}</button>
       <span id="kbmove-err" class="kbmove-err" role="alert" aria-live="assertive">{kbError}</span>
     </form>
   {/if}
   {#if pendingPromo}
     <div class="promo-overlay">
-      <button class="promo-backdrop" type="button" aria-label="Cancel promotion" onclick={cancelPromo}></button>
-      <div class="promo-card" role="dialog" aria-label="Choose promotion piece">
-        <p class="promo-title">Promote to</p>
+      <button class="promo-backdrop" type="button" aria-label={t('board.cancelPromotion')} onclick={cancelPromo}></button>
+      <div class="promo-card" role="dialog" aria-label={t('board.choosePromo')}>
+        <p class="promo-title">{t('board.promoteTo')}</p>
         <div class="promo-pieces">
           {#each PROMOTION_ORDER as pc (pc)}
             <button
               class="promo-btn"
               type="button"
-              aria-label={PROMOTION_NAME[pc]}
+              aria-label={t('piece.' + pc)}
               onclick={() => choosePromo(pc)}
             >{PROMOTION_GLYPH[sideToMove][pc]}</button>
           {/each}

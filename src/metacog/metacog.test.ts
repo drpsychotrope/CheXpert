@@ -72,7 +72,7 @@ describe('calibration — verdict thresholds (minReported lowered for tests)', (
 
 describe('calibration — sentence is descriptive, not a grade (AP-META-1)', () => {
   it('contains a percentage and the confidence word, and NO grade token', () => {
-    const cal = calibration(conf('sure', 10, 8), { minReported: 4 });
+    const cal = calibration(conf('sure', 10, 8), { minReported: 4, locale: 'en' });
     const s = cal.readout!.sentence;
     expect(s).toMatch(/%/);
     expect(s.toLowerCase()).toContain('sure');
