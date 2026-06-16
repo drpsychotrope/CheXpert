@@ -204,7 +204,7 @@ Chaque workstream = une branche/PR isolée → `git revert` du merge suffit. W1/
 | V2-W5 — coutures moteur & résilience coquille (P1-03/04/06 + L8 ; P1-05 différé) | ✅ livré | `check` 0 · nav smoke | `e9f1...` (W5) |
 | V2-W7 — ids anti-collision import/répertoire + PGN multi-parties | ✅ livré | `check` 0 · `test` 487 | (W7) |
 | V2-W10 — closers de boucle (badge cartes dues P1-07) | ✅ livré | boot smoke · `test` 487 | (W10) |
-| V2-W11 — `next()` async par index (ripple appelants) | ◻️ à venir (P1, structurel) | — | — |
+| V2-W11 — `next()` async par index (ripple 8 appelants en lockstep) | ✅ livré | `test` 488 · Tactics live · guard P1-02 | (W11, PR séparée) |
 | V2-W12 — décomposition `Play.svelte` + confirm non bloquant | ◻️ à venir (P1, structurel) | — | — |
 | V2-W13…W19 | ◻️ à venir (P2 + docs) | — | — |
 
