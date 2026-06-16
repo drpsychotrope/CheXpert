@@ -82,6 +82,9 @@
 
   let el: HTMLDivElement;
   let cg: Api | null = null;
+  // Honor the OS reduced-motion preference: no piece-slide animation (audit v2 W13 / WCAG 2.3.3).
+  const reduceMotion =
+    typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   // Promotion picker (audit W4): chessground's `after` gives only (from,to). When the move is
   // a pawn reaching the last rank, pause and ask which piece, then forward it to onMove.
@@ -149,7 +152,7 @@
       events: {
         select: (key: Key) => onSelect?.(key as string),
       },
-      animation: { enabled: true, duration: 200 },
+      animation: { enabled: !reduceMotion, duration: reduceMotion ? 0 : 200 },
       highlight: { lastMove: true, check: true },
       drawable: {
         enabled: true,
