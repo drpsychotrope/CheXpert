@@ -871,3 +871,32 @@ Calculate) already reassign `display` per move, so they were never stale.
 
 Board wiring only — no schema, API, or rules change. Cross-links: ADR-0050 (Board turnColor — the
 other half of the same fen-reactivity fix), ADR-0031 (interactive analysis board / spec E).
+
+## ADR-0052 — Audit v2 remediation: scope, decisions, and delivery
+**Date:** 2026-06-16 · **Status:** accepted
+
+A second audit (`reports/audit-v2-2026-06-10.md` — 16 agents + adversarial verification + **live
+execution**, the dynamic pass v1 lacked) produced a 143-finding backlog (4 critical / 37 major /
+64 minor / 38 note) plus the first UX/UI review. Remediation is planned in
+`specs/audit-v2-remediation-spec.md` (18 workstreams) with the `/enrich` bundle
+`reports/audit-v2-remediation_improvements.md`.
+
+**Ratified decisions (2026-06-10):** Q1 one PR per workstream, merged by priority batch; Q2 fold
+trivial P3 into their axis, defer the rest; Q3 **UI target language = French** (a dedicated chantier,
+W18); Q4 keep English SAN as the international convention; Q5 light theme deferred (tokens first);
+Q6 SAN/UCI keyboard input before arrow-key board navigation.
+
+**Delivered (merged; svelte-check 0 errors/0 warnings, 488 Vitest, build green):** P0 — W1
+full-strength analysis (`fullStrength` per call), W2 import-colour detection, W3 Chess960 castle-aware
+undo, W4 keyboard move path. P1 — W5 engine seams + shell resilience, W6 rules guards (moveUci ×5,
+960 king-step), W7 import/repertoire id robustness, W8 coach/insights honesty, W9 drill guards, W10
+due-card badge, W11 async on-target puzzle index, W12-part1 non-blocking coach dialog + clock-fix,
+P1-05 engine-crash recovery (Play). P2 — W13 a11y baseline + nav (absorbed W16), W14 click-to-move +
+themed confirm dialogs, W15 UX journeys, W17 design tokens + promoted shared components.
+
+**Remaining (tracked in the spec §13), future work:** **W18** — the full French UI conversion
+(i18n catalogue + ~316 strings + data JSON + SAN-display policy + tests); this ADR records the
+*decision*, the conversion itself is a standalone effort. **W12-part2** — extracting Play.svelte's
+state machine + clock controller to meet the `<300`-line DoD. Plus mechanical W17 scoped-dup deletion,
+the Sparring/Comeback/Endgames crash-recovery siblings of P1-05, and assorted journey / aria-live
+polish. Cross-links: ADR-0032 (CSP), ADR-0050/0051 (board reactivity — preserved throughout).

@@ -50,7 +50,7 @@ Everything runs in the browser. Nothing leaves your device by default.
   clock (snappy in bullet, deliberate in classical). Your **game rating is per time control** — a bullet
   result no longer moves your classical number. The headline rating shown elsewhere is your classical pool;
   the practice drills (Comeback/Sparring) remain untimed = classical.
-- **Coached mode** — optional engine check that warns before an obvious blunder while you play.
+- **Coached mode** — optional engine check that flags an apparent blunder right after you play it and offers a take-back (best-effort; pre-move alerts come in Phase 2).
 - **Chess960 (Wild)** — play a random Fischer-random position or a specific SP-ID (0–959) against
   the adaptive bot. Castle by dragging the king onto its own rook. v1 is untimed and not yet
   auto-analysed (the standard analysis pipeline assumes opening theory; see ADR-0041).
@@ -154,7 +154,7 @@ Zstandard — on older Node that single step is skipped and the app uses its see
 ```bash
 npm install      # one-shot setup: engine + puzzles + .exe launcher (see below)
 npm run dev      # http://localhost:5173
-npm test         # Vitest — 376 tests
+npm test         # Vitest (full suite)
 npm run check    # svelte-check (type check)
 npm run build    # type-check + production build
 ```
@@ -346,4 +346,4 @@ every non-obvious choice):
    walks the study plan end-to-end through the real trainers, ending in a reflection; and curated
    teach-before-test concept cards.
 
-Status: **376 tests passing**, type-clean (`svelte-check` 0 errors), production build green.
+Status: **all tests green** (Vitest full suite), type-clean (`svelte-check` 0 errors), production build green.
