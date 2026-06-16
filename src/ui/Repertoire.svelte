@@ -6,6 +6,7 @@
   import type { RepertoireLine } from '../repertoire/types';
   import { reviewItem } from '../srs/SrsStore';
   import { resultToGrade } from '../srs/fsrs';
+  import { t, tn } from '../i18n';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -45,7 +46,7 @@
   async function save() {
     buildError = '';
     if (!name.trim()) {
-      buildError = 'Give this line a name.';
+      buildError = t('repertoire.giveName');
       return;
     }
     const sans = movesText.trim().split(/[\s,]+/).filter(Boolean)
@@ -58,7 +59,7 @@
     const id = `rep:${slug}:${color}:${shortHash(sans.join(' '))}`;
     const res = buildLine(id, name.trim(), color, sans, Date.now());
     if (!res.ok || !res.line) {
-      buildError = res.error ?? 'Could not build line';
+      buildError = res.error ?? t('repertoire.couldNotBuild');
       return;
     }
     await saveLine(res.line);
@@ -103,7 +104,7 @@
     const uci = from + to + (new ChessGame(drill.fen()).isPromotion(from, to) ? promo : '');
     const res = drill.play(uci);
     if (res === 'wrong') {
-      drillFeedback = 'Not your repertoire move — try again.';
+      drillFeedback = t('repertoire.notYourMove');
       drillKind = 'bad';
       return;
     }
@@ -112,38 +113,40 @@
     if (res === 'done') {
       const ms = Date.now() - drillStartedAt;
       const solved = drill.mistakes === 0;
-      drillFeedback = solved ? 'Line complete, no mistakes ✔' : `Line complete (${drill.mistakes} mistake${drill.mistakes === 1 ? '' : 's'}).`;
+      drillFeedback = solved
+        ? t('repertoire.lineCompleteNoMistakes')
+        : tn(drill.mistakes, 'repertoire.lineCompleteMistakesOne', 'repertoire.lineCompleteMistakesMany');
       drillKind = solved ? 'good' : '';
       await reviewItem('repertoire', drill.line.id, resultToGrade(solved, ms), Date.now());
     } else {
-      drillFeedback = 'Correct.';
+      drillFeedback = t('repertoire.correct');
       drillKind = 'good';
     }
   }
 </script>
 
 <section class="col center">
-  <h2>Opening repertoire</h2>
+  <h2>{t('repertoire.title')}</h2>
 
   {#if mode === 'list'}
-    <p class="muted">Build the lines you want to play, then drill them with spaced repetition until they're automatic.</p>
+    <p class="muted">{t('repertoire.intro')}</p>
     <div class="row center">
-      <button onclick={() => (mode = 'build')}>+ New line</button>
+      <button onclick={() => (mode = 'build')}>{t('repertoire.newLine')}</button>
     </div>
 
     {#if lines.length === 0}
-      <p class="muted">No lines yet.</p>
+      <p class="muted">{t('repertoire.noLines')}</p>
     {:else}
       <div class="lines">
         {#each lines as l (l.id)}
           <div class="line-card">
             <div class="col" style="gap:0.2rem;align-items:flex-start">
               <b>{l.name}</b>
-              <span class="muted" style="font-size:0.8rem">{l.color === 'w' ? 'White' : 'Black'} · {l.san.join(' ')}</span>
+              <span class="muted" style="font-size:0.8rem">{l.color === 'w' ? t('repertoire.white') : t('repertoire.black')} · {l.san.join(' ')}</span>
             </div>
             <div class="row">
-              <button onclick={() => startDrill(l)}>Drill</button>
-              <button class="ghost" onclick={() => remove(l.id)} aria-label="Delete line">✕</button>
+              <button onclick={() => startDrill(l)}>{t('repertoire.drill')}</button>
+              <button class="ghost" onclick={() => remove(l.id)} aria-label={t('repertoire.deleteLineAria')}>✕</button>
             </div>
           </div>
         {/each}
@@ -152,25 +155,25 @@
 
   {:else if mode === 'build'}
     <div class="panel col" style="max-width:520px;width:100%">
-      <label>Name<input bind:value={name} placeholder="e.g. Italian — main line" /></label>
-      <label>You play
+      <label>{t('repertoire.nameLabel')}<input bind:value={name} placeholder={t('repertoire.namePlaceholder')} /></label>
+      <label>{t('repertoire.youPlay')}
         <select bind:value={color}>
-          <option value="w">White</option>
-          <option value="b">Black</option>
+          <option value="w">{t('repertoire.white')}</option>
+          <option value="b">{t('repertoire.black')}</option>
         </select>
       </label>
-      <label>Moves (SAN, space-separated)
+      <label>{t('repertoire.movesLabel')}
         <textarea bind:value={movesText} rows="3" placeholder="e4 e5 Nf3 Nc6 Bc4 Bc5"></textarea>
       </label>
       {#if buildError}<p class="feedback bad">{buildError}</p>{/if}
       <div class="row">
-        <button onclick={save} disabled={!movesText.trim()}>Save line</button>
-        <button class="ghost" onclick={() => (mode = 'list')}>Cancel</button>
+        <button onclick={save} disabled={!movesText.trim()}>{t('repertoire.saveLine')}</button>
+        <button class="ghost" onclick={() => (mode = 'list')}>{t('repertoire.cancel')}</button>
       </div>
     </div>
 
   {:else if mode === 'drill' && drill}
-    <p><b>{drill.line.name}</b> — play your moves</p>
+    <p><b>{drill.line.name}</b> — {t('repertoire.playYourMoves')}</p>
     <div class="board-wrap">
       <Board
         {fen}
@@ -184,16 +187,16 @@
     </div>
     <p class="feedback {drillKind}">{drillFeedback}</p>
     <div class="row center">
-      {#if drill.done}<button onclick={() => drill && startDrill(drill.line)}>Again</button>{/if}
-      <button class="ghost" onclick={() => (mode = 'list')}>← Lines</button>
+      {#if drill.done}<button onclick={() => drill && startDrill(drill.line)}>{t('repertoire.again')}</button>{/if}
+      <button class="ghost" onclick={() => (mode = 'list')}>{t('repertoire.linesBack')}</button>
     </div>
   {/if}
 
   <ConfirmDialog
     open={pendingDelete !== null}
-    title="Delete this line?"
-    body="The repertoire line and its review card will be removed. This can't be undone."
-    confirmLabel="Delete"
+    title={t('repertoire.deleteTitle')}
+    body={t('repertoire.deleteBody')}
+    confirmLabel={t('repertoire.deleteConfirm')}
     danger
     onConfirm={confirmRemove}
     onCancel={() => (pendingDelete = null)}

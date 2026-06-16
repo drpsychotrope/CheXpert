@@ -16,6 +16,7 @@
   import { resultToGrade } from '../srs/fsrs';
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
+  import { t, tn, fmtPct } from '../i18n';
 
   type Drill = 'menu' | 'coordinate' | 'blindfold' | 'relation' | 'knight' | 'findall';
   let drill = $state<Drill>('menu');
@@ -36,10 +37,12 @@
   async function loadMastery() { mastery = visionMastery(await allCards()); }
   loadMastery();
 
+  // `msg` already carries the ✔ / ✗ marker (folded into the i18n message variant by the
+  // caller, which selects the correct/wrong key from `ok`); score() owns only the counters.
   function score(ok: boolean, msg: string) {
     asked += 1;
-    if (ok) { correct += 1; streak += 1; feedback = `✔ ${msg}`; feedbackKind = 'good'; }
-    else { streak = 0; feedback = `✗ ${msg}`; feedbackKind = 'bad'; }
+    if (ok) { correct += 1; streak += 1; feedback = msg; feedbackKind = 'good'; }
+    else { streak = 0; feedback = msg; feedbackKind = 'bad'; }
   }
   function persistDrill(key: 'diagonal' | 'knight' | 'findall', ok: boolean, ms: number) {
     if (!app.model) return;
@@ -66,7 +69,7 @@
     promptAt = Date.now();
   }
   async function gradeCoordinate(ok: boolean) {
-    score(ok, ok ? `${coordTarget}.` : `it was ${coordTarget}.`);
+    score(ok, ok ? t('vision.coordCorrect', { sq: coordTarget }) : t('vision.coordWrong', { sq: coordTarget }));
     await reviewItem('vision-square', coordTarget, resultToGrade(ok, elapsed(), VISION_GRADE_THRESHOLDS), Date.now());
     setTimeout(newCoordinate, 750);
   }
@@ -99,8 +102,12 @@
   async function answerBlindfold(pick: string | null) {
     if (blindPhase !== 'ask' || feedback) return;
     const ok = pick === blindAnswer;
-    const truth = blindAnswer ? `${blindSquare} = ${blindAnswer}` : `${blindSquare} is empty`;
-    score(ok, ok ? `${truth}.` : `${truth}.`);
+    const msg = blindAnswer
+      ? (ok ? t('vision.blindCorrectPiece', { sq: blindSquare, piece: blindAnswer })
+            : t('vision.blindWrongPiece', { sq: blindSquare, piece: blindAnswer }))
+      : (ok ? t('vision.blindCorrectEmpty', { sq: blindSquare })
+            : t('vision.blindWrongEmpty', { sq: blindSquare }));
+    score(ok, msg);
     await reviewItem('vision-square', blindSquare, blindfoldGrade(ok), Date.now());
     setTimeout(newBlindfold, 900);
   }
@@ -117,7 +124,10 @@
   function answerRelation(guess: boolean | number) {
     if (!rel || feedback) return;
     const ok = guess === rel.answer;
-    score(ok, `answer: ${typeof rel.answer === 'boolean' ? (rel.answer ? 'yes' : 'no') : rel.answer}.`);
+    const answer = typeof rel.answer === 'boolean'
+      ? (rel.answer ? t('vision.yes') : t('vision.no'))
+      : String(rel.answer);
+    score(ok, ok ? t('vision.relCorrect', { answer }) : t('vision.relWrong', { answer }));
     persistDrill('diagonal', ok, elapsed());
     setTimeout(newRelation, 800);
   }
@@ -138,7 +148,9 @@
     if (feedback) return; // already graded this prompt — don't double-count (audit v2 P1-13)
     const truth = knightDistance(kFrom, kTo);
     const ok = Number(kAnswer) === truth;
-    score(ok, `${truth} move${truth === 1 ? '' : 's'}.`);
+    score(ok, tn(truth,
+      ok ? 'vision.knightCorrectOne' : 'vision.knightWrongOne',
+      ok ? 'vision.knightCorrectMany' : 'vision.knightWrongMany'));
     if (!ok) kRevealed = knightShortestPath(kFrom, kTo);
     persistDrill('knight', ok, elapsed());
   }
@@ -148,7 +160,9 @@
   let faTask = $state<'checks' | 'captures' | 'hanging'>('checks');
   let faTargets: string[] = [];
   let faAnswer = $state('');
-  const faLabel = { checks: 'checking moves', captures: 'captures', hanging: 'pieces you can win' };
+  // Maps task → i18n key; the labels themselves live in the catalogue (vision.label*).
+  const faLabelKey = { checks: 'vision.labelChecks', captures: 'vision.labelCaptures', hanging: 'vision.labelHanging' } as const;
+  const faLabel = (task: 'checks' | 'captures' | 'hanging'): string => t(faLabelKey[task]);
   async function newFindAll() {
     const p = app.model ? await app.puzzles.next({ rating: app.model.puzzleRating.rating, window: 600, exclude: new Set() }) : null;
     faFen = p?.fen ?? FALLBACK_FENS[Math.floor(rnd() * FALLBACK_FENS.length)];
@@ -163,7 +177,10 @@
     if (feedback) return; // already graded this prompt — don't double-count (audit v2 P1-13)
     const truth = faTargets.length;
     const ok = Number(faAnswer) === truth;
-    score(ok, `there ${truth === 1 ? 'is' : 'are'} ${truth} ${faLabel[faTask]}.`);
+    const key = truth === 1
+      ? (ok ? 'vision.findAllCorrectIs' : 'vision.findAllWrongIs')
+      : (ok ? 'vision.findAllCorrectAre' : 'vision.findAllWrongAre');
+    score(ok, t(key, { n: truth, label: faLabel(faTask) }));
     persistDrill('findall', ok, elapsed());
   }
 
@@ -184,115 +201,114 @@
 </script>
 
 <section class="col center">
-  <h2>Calculation & vision</h2>
+  <h2>{t('vision.title')}</h2>
 
   {#if drill === 'menu'}
     <p class="muted" style="max-width:580px">
-      Board vision you can't fake — every drill needs you to locate or relate real squares, not
-      compute a formula. Per-square recall is spaced-repeated so weak squares come back.
+      {t('vision.menuIntro')}
     </p>
-    <p class="muted">Board mastery: <b>{Math.round(mastery * 100)}%</b></p>
+    <p class="muted">{t('vision.boardMasteryLabel')} <b>{fmtPct(mastery * 100)}</b></p>
     <div class="drills">
       <button class="drill-card" onclick={() => startDrill('coordinate')}>
-        <b>Coordinate → square</b>
-        <span class="muted">A coordinate is named — click it on a blank board, as fast as you can.</span>
+        <b>{t('vision.coordTitle')}</b>
+        <span class="muted">{t('vision.coordDesc')}</span>
       </button>
       <button class="drill-card" onclick={() => startDrill('blindfold')}>
-        <b>Blindfold</b>
-        <span class="muted">Study a position, then recall what stands on a square from memory.</span>
+        <b>{t('vision.blindfoldTitle')}</b>
+        <span class="muted">{t('vision.blindfoldDesc')}</span>
       </button>
       <button class="drill-card" onclick={() => startDrill('relation')}>
-        <b>Lines & diagonals</b>
-        <span class="muted">Same diagonal? Same colour? How many squares between?</span>
+        <b>{t('vision.relationTitle')}</b>
+        <span class="muted">{t('vision.relationDesc')}</span>
       </button>
       <button class="drill-card" onclick={() => startDrill('knight')}>
-        <b>Knight distance</b>
-        <span class="muted">How many moves does a knight need from A to B?</span>
+        <b>{t('vision.knightTitle')}</b>
+        <span class="muted">{t('vision.knightDesc')}</span>
       </button>
       <button class="drill-card" onclick={() => startDrill('findall')}>
-        <b>Find them all</b>
-        <span class="muted">Count every check, capture, or hanging piece in a position.</span>
+        <b>{t('vision.findallTitle')}</b>
+        <span class="muted">{t('vision.findallDesc')}</span>
       </button>
     </div>
 
   {:else if drill === 'coordinate'}
-    <p class="muted">Score {correct}/{asked} · streak {streak}</p>
+    <p class="muted">{t('vision.scoreLine', { correct, asked, streak })}</p>
     <div class="prompt">{coordTarget}</div>
-    <p class="muted">Click this square.</p>
+    <p class="muted">{t('vision.clickThisSquare')}</p>
     <div class="board-wrap" style="max-width:300px">
       <Board fen={EMPTY_FEN} coords={false} onSelect={onCoordClick} />
     </div>
     <p class="feedback {feedbackKind}">{feedback}</p>
-    <button class="ghost" onclick={backToMenu}>← Drills</button>
+    <button class="ghost" onclick={backToMenu}>{t('vision.backToDrills')}</button>
 
   {:else if drill === 'blindfold'}
-    <p class="muted">Score {correct}/{asked} · streak {streak}</p>
+    <p class="muted">{t('vision.scoreLine', { correct, asked, streak })}</p>
     {#if blindPhase === 'show'}
-      <p class="muted">Memorise — board hides in a moment…</p>
+      <p class="muted">{t('vision.memorise')}</p>
       <div class="board-wrap" style="max-width:300px">
         <Board fen={blindFen} viewOnly={true} />
       </div>
     {:else}
-      <p class="muted">What piece is on <b>{blindSquare}</b>?</p>
+      <p class="muted">{t('vision.whatPieceOnPre')}<b>{blindSquare}</b>{t('vision.whatPieceOnPost')}</p>
       <div class="piece-pick">
         {#each WHITE_PIECES as [ch, sym]}<button class="pc" onclick={() => answerBlindfold(ch)}>{sym}</button>{/each}
       </div>
       <div class="piece-pick">
         {#each BLACK_PIECES as [ch, sym]}<button class="pc" onclick={() => answerBlindfold(ch)}>{sym}</button>{/each}
       </div>
-      <button onclick={() => answerBlindfold(null)}>Empty</button>
+      <button onclick={() => answerBlindfold(null)}>{t('vision.empty')}</button>
     {/if}
     <p class="feedback {feedbackKind}">{feedback}</p>
-    <button class="ghost" onclick={backToMenu}>← Drills</button>
+    <button class="ghost" onclick={backToMenu}>{t('vision.backToDrills')}</button>
 
   {:else if drill === 'relation'}
-    <p class="muted">Score {correct}/{asked} · streak {streak}</p>
+    <p class="muted">{t('vision.scoreLine', { correct, asked, streak })}</p>
     <div class="prompt small">{rel?.prompt}</div>
     {#if rel && rel.kind === 'between'}
       <div class="row center">
         <input type="number" min="0" max="6" bind:value={relGuess} style="width:5rem"
           onkeydown={(e) => e.key === 'Enter' && answerRelation(Number(relGuess))} />
-        <button onclick={() => answerRelation(Number(relGuess))} disabled={relGuess === ''}>Check</button>
+        <button onclick={() => answerRelation(Number(relGuess))} disabled={relGuess === ''}>{t('vision.check')}</button>
       </div>
     {:else}
       <div class="row center">
-        <button onclick={() => answerRelation(true)}>Yes</button>
-        <button onclick={() => answerRelation(false)}>No</button>
+        <button onclick={() => answerRelation(true)}>{t('vision.yesBtn')}</button>
+        <button onclick={() => answerRelation(false)}>{t('vision.noBtn')}</button>
       </div>
     {/if}
     <p class="feedback {feedbackKind}">{feedback}</p>
-    <button class="ghost" onclick={backToMenu}>← Drills</button>
+    <button class="ghost" onclick={backToMenu}>{t('vision.backToDrills')}</button>
 
   {:else if drill === 'knight'}
-    <p class="muted">Score {correct}/{asked} · streak {streak}</p>
+    <p class="muted">{t('vision.scoreLine', { correct, asked, streak })}</p>
     <div class="prompt small">{kFrom} → {kTo}</div>
-    <p class="muted">Fewest knight moves?</p>
+    <p class="muted">{t('vision.fewestKnightMoves')}</p>
     <div class="row center">
       <input type="number" min="1" max="8" bind:value={kAnswer} style="width:5rem"
         onkeydown={(e) => e.key === 'Enter' && answerKnight()} />
-      <button onclick={answerKnight} disabled={kAnswer === ''}>Check</button>
-      <button class="ghost" onclick={newKnight}>Next →</button>
+      <button onclick={answerKnight} disabled={kAnswer === ''}>{t('vision.check')}</button>
+      <button class="ghost" onclick={newKnight}>{t('vision.next')}</button>
     </div>
     <p class="feedback {feedbackKind}">{feedback}</p>
     {#if kRevealed}
-      <p class="muted" style="font-size:0.85rem">Path: {kRevealed.join(' → ')}</p>
+      <p class="muted" style="font-size:0.85rem">{t('vision.path', { path: kRevealed.join(' → ') })}</p>
     {/if}
-    <button class="ghost" onclick={backToMenu}>← Drills</button>
+    <button class="ghost" onclick={backToMenu}>{t('vision.backToDrills')}</button>
 
   {:else if drill === 'findall'}
-    <p class="muted">Score {correct}/{asked} · streak {streak}</p>
+    <p class="muted">{t('vision.scoreLine', { correct, asked, streak })}</p>
     <div class="board-wrap" style="max-width:300px">
       <Board fen={faFen} viewOnly={true} orientation="white" turnColor={faFen.split(' ')[1] === 'w' ? 'white' : 'black'} showTurn turnLabel="move" />
     </div>
-    <p class="muted">How many <b>{faLabel[faTask]}</b> for the side to move?</p>
+    <p class="muted">{t('vision.howManyForPre')}<b>{faLabel(faTask)}</b>{t('vision.howManyForPost')}</p>
     <div class="row center">
       <input type="number" min="0" max="40" bind:value={faAnswer} style="width:5rem"
         onkeydown={(e) => e.key === 'Enter' && answerFindAll()} />
-      <button onclick={answerFindAll} disabled={faAnswer === ''}>Check</button>
-      <button class="ghost" onclick={newFindAll}>Next →</button>
+      <button onclick={answerFindAll} disabled={faAnswer === ''}>{t('vision.check')}</button>
+      <button class="ghost" onclick={newFindAll}>{t('vision.next')}</button>
     </div>
     <p class="feedback {feedbackKind}">{feedback}</p>
-    <button class="ghost" onclick={backToMenu}>← Drills</button>
+    <button class="ghost" onclick={backToMenu}>{t('vision.backToDrills')}</button>
   {/if}
 </section>
 

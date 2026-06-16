@@ -4,6 +4,7 @@
   import { loadAllAnalyses } from '../analysis/runAnalysis';
   import { buildWeaknessProfile, drillTarget, type WeaknessProfile, type Dimension } from '../analysis/weakness';
   import { poolRating } from '../store/playerModel';
+  import { t, tn } from '../i18n';
 
   let profile = $state<WeaknessProfile | null>(null);
   let loading = $state(true);
@@ -45,27 +46,28 @@
 </script>
 
 <section class="col" style="max-width:680px;margin:0 auto">
-  <h2>Weakness dashboard</h2>
+  <h2>{t('dashboard.title')}</h2>
 
   {#if loading}
-    <p class="muted">Loading…</p>
+    <p class="muted">{t('dashboard.loading')}</p>
   {:else if !profile}
     <div class="panel col center">
-      <p>No analysed games yet.</p>
-      <p class="muted">Import a game and analyse it — your weaknesses will appear here.</p>
-      <button onclick={() => app.go('import')}>Analyse a game →</button>
+      <p>{t('dashboard.noGamesTitle')}</p>
+      <p class="muted">{t('dashboard.noGamesBody')}</p>
+      <button onclick={() => app.go('import')}>{t('dashboard.analyseGame')}</button>
     </div>
   {:else}
     <p class="muted">
-      Based on {profile.gamesAnalyzed} analysed {profile.gamesAnalyzed === 1 ? 'game' : 'games'}
-      ({profile.playerMoves} of your moves). The dashed ring is the typical level for your rating —
-      inside it is a weakness. These are directional pointers, not a precise grade.
+      {t('dashboard.basedOn', {
+        games: tn(profile.gamesAnalyzed, 'dashboard.gamesOne', 'dashboard.gamesMany'),
+        moves: profile.playerMoves,
+      })}
     </p>
 
     <Radar dimensions={profile.dimensions} />
 
     <div class="row">
-      <button onclick={() => app.go('insights')}>Insights: top leaks + study plan + progress →</button>
+      <button onclick={() => app.go('insights')}>{t('dashboard.insightsLink')}</button>
     </div>
 
     <div class="col">
@@ -77,12 +79,12 @@
               <span style="color:{scoreColor(d.score)};font-weight:700">{d.score}</span>
             </div>
             <span class="muted" style="font-size:0.85rem">{d.detail}</span>
-            {#if d.sampleSize < 3}<span class="muted" style="font-size:0.75rem"> · low data</span>{/if}
+            {#if d.sampleSize < 3}<span class="muted" style="font-size:0.75rem">{t('dashboard.lowData')}</span>{/if}
           </div>
           <div class="row" style="gap:0.4rem;align-items:center">
-            <button onclick={() => drill(d.dimension)}>{d.dimension === 'resilience' ? 'Defend' : 'Drill'}</button>
+            <button onclick={() => drill(d.dimension)}>{d.dimension === 'resilience' ? t('dashboard.defend') : t('dashboard.drill')}</button>
             {#if d.dimension === 'timeManagement'}
-              <button class="link" onclick={() => app.go('when-to-think')}>Train when to think →</button>
+              <button class="link" onclick={() => app.go('when-to-think')}>{t('dashboard.trainWhenToThink')}</button>
             {/if}
           </div>
         </div>
@@ -91,8 +93,8 @@
 
     {#if profile.weakest}
       <p class="feedback">
-        Biggest opportunity: <b>{dimLabels[profile.weakest]}</b>.
-        <button class="link" onclick={() => drill(profile!.weakest!)}>Train it now →</button>
+        {t('dashboard.biggestOpportunity')} <b>{dimLabels[profile.weakest]}</b>.
+        <button class="link" onclick={() => drill(profile!.weakest!)}>{t('dashboard.trainItNow')}</button>
       </p>
     {/if}
   {/if}

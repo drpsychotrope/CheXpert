@@ -2,6 +2,7 @@
   import { app } from '../state/app.svelte';
   import ConceptCard from './ConceptCard.svelte';
   import { loadConcepts, type ConceptCard as Card } from '../concepts/concepts';
+  import { t } from '../i18n';
 
   let cards = $state<Card[]>([]);
   // Optional focus motif handed over by a contextual "Learn the pattern" link.
@@ -15,18 +16,18 @@
 </script>
 
 <section class="col">
-  <h2>Concepts — the pattern library</h2>
-  <p class="muted">Curated, offline worked examples for the tactics we detect. Reference, not a test.</p>
+  <h2>{t('concepts.title')}</h2>
+  <p class="muted">{t('concepts.subtitle')}</p>
 
   {#if focus}
     <p class="feedback">
-      Showing: {focus}
-      <button class="link" onclick={() => (app.conceptFocusMotif = null)}>show all</button>
+      {t('concepts.showing', { focus })}
+      <button class="link" onclick={() => (app.conceptFocusMotif = null)}>{t('concepts.showAll')}</button>
     </p>
   {/if}
 
   {#if cards.length === 0}
-    <p class="muted">No concept cards available.</p>
+    <p class="muted">{t('concepts.noCards')}</p>
   {:else}
     <div class="list">
       {#each visible as card (card.motif)}

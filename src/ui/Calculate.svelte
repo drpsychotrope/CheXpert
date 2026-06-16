@@ -10,6 +10,7 @@
   import type { Puzzle } from '../trainer/puzzle';
   import { putAttempt, getAttempt } from '../store/attemptsRepo';
   import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
+  import { t, tn } from '../i18n';
 
   let puzzle = $state<Puzzle | null>(null);
   let display = $state(new ChessGame());
@@ -50,7 +51,7 @@
     const p =
       (await app.puzzles.next({ rating: model.puzzleRating.rating, window: 400, exclude: seen, source: 'personal' })) ??
       (await app.puzzles.next({ rating: model.puzzleRating.rating, window: 300, exclude: seen }));
-    if (!p) { feedback = 'No puzzles in range.'; return; }
+    if (!p) { feedback = t('calc.noPuzzles'); return; }
     seen.add(p.id);
     puzzle = p;
     display = new ChessGame(p.fen);
@@ -136,15 +137,15 @@
     const g = gradeCalcLine(puzzle.moves, userMoves);
     solved = g.correct;
     if (g.correct) {
-      feedback = `Full line ✓ — ${userMoves.length} ${userMoves.length === 1 ? 'move' : 'moves'}, all correct.`;
+      feedback = tn(userMoves.length, 'calc.fullLineOne', 'calc.fullLineMany');
       feedbackKind = 'good';
     } else {
       const k = firstWrongUserMove(g.solvedPlies);
       const played = userMoves[k - 1];
       const want = puzzle.moves[g.solvedPlies];
       feedback = played == null
-        ? `You stopped early — the line continues past your move ${k - 1}.`
-        : `Diverged at your move ${k} — you played ${fmtUci(played)}, the line was ${fmtUci(want)}. You calculated ${k - 1} of your moves.`;
+        ? t('calc.stoppedEarly', { k: k - 1 })
+        : t('calc.diverged', { k, played: fmtUci(played), want: fmtUci(want), ok: k - 1 });
       feedbackKind = 'bad';
     }
     await logAttempt(g.correct);
@@ -184,19 +185,19 @@
 </script>
 
 <section class="col center">
-  <h2>Calculation</h2>
+  <h2>{t('calc.title')}</h2>
   <p class="muted" style="max-width:440px;font-size:0.85rem">
-    See the whole forcing line in your head, then tap it out one move at a time —
-    <b>from-square, then to-square</b>. The pieces won’t move. <b>Submit</b> checks it;
-    <b>Undo</b> takes back the last move.
+    {t('calc.introLead')}
+    <b>{t('calc.introTapBold')}</b>{t('calc.introMid')} <b>{t('calc.introSubmitBold')}</b>{t('calc.introSubmitTail')}
+    <b>{t('calc.introUndoBold')}</b>{t('calc.introUndoTail')}
   </p>
 
   {#if metacog && phase === 'input'}
-    <div class="row center metacog" role="group" aria-label="How confident are you?">
-      <span class="muted metacog-label">Confidence:</span>
-      <button type="button" class="chip {confidence === 'sure' ? 'on' : ''}" onclick={() => (confidence = confidence === 'sure' ? undefined : 'sure')}>Sure</button>
-      <button type="button" class="chip {confidence === 'unsure' ? 'on' : ''}" onclick={() => (confidence = confidence === 'unsure' ? undefined : 'unsure')}>Unsure</button>
-      <button type="button" class="chip {confidence === 'guess' ? 'on' : ''}" onclick={() => (confidence = confidence === 'guess' ? undefined : 'guess')}>Guess</button>
+    <div class="row center metacog" role="group" aria-label={t('calc.confidenceGroup')}>
+      <span class="muted metacog-label">{t('calc.confidence')}</span>
+      <button type="button" class="chip {confidence === 'sure' ? 'on' : ''}" onclick={() => (confidence = confidence === 'sure' ? undefined : 'sure')}>{t('calc.sure')}</button>
+      <button type="button" class="chip {confidence === 'unsure' ? 'on' : ''}" onclick={() => (confidence = confidence === 'unsure' ? undefined : 'unsure')}>{t('calc.unsure')}</button>
+      <button type="button" class="chip {confidence === 'guess' ? 'on' : ''}" onclick={() => (confidence = confidence === 'guess' ? undefined : 'guess')}>{t('calc.guess')}</button>
     </div>
   {/if}
 
@@ -219,9 +220,9 @@
 
   {#if phase === 'input'}
     <div class="row center myline">
-      <span class="muted">My line:</span>
+      <span class="muted">{t('calc.myLine')}</span>
       {#if userMoves.length === 0}
-        <span class="muted">— tap a from-square, then a to-square</span>
+        <span class="muted">{t('calc.tapHint')}</span>
       {:else}
         {#each userMoves as m, i}<span class="ply">{i + 1}.{fmtUci(m)}</span>{/each}
       {/if}
@@ -231,12 +232,12 @@
   <p class="feedback {feedbackKind}">{feedback}</p>
 
   {#if phase === 'revealed' && solutionSan}
-    <p class="muted solution">Solution: {solutionSan}</p>
+    <p class="muted solution">{t('calc.solution', { line: solutionSan })}</p>
   {/if}
 
   {#if metacog && phase === 'revealed' && !solved}
-    <div class="col center metacog" role="group" aria-label="Why did you miss?">
-      <span class="muted metacog-label">Why did you miss? (optional)</span>
+    <div class="col center metacog" role="group" aria-label={t('calc.whyMissGroup')}>
+      <span class="muted metacog-label">{t('calc.whyMiss')}</span>
       <div class="row center" style="flex-wrap:wrap">
         {#each SELF_TAGS as tag}
           <button type="button" class="chip {selfTag === tag ? 'on' : ''}" onclick={() => updateSelfTag(tag)}>{SELF_TAG_LABELS[tag]}</button>
@@ -247,10 +248,10 @@
 
   <div class="row center">
     {#if phase === 'input'}
-      <button class="ghost" onclick={undo} disabled={userMoves.length === 0}>⌫ Undo</button>
-      <button onclick={submit} disabled={userMoves.length === 0}>Submit</button>
+      <button class="ghost" onclick={undo} disabled={userMoves.length === 0}>{t('calc.undo')}</button>
+      <button onclick={submit} disabled={userMoves.length === 0}>{t('calc.submit')}</button>
     {/if}
-    <button onclick={load}>Next position →</button>
+    <button onclick={load}>{t('calc.next')}</button>
   </div>
 </section>
 

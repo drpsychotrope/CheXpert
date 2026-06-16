@@ -8,6 +8,7 @@
   import Board from './Board.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { winPct } from '../analysis/winProb';
+  import { t } from '../i18n';
 
   const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   const startFen = app.analysisFen ?? START;
@@ -94,9 +95,9 @@
 </script>
 
 <section class="col center">
-  <h2>Analysis board</h2>
+  <h2>{t('analysisBoard.title')}</h2>
   <div class="row" style="gap:1rem;align-items:stretch">
-    <div class="evalbar" title="White winning chance">
+    <div class="evalbar" title={t('analysisBoard.whiteWinningChance')}>
       <div class="evalfill" style="height:{topWhitePct}%"></div>
     </div>
     <div class="board-wrap">
@@ -113,18 +114,18 @@
   </div>
 
   <div class="col" style="gap:0.2rem;width:100%;max-width:420px">
-    <h4>Engine lines {thinking ? '…' : ''}</h4>
+    <h4>{t('analysisBoard.engineLines')} {thinking ? '…' : ''}</h4>
     {#each lines as l (l.uci)}
       <button class="line panel" onclick={() => playLine(l.uci)}>
         <span><b>{fmtCp(l.cp, l.mate)}</b> &nbsp; {l.san}</span>
       </button>
     {/each}
-    {#if !lines.length && !thinking}<p class="muted">No legal moves (game over).</p>{/if}
+    {#if !lines.length && !thinking}<p class="muted">{t('analysisBoard.noLegalMoves')}</p>{/if}
   </div>
 
   <div class="row center">
-    <button onclick={back} disabled={stack.length <= 1}>← Back</button>
-    <button class="ghost" onclick={reset}>Reset</button>
+    <button onclick={back} disabled={stack.length <= 1}>{t('analysisBoard.back')}</button>
+    <button class="ghost" onclick={reset}>{t('analysisBoard.reset')}</button>
   </div>
 </section>
 

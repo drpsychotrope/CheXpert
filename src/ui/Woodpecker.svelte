@@ -9,6 +9,7 @@
     cycleStats, improvement, saveSet, listSets, deleteSet,
   } from '../woodpecker/woodpecker';
   import type { WoodpeckerSet } from '../woodpecker/types';
+  import { t, tn, fmtPct } from '../i18n';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   let pendingDelete = $state<string | null>(null); // themed delete confirm (audit v2 W14/H39)
@@ -48,7 +49,7 @@
     }
     if (ids.length === 0) return;
     const now = Date.now();
-    await saveSet(createSet(`wp:${now}`, `Set of ${ids.length}`, ids, now));
+    await saveSet(createSet(`wp:${now}`, t('woodpecker.setName', { n: ids.length }), ids, now));
     await refresh();
   }
 
@@ -94,7 +95,7 @@
     const idx = nextIndex(active);
 
     if (res === 'wrong') {
-      feedback = 'Missed — counts as a miss this cycle.';
+      feedback = t('woodpecker.missed');
       feedbackKind = 'bad';
       active = recordResult(active, idx, false, Date.now() - puzzleStartedAt);
       await saveSet(active);
@@ -104,13 +105,13 @@
     display = new ChessGame(trainer.getFen());
     fen = display.fen;
     if (res === 'solved') {
-      feedback = 'Solved ✔';
+      feedback = t('woodpecker.solved');
       feedbackKind = 'good';
       active = recordResult(active, idx, true, Date.now() - puzzleStartedAt);
       await saveSet(active);
       setTimeout(loadCurrent, 450);
     } else {
-      feedback = 'Good — continue.';
+      feedback = t('woodpecker.continue');
       feedbackKind = 'good';
     }
   }
@@ -143,16 +144,14 @@
 </script>
 
 <section class="col center">
-  <h2>Woodpecker</h2>
+  <h2>{t('woodpecker.title')}</h2>
   <p class="muted" style="max-width:560px">
-    A <b>fixed</b> set of puzzles, solved again and again — faster each cycle — until the patterns are
-    automatic. This complements spaced repetition: Review spreads many puzzles over time; Woodpecker
-    drills one set to speed.
+    {t('woodpecker.introLead')}<b>{t('woodpecker.introFixedBold')}</b>{t('woodpecker.introTail')}
   </p>
 
   {#if mode === 'list'}
     <div class="row center">
-      <label>Set size
+      <label>{t('woodpecker.setSize')}
         <select bind:value={setSize}>
           <option value={5}>5</option>
           <option value={7}>7</option>
@@ -160,11 +159,11 @@
           <option value={15}>15</option>
         </select>
       </label>
-      <button onclick={makeSet} disabled={!model || app.puzzles.size === 0}>+ New set</button>
+      <button onclick={makeSet} disabled={!model || app.puzzles.size === 0}>{t('woodpecker.newSet')}</button>
     </div>
 
     {#if sets.length === 0}
-      <p class="muted">No sets yet — create one to start.</p>
+      <p class="muted">{t('woodpecker.noSets')}</p>
     {:else}
       <div class="sets">
         {#each sets as s (s.id)}
@@ -173,12 +172,12 @@
             <div class="col" style="gap:0.2rem;align-items:flex-start">
               <b>{s.name}</b>
               <span class="muted" style="font-size:0.8rem">
-                {s.puzzleIds.length} puzzles · {completed.length} cycle{completed.length === 1 ? '' : 's'} done
-                {#if completed.length}· last {fmt(cycleStats(completed[completed.length - 1]).totalMs)}{/if}
+                {tn(completed.length, 'woodpecker.setSummaryOne', 'woodpecker.setSummaryMany', { puzzles: s.puzzleIds.length })}
+                {#if completed.length}{t('woodpecker.lastTime', { time: fmt(cycleStats(completed[completed.length - 1]).totalMs) })}{/if}
               </span>
             </div>
             <div class="row">
-              <button onclick={() => beginCycle(s)}>{completed.length ? 'Next cycle' : 'Start'}</button>
+              <button onclick={() => beginCycle(s)}>{completed.length ? t('woodpecker.nextCycle') : t('woodpecker.start')}</button>
               <button class="ghost" onclick={() => remove(s.id)}>✕</button>
             </div>
           </div>
@@ -189,29 +188,29 @@
     {@const cur = currentCycle(active)}
     {@const stats = cur ? cycleStats(cur) : null}
     <p class="muted">
-      {active.name} · cycle {cur?.cycle ?? active.cycles.length}
-      {#if stats}· {stats.solvedCount}/{stats.total} solved{/if}
+      {t('woodpecker.runHeader', { name: active.name, cycle: cur?.cycle ?? active.cycles.length })}
+      {#if stats}{t('woodpecker.runSolved', { solved: stats.solvedCount, total: stats.total })}{/if}
     </p>
 
     {#if cycleDone}
       {@const done = active.cycles.filter((c) => c.completedAt != null)}
       <div class="panel col center">
-        <h3>Cycle complete</h3>
+        <h3>{t('woodpecker.cycleComplete')}</h3>
         {#if done.length}
           {@const last = cycleStats(done[done.length - 1])}
-          <p>Time: <b>{fmt(last.totalMs)}</b> · Accuracy: <b>{Math.round(last.accuracy * 100)}%</b></p>
+          <p>{t('woodpecker.timeLabel')} <b>{fmt(last.totalMs)}</b>{t('woodpecker.accuracyLabel')} <b>{fmtPct(last.accuracy * 100)}</b></p>
         {/if}
         {#if lastImprovement}
           <p class={lastImprovement.fasterMs > 0 ? 'feedback good' : 'muted'}>
             {lastImprovement.fasterMs > 0
-              ? `${fmt(lastImprovement.fasterMs)} faster than last cycle` +
-                (lastImprovement.moreAccurate ? ' — and at least as accurate. ✔' : '.')
-              : 'Not faster than last cycle yet — run it again.'}
+              ? t('woodpecker.faster', { time: fmt(lastImprovement.fasterMs) }) +
+                (lastImprovement.moreAccurate ? t('woodpecker.fasterAndAccurate') : t('woodpecker.fasterPeriod'))
+              : t('woodpecker.notFaster')}
           </p>
         {/if}
         <div class="row center">
-          <button onclick={() => active && beginCycle(active)}>Run again →</button>
-          <button class="ghost" onclick={() => (mode = 'list')}>← Sets</button>
+          <button onclick={() => active && beginCycle(active)}>{t('woodpecker.runAgain')}</button>
+          <button class="ghost" onclick={() => (mode = 'list')}>{t('woodpecker.backToSets')}</button>
         </div>
       </div>
     {:else}
@@ -229,15 +228,15 @@
         />
       </div>
       <p class="feedback {feedbackKind}">{feedback}</p>
-      <button class="ghost" onclick={() => (mode = 'list')}>Pause (progress saved)</button>
+      <button class="ghost" onclick={() => (mode = 'list')}>{t('woodpecker.pause')}</button>
     {/if}
   {/if}
 
   <ConfirmDialog
     open={pendingDelete !== null}
-    title="Delete this set?"
-    body="This Woodpecker set and its cycle history will be removed. This can't be undone."
-    confirmLabel="Delete"
+    title={t('woodpecker.deleteTitle')}
+    body={t('woodpecker.deleteBody')}
+    confirmLabel={t('woodpecker.deleteConfirm')}
     danger
     onConfirm={confirmRemove}
     onCancel={() => (pendingDelete = null)}

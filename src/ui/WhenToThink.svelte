@@ -20,6 +20,7 @@
   } from '../analysis/criticalMomentDrill';
   import { fallbackDrillItems } from '../analysis/criticalMomentFallback';
   import { explainPly, type Explanation } from '../analysis/explain';
+  import { t, tn, fmtPct, getLocale } from '../i18n';
 
   let items = $state<DrillItem[]>([]);
   let idx = $state(0);
@@ -34,7 +35,7 @@
   const hasNext = $derived(idx + 1 < items.length);
   // POV from the side to move in fenBefore: FEN field 2 is 'w' or 'b'.
   const toMove = $derived(current ? (current.fenBefore.split(' ')[1] === 'b' ? 'black' : 'white') : 'white');
-  const explanation = $derived<Explanation | null>(current ? explainPly(current.ply) : null);
+  const explanation = $derived<Explanation | null>(current ? explainPly(current.ply, getLocale()) : null);
 
   onMount(async () => {
     let built: DrillItem[] = [];
@@ -80,20 +81,19 @@
 </script>
 
 <section class="col center" style="max-width:680px;margin:0 auto">
-  <h2>When to think</h2>
+  <h2>{t('whenToThink.title')}</h2>
 
   {#if status === 'loading'}
-    <p class="muted">Loading positions from your games…</p>
+    <p class="muted">{t('whenToThink.loadingPositions')}</p>
   {:else if status === 'empty'}
     <div class="panel col center">
-      <p>No positions to drill yet.</p>
-      <p class="muted">Analyse a game and your own critical moments will appear here to practise.</p>
-      <button onclick={() => app.go('import')}>Analyse a game →</button>
+      <p>{t('whenToThink.emptyTitle')}</p>
+      <p class="muted">{t('whenToThink.emptyBody')}</p>
+      <button onclick={() => app.go('import')}>{t('whenToThink.analyseAGame')}</button>
     </div>
   {:else if current}
     <p class="muted">
-      Position {idx + 1} / {items.length}{usingFallback ? ' · sample positions (analyse a game to drill your own)' : ''}.
-      Recognising critical moments is a trainable feel — this is practice, not a graded verdict.
+      {t('whenToThink.positionIntro', { idx: idx + 1, total: items.length })}{usingFallback ? t('whenToThink.sampleSuffix') : ''}{t('whenToThink.positionTail')}
     </p>
 
     <div class="board-wrap">
@@ -101,27 +101,27 @@
     </div>
 
     <p class="prompt">
-      <b>{toMove === 'white' ? 'White' : 'Black'} to move</b> — would you stop and think here?
+      {@html t('whenToThink.toMovePrompt', { color: toMove === 'white' ? t('color.white') : t('color.black') })}
     </p>
 
     {#if !revealed}
       <div class="row center">
-        <button onclick={() => call('critical')}>Critical (invest time)</button>
-        <button class="ghost" onclick={() => call('routine')}>Routine (play fast)</button>
+        <button onclick={() => call('critical')}>{t('whenToThink.callCritical')}</button>
+        <button class="ghost" onclick={() => call('routine')}>{t('whenToThink.callRoutine')}</button>
       </div>
     {:else if result}
       <div class="panel col reveal {result.correct ? 'good' : 'bad'}">
         <p class="verdict">
-          {result.correct ? 'Correct' : 'Not quite'} — this was a
-          <b>{result.truth === 'critical' ? 'CRITICAL' : 'ROUTINE'}</b> moment.
+          {@html t('whenToThink.verdict', {
+            judgement: result.correct ? t('whenToThink.verdictCorrect') : t('whenToThink.verdictNotQuite'),
+            truth: result.truth === 'critical' ? t('whenToThink.truthCritical') : t('whenToThink.truthRoutine'),
+          })}
         </p>
         <p class="swing">
           {#if result.truth === 'critical'}
-            About <b>{Math.round(current.winProbLoss)}%</b> in winning chances hung on this move —
-            a moment where a wrong choice proved expensive.
+            {@html t('whenToThink.swingCritical', { pct: fmtPct(Math.round(current.winProbLoss)) })}
           {:else}
-            Only about <b>{Math.round(current.winProbLoss)}%</b> in winning chances hung on this — a
-            position to play quickly.
+            {@html t('whenToThink.swingRoutine', { pct: fmtPct(Math.round(current.winProbLoss)) })}
           {/if}
         </p>
         {#if explanation}
@@ -135,16 +135,16 @@
 
       <div class="row center">
         {#if hasNext}
-          <button onclick={next}>Next →</button>
+          <button onclick={next}>{t('whenToThink.next')}</button>
         {/if}
-        <button class="ghost" onclick={restart}>Restart</button>
-        <button class="ghost" onclick={() => app.go('dashboard')}>Back to dashboard</button>
+        <button class="ghost" onclick={restart}>{t('whenToThink.restart')}</button>
+        <button class="ghost" onclick={() => app.go('dashboard')}>{t('whenToThink.backToDashboard')}</button>
       </div>
     {/if}
 
     <p class="tally muted">
-      You've called {total} {total === 1 ? 'position' : 'positions'} · {right} matched the game's outcome.
-      {#if atEnd}That's the set — recognising critical moments is a feel you build with practice.{/if}
+      {tn(total, 'whenToThink.tallyOne', 'whenToThink.tallyMany', { right })}
+      {#if atEnd}{t('whenToThink.tallyEnd')}{/if}
     </p>
   {/if}
 </section>

@@ -3,6 +3,8 @@
 // actually present (extends the no-LLM honesty doctrine, ADR-0007/AP-CHESS-19).
 
 import { Chess } from 'chess.js';
+import { gt } from '../i18n/gen';
+import type { Locale } from '../i18n/translate';
 
 const VAL: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
@@ -68,16 +70,17 @@ function structure(color: 'w' | 'b', pawns: Record<'w' | 'b', Pawn[]>): SideStru
   return { doubledFiles, isolated: isolated.sort(), passed };
 }
 
-/** Honest phrases for present structural features. Optionally restricted to one side. */
-export function explainPositional(fen: string, side?: 'w' | 'b'): string[] {
+/** Honest phrases for present structural features, in `locale`. Optionally restricted to one side.
+ * The verb agreement is baked per-locale (FR plural "ont" vs EN "has"); {who} is the localized subject. */
+export function explainPositional(fen: string, side: 'w' | 'b' | undefined, locale: Locale): string[] {
   const F = positionalFeatures(fen);
   const out: string[] = [];
   for (const c of ['w', 'b'] as const) {
     if (side && side !== c) continue;
-    const who = c === 'w' ? 'White' : 'Black';
-    if (F[c].isolated.length) out.push(`${who} has an isolated pawn (${F[c].isolated.join(', ')}).`);
-    if (F[c].doubledFiles.length) out.push(`${who} has doubled pawns on the ${F[c].doubledFiles.join('/')}-file.`);
-    if (F[c].passed.length) out.push(`${who} has a passed pawn (${F[c].passed.join(', ')}).`);
+    const who = gt(c === 'w' ? 'pos.subjectW' : 'pos.subjectB', locale);
+    if (F[c].isolated.length) out.push(gt('pos.isolated', locale, { who, sq: F[c].isolated.join(', ') }));
+    if (F[c].doubledFiles.length) out.push(gt('pos.doubled', locale, { who, sq: F[c].doubledFiles.join('/') }));
+    if (F[c].passed.length) out.push(gt('pos.passed', locale, { who, sq: F[c].passed.join(', ') }));
   }
   return out;
 }

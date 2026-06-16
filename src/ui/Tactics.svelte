@@ -11,6 +11,7 @@
   import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
   import { cardForThemes, loadConcepts, type ConceptCard as ConceptCardData } from '../concepts/concepts';
   import { failCountByPuzzle, isLeech } from '../srs/schedule';
+  import { t } from '../i18n';
 
   let trainer = $state<TacticalTrainer | null>(null);
   let puzzle = $state<Puzzle | null>(null);
@@ -100,7 +101,7 @@
   async function onTimeout() {
     if (!trainer || trainer.state.status !== 'solving') return;
     locked = true;
-    feedback = '⏱ Time — counts as a miss.';
+    feedback = t('tactics.timeMiss');
     feedbackKind = 'bad';
     await finish(false);
   }
@@ -134,7 +135,7 @@
     }
 
     if (!p) {
-      feedback = 'No more puzzles available in your range.';
+      feedback = t('tactics.noMore');
       return;
     }
     seen.add(p.id);
@@ -184,7 +185,7 @@
 
     if (result === 'wrong') {
       stopTimer();
-      feedback = 'Not the move — Retry the position, or move on.';
+      feedback = t('tactics.wrong');
       feedbackKind = 'bad';
       await finish(false);
       // Reset the board to the puzzle's start so Retry is one click away.
@@ -202,11 +203,11 @@
 
     if (result === 'solved') {
       stopTimer();
-      feedback = 'Solved! ✔';
+      feedback = t('tactics.solved');
       feedbackKind = 'good';
       await finish(true);
     } else {
-      feedback = 'Correct — keep going.';
+      feedback = t('tactics.keepGoing');
       feedbackKind = 'good';
     }
   }
@@ -281,7 +282,7 @@
     if (trainer) {
       const m = trainer.expectedMove();
       if (m) {
-        feedback = `Hint: a strong piece moves from ${m.slice(0, 2)}.`;
+        feedback = t('tactics.hint', { sq: m.slice(0, 2) });
         feedbackKind = '';
       }
     }
@@ -295,7 +296,7 @@
     display = new ChessGame(puzzle.fen);
     fen = display.fen;
     lastMove = null;
-    feedback = 'Retry — find the move.';
+    feedback = t('tactics.retryFind');
     feedbackKind = '';
     confidence = undefined;
     selfTag = undefined;
@@ -305,33 +306,32 @@
 </script>
 
 <section class="col center">
-  <h2>Tactics</h2>
+  <h2>{t('tactics.title')}</h2>
   {#if model}
     <p class="muted">
-      Puzzle rating {Math.round(model.puzzleRating.rating)} ±{Math.round(model.puzzleRating.rd)}
-      · session {solvedThisSession}/{attemptedThisSession}
+      {t('tactics.ratingLine', { rating: Math.round(model.puzzleRating.rating), rd: Math.round(model.puzzleRating.rd), solved: solvedThisSession, attempted: attemptedThisSession })}
     </p>
   {/if}
   {#if drillThemes && drillThemes.length}
     <p class="feedback">
-      Drilling your weakness: {drillThemes.slice(0, 3).join(', ')}
-      <button class="link" onclick={clearDrill}>clear</button>
+      {t('tactics.drilling', { themes: drillThemes.slice(0, 3).join(', ') })}
+      <button class="link" onclick={clearDrill}>{t('tactics.clear')}</button>
     </p>
   {:else if mode === 'personal'}
-    <p class="muted" style="font-size:0.85rem">★ From your own games</p>
+    <p class="muted" style="font-size:0.85rem">{t('tactics.fromYourGames')}</p>
   {/if}
   {#if timed}
-    <p class="feedback {timeLeft <= 5 ? 'bad' : ''}">⏱ {timeLeft}s — beat the clock
-      <button class="link" onclick={clearDrill}>clear</button>
+    <p class="feedback {timeLeft <= 5 ? 'bad' : ''}">{t('tactics.beatClock', { n: timeLeft })}
+      <button class="link" onclick={clearDrill}>{t('tactics.clear')}</button>
     </p>
   {/if}
 
   {#if metacog && trainer?.state.status === 'solving'}
-    <div class="row center metacog" role="group" aria-label="How confident are you?">
-      <span class="muted metacog-label">Confidence:</span>
-      <button type="button" class="chip {confidence === 'sure' ? 'on' : ''}" onclick={() => (confidence = confidence === 'sure' ? undefined : 'sure')}>Sure</button>
-      <button type="button" class="chip {confidence === 'unsure' ? 'on' : ''}" onclick={() => (confidence = confidence === 'unsure' ? undefined : 'unsure')}>Unsure</button>
-      <button type="button" class="chip {confidence === 'guess' ? 'on' : ''}" onclick={() => (confidence = confidence === 'guess' ? undefined : 'guess')}>Guess</button>
+    <div class="row center metacog" role="group" aria-label={t('tactics.confidenceGroup')}>
+      <span class="muted metacog-label">{t('tactics.confidence')}</span>
+      <button type="button" class="chip {confidence === 'sure' ? 'on' : ''}" onclick={() => (confidence = confidence === 'sure' ? undefined : 'sure')}>{t('tactics.sure')}</button>
+      <button type="button" class="chip {confidence === 'unsure' ? 'on' : ''}" onclick={() => (confidence = confidence === 'unsure' ? undefined : 'unsure')}>{t('tactics.unsure')}</button>
+      <button type="button" class="chip {confidence === 'guess' ? 'on' : ''}" onclick={() => (confidence = confidence === 'guess' ? undefined : 'guess')}>{t('tactics.guess')}</button>
     </div>
   {/if}
 
@@ -361,9 +361,9 @@
 
   {#if showLearn && card}
     <p class="feedback">
-      {#if leech}This one keeps beating you.{/if}
-      <button class="link" onclick={openLearn}>Learn the pattern →</button>
-      <button class="link" onclick={() => { app.conceptFocusMotif = card!.motif; app.go('concepts'); }}>open in library</button>
+      {#if leech}{t('tactics.leech')}{/if}
+      <button class="link" onclick={openLearn}>{t('tactics.learnPattern')}</button>
+      <button class="link" onclick={() => { app.conceptFocusMotif = card!.motif; app.go('concepts'); }}>{t('tactics.openInLibrary')}</button>
     </p>
   {/if}
 
@@ -372,8 +372,8 @@
   {/if}
 
   {#if metacog && trainer?.state.status === 'failed'}
-    <div class="col center metacog" role="group" aria-label="Why did you miss?">
-      <span class="muted metacog-label">Why did you miss? (optional)</span>
+    <div class="col center metacog" role="group" aria-label={t('tactics.whyMissGroup')}>
+      <span class="muted metacog-label">{t('tactics.whyMiss')}</span>
       <div class="row center" style="flex-wrap:wrap">
         {#each SELF_TAGS as tag}
           <button type="button" class="chip {selfTag === tag ? 'on' : ''}" onclick={() => updateSelfTag(tag)}>{SELF_TAG_LABELS[tag]}</button>
@@ -383,14 +383,14 @@
   {/if}
 
   <div class="row center">
-    <button onclick={hint} disabled={trainer?.state.status !== 'solving' || locked}>Hint</button>
-    <button onclick={retry} disabled={!puzzle}>↻ Retry</button>
-    <button onclick={loadNext}>Next puzzle →</button>
+    <button onclick={hint} disabled={trainer?.state.status !== 'solving' || locked}>{t('tactics.hintBtn')}</button>
+    <button onclick={retry} disabled={!puzzle}>{t('tactics.retryBtn')}</button>
+    <button onclick={loadNext}>{t('tactics.nextBtn')}</button>
   </div>
   {#if puzzle}
     <p class="muted" style="font-size:0.8rem">
-      Themes: {puzzle.themes.join(', ') || '—'}
-      {#if puzzle.source === 'personal'} · ★ from your game{/if}
+      {t('tactics.themes', { themes: puzzle.themes.join(', ') || t('tactics.themesEmpty') })}
+      {#if puzzle.source === 'personal'}{t('tactics.fromYourGameTag')}{/if}
     </p>
   {/if}
 </section>

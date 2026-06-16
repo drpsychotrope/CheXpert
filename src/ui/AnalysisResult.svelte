@@ -11,6 +11,7 @@
   import { describeOpening, type OpeningName } from '../opening/eco';
   import { buildLine, saveLine } from '../repertoire/repertoire';
   import type { GameAnalysis } from '../analysis/types';
+  import { t, tn, fmtPct, getLocale } from '../i18n';
 
   interface Props {
     analysis: GameAnalysis;
@@ -24,11 +25,11 @@
   const moments = $derived(criticalMoments(analysis));
   const orientation = $derived(analysis.playerColor === 'b' ? 'black' : 'white');
   const selPly = $derived(selectedPly != null ? analysis.plies[selectedPly] : null);
-  const selEx = $derived(selPly ? explainPly(selPly) : null);
+  const selEx = $derived(selPly ? explainPly(selPly, getLocale()) : null);
   const mistakes = $derived(
     analysis.plies
       .filter((p) => p.color === analysis.playerColor && (p.severity === 'mistake' || p.severity === 'blunder'))
-      .map((p) => ({ ply: p, ex: explainPly(p) })),
+      .map((p) => ({ ply: p, ex: explainPly(p, getLocale()) })),
   );
 
   // Opening naming + repertoire-gap (ADR-0028).
@@ -49,19 +50,19 @@
 </script>
 
 <div class="row" style="gap:1.5rem">
-  <div><b style="font-size:1.5rem">{analysis.acpl}</b><br /><span class="muted">your ACPL</span></div>
-  <div><b style="font-size:1.5rem;color:var(--bad)">{analysis.blunders}</b><br /><span class="muted">blunders</span></div>
-  <div><b style="font-size:1.5rem">{analysis.mistakes}</b><br /><span class="muted">mistakes</span></div>
-  <div><b style="font-size:1.5rem">{analysis.inaccuracies}</b><br /><span class="muted">inaccuracies</span></div>
+  <div><b style="font-size:1.5rem">{analysis.acpl}</b><br /><span class="muted">{t('analysisResult.yourAcpl')}</span></div>
+  <div><b style="font-size:1.5rem;color:var(--bad)">{analysis.blunders}</b><br /><span class="muted">{t('analysisResult.blunders')}</span></div>
+  <div><b style="font-size:1.5rem">{analysis.mistakes}</b><br /><span class="muted">{t('analysisResult.mistakes')}</span></div>
+  <div><b style="font-size:1.5rem">{analysis.inaccuracies}</b><br /><span class="muted">{t('analysisResult.inaccuracies')}</span></div>
 </div>
 
 {#if opening}
   <p class="muted" style="font-size:0.85rem">
-    Opening: <b>{opening.name}</b> ({opening.eco}) · left book at move {Math.floor(opening.plyInBook / 2) + 1}.
+    {t('analysisResult.opening')} <b>{opening.name}</b> ({opening.eco}) · {t('analysisResult.leftBook', { move: Math.floor(opening.plyInBook / 2) + 1 })}
     {#if repAdded}
-      <span style="color:var(--good)">✓ added to repertoire</span>
+      <span style="color:var(--good)">{t('analysisResult.addedToRep')}</span>
     {:else}
-      <button class="link" onclick={addToRepertoire}>Add this line to repertoire</button>
+      <button class="link" onclick={addToRepertoire}>{t('analysisResult.addLineToRep')}</button>
     {/if}
   </p>
 {/if}
@@ -71,19 +72,19 @@
 <div class="row" style="gap:1rem;font-size:0.85rem">
   {#each PHASES as ph}
     {#if analysis.byPhase[ph].plies > 0}
-      <span class="muted">{ph} ACPL <b style="color:var(--text)">{Math.round(analysis.byPhase[ph].acpl)}</b></span>
+      <span class="muted">{t('analysisResult.phaseAcpl', { phase: ph })} <b style="color:var(--text)">{Math.round(analysis.byPhase[ph].acpl)}</b></span>
     {/if}
   {/each}
 </div>
 
 {#if moments.length}
   <div class="col" style="gap:0.2rem">
-    <h4>Critical moments</h4>
+    <h4>{t('analysisResult.criticalMoments')}</h4>
     {#each moments as m (m.plyIndex)}
       <button class="moment {selectedPly === m.plyIndex ? 'sel' : ''}" onclick={() => (selectedPly = m.plyIndex)}>
-        <span>Move {m.ply.moveNumber} <b>{m.ply.san}</b></span>
-        <span class="muted">{m.side === 'player' ? 'you' : 'opponent'}</span>
-        <span class="muted">−{Math.round(m.winProbLoss)}%</span>
+        <span>{t('analysisResult.moveLabel', { n: m.ply.moveNumber })} <b>{m.ply.san}</b></span>
+        <span class="muted">{m.side === 'player' ? t('analysisResult.you') : t('analysisResult.opponent')}</span>
+        <span class="muted">−{fmtPct(m.winProbLoss)}</span>
       </button>
     {/each}
   </div>
@@ -97,31 +98,30 @@
     <p class="muted" style="font-size:0.85rem">{selEx.headline}</p>
     {#each selEx.reasons as r}<p class="muted" style="font-size:0.85rem">{r}</p>{/each}
     {#if selEx.better}<p class="better">{selEx.better}</p>{/if}
-    <button class="link" onclick={() => { if (selPly) { app.analysisFen = selPly.fenBefore; app.go('analysis-board'); } }}>Explore this position →</button>
+    <button class="link" onclick={() => { if (selPly) { app.analysisFen = selPly.fenBefore; app.go('analysis-board'); } }}>{t('analysisResult.exploreThisPosition')}</button>
   </div>
 {/if}
 
 {#if puzzlesMade > 0}
   <p class="feedback good">
-    Created {puzzlesMade} personalised {puzzlesMade === 1 ? 'puzzle' : 'puzzles'} from your
-    mistakes — find them in <button class="link" onclick={() => app.go('tactics')}>Tactics</button>.
+    {tn(puzzlesMade, 'analysisResult.createdPuzzlesOne', 'analysisResult.createdPuzzlesMany')}<button class="link" onclick={() => app.go('tactics')}>{t('analysisResult.tacticsLink')}</button>{t('analysisResult.tacticsLinkSuffix')}
   </p>
 {:else}
-  <p class="muted">No clear-cut, unique-solution mistakes found to turn into puzzles.</p>
+  <p class="muted">{t('analysisResult.noPuzzles')}</p>
 {/if}
 <div class="row">
-  <button onclick={() => app.go('dashboard')}>See your weakness dashboard →</button>
+  <button onclick={() => app.go('dashboard')}>{t('analysisResult.seeDashboard')}</button>
 </div>
 
 {#if mistakes.length}
-  <h4>Your mistakes, explained</h4>
+  <h4>{t('analysisResult.mistakesExplained')}</h4>
   <div class="col" style="gap:0.4rem">
     {#each mistakes as m (m.ply.ply)}
       <details class="mistake">
         <summary>
-          <span>Move {m.ply.moveNumber}: <b>{m.ply.san}</b></span>
+          <span>{t('analysisResult.moveColon', { n: m.ply.moveNumber })} <b>{m.ply.san}</b></span>
           <span class="muted sev">{m.ply.severity}</span>
-          <span class="muted">−{Math.round(m.ply.winProbLoss)}% win</span>
+          <span class="muted">−{fmtPct(m.ply.winProbLoss)}{t('analysisResult.winSuffix')}</span>
         </summary>
         <div class="why">
           {#each m.ex.reasons as r}<p>{r}</p>{/each}
@@ -131,8 +131,7 @@
     {/each}
   </div>
   <p class="muted" style="font-size:0.75rem">
-    Explanations are rule-based and derived only from the engine's own evaluation — never invented.
-    When we can't name a specific tactical pattern, we say so rather than guess.
+    {t('analysisResult.explanationsNote')}
   </p>
 {/if}
 

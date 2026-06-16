@@ -9,6 +9,7 @@
   import { allAttempts } from '../store/attemptsRepo';
   import { interleave, buildLapseSet } from '../srs/schedule';
   import { createSet, saveSet } from '../woodpecker/woodpecker';
+  import { t, tn } from '../i18n';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -88,7 +89,7 @@
     const res = trainer.playUserMove(uci);
 
     if (res === 'wrong') {
-      feedback = 'Missed — scheduled again soon.';
+      feedback = t('review.missed');
       feedbackKind = 'bad';
       display = new ChessGame(puzzle.fen);
       fen = display.fen;
@@ -99,11 +100,11 @@
     fen = display.fen;
     lastMove = [from, to];
     if (res === 'solved') {
-      feedback = 'Solved ✔';
+      feedback = t('review.solved');
       feedbackKind = 'good';
       await grade(true);
     } else {
-      feedback = 'Correct — keep going.';
+      feedback = t('review.keepGoing');
       feedbackKind = 'good';
     }
   }
@@ -140,11 +141,11 @@
     const attempts = (await allAttempts()) as Array<{ puzzleId: string; solved: boolean }>;
     const ids = buildLapseSet(attempts, 12);
     if (!ids.length) {
-      missesMsg = 'No failed puzzles yet — miss a few in Tactics first.';
+      missesMsg = t('review.noFailedPuzzles');
       return;
     }
     await saveSet(createSet('wp:lapses', 'Your misses', ids, Date.now()));
-    missesMsg = `Built a ${ids.length}-puzzle "Your misses" set — train it in Woodpecker.`;
+    missesMsg = t('review.builtMissesSet', { n: ids.length });
   }
 
   $effect(() => {
@@ -153,32 +154,32 @@
 </script>
 
 <section class="col center">
-  <h2>Review</h2>
-  <p class="muted">Spaced repetition (FSRS) of the puzzles you've seen — your weakest patterns resurface right before you'd forget them.</p>
+  <h2>{t('review.title')}</h2>
+  <p class="muted">{t('review.subtitle')}</p>
 
   {#if loading}
-    <p class="muted">Loading your due queue…</p>
+    <p class="muted">{t('review.loadingQueue')}</p>
   {:else if queue.length === 0}
     <div class="panel col center">
-      <p>Nothing due right now. 🎉</p>
+      <p>{t('review.nothingDue')}</p>
       {#if scheduledCount > 0}
-        <p class="muted">{scheduledCount} {scheduledCount === 1 ? 'puzzle' : 'puzzles'} scheduled{nextDue ? ` · next due ${nextDue}` : ''}. Spaced repetition holds cards back until they're due — solved puzzles resurface in minutes, fast ones later.</p>
+        <p class="muted">{tn(scheduledCount, 'review.scheduledOne', 'review.scheduledMany')}{nextDue ? t('review.nextDueSuffix', { when: nextDue }) : ''}{t('review.scheduledTail')}</p>
       {:else}
-        <p class="muted">Solve puzzles in Tactics or analyse a game to add cards to your review schedule.</p>
+        <p class="muted">{t('review.emptyHint')}</p>
       {/if}
-      <button onclick={() => app.go('tactics')}>Go to Tactics →</button>
-      <button class="ghost" onclick={buildMissesSet}>Build a "your misses" set →</button>
+      <button onclick={() => app.go('tactics')}>{t('review.goToTactics')}</button>
+      <button class="ghost" onclick={buildMissesSet}>{t('review.buildMisses')}</button>
       {#if missesMsg}<p class="muted" style="font-size:0.85rem">{missesMsg}</p>{/if}
     </div>
   {:else if !trainer}
     <div class="panel col center">
-      <p>Review complete — {reviewed} card{reviewed === 1 ? '' : 's'} done.</p>
-      <button onclick={loadQueue}>Check for more →</button>
-      <button class="ghost" onclick={buildMissesSet}>Build a "your misses" set →</button>
+      <p>{tn(reviewed, 'review.completeOne', 'review.completeMany')}</p>
+      <button onclick={loadQueue}>{t('review.checkForMore')}</button>
+      <button class="ghost" onclick={buildMissesSet}>{t('review.buildMisses')}</button>
       {#if missesMsg}<p class="muted" style="font-size:0.85rem">{missesMsg}</p>{/if}
     </div>
   {:else}
-    <p class="muted">Card {index + 1} of {queue.length} · {reviewed} reviewed</p>
+    <p class="muted">{t('review.cardProgress', { index: index + 1, total: queue.length, reviewed })}</p>
     <div class="board-wrap">
       <Board
         {fen}
@@ -202,7 +203,7 @@
     </div>
     <p class="feedback {feedbackKind}">{feedback}</p>
     {#if trainer.state.status !== 'solving'}
-      <button onclick={nextCard}>Next →</button>
+      <button onclick={nextCard}>{t('review.next')}</button>
     {/if}
   {/if}
 </section>

@@ -22,6 +22,7 @@
   import { dueCount, dueCards } from '../srs/SrsStore';
   import { weakSquares } from '../vision/weakSquares';
   import { poolRating } from '../store/playerModel';
+  import { t } from '../i18n';
 
   let loading = $state(true);
   let now = $state(0);
@@ -130,12 +131,12 @@
 </script>
 
 <section class="col" style="max-width:680px;margin:0 auto">
-  <h2>Practice session</h2>
+  <h2>{t('session.title')}</h2>
   {#if loading}
-    <p class="muted">Building your session…</p>
+    <p class="muted">{t('session.building')}</p>
   {:else if app.activeSession && step}
     <p class="muted" style="font-size:0.82rem">
-      Step {app.activeSession.current + 1} of {app.activeSession.plan.steps.length} · ~{remainingMin} min left
+      {t('session.stepProgress', { current: app.activeSession.current + 1, total: app.activeSession.plan.steps.length, min: remainingMin })}
     </p>
 
     {#if step.kind === 'reflection'}
@@ -145,30 +146,30 @@
         <textarea
           bind:value={app.activeSession.reflection}
           rows="4"
-          placeholder="What did you notice? What will you do differently?"
+          placeholder={t('session.reflectionPlaceholder')}
           style="width:100%"></textarea>
         <p class="muted" style="font-size:0.72rem">
-          {reflectTimerDone ? 'Take as long as you like.' : 'Sit with it for ~20s — then finish whenever you are ready.'}
-          Notes are shown here only and are not saved.
+          {reflectTimerDone ? t('session.takeYourTime') : t('session.sitWithIt')}
+          {t('session.notesNotSaved')}
         </p>
-        <button onclick={finish}>Finish</button>
+        <button onclick={finish}>{t('session.finish')}</button>
       </div>
     {:else}
       <div class="panel col" style="gap:0.4rem">
-        <b>{step.minutes}m · {step.kind}</b> — {step.focus}
+        <b>{t('session.stepHeader', { minutes: step.minutes, kind: step.kind })}</b> — {step.focus}
         <span class="muted" style="font-size:0.82rem">{step.reason}</span>
         <div class="row" style="gap:0.5rem">
-          <button onclick={() => launch(step)}>Open {step.kind} →</button>
-          <button onclick={advance}>Done → next</button>
-          <button onclick={advance}>Skip →</button>
+          <button onclick={() => launch(step)}>{t('session.openTrainer', { kind: step.kind })}</button>
+          <button onclick={advance}>{t('session.doneNext')}</button>
+          <button onclick={advance}>{t('session.skipStep')}</button>
         </div>
         <span class="muted" style="font-size:0.72rem">
-          Launches the real trainer. Return here via "Session" in the nav to resume this step.
+          {t('session.launchesHint')}
         </span>
       </div>
     {/if}
   {:else}
-    <p class="muted">No session available.</p>
-    <button onclick={() => app.go('insights')}>Back to Insights</button>
+    <p class="muted">{t('session.noSession')}</p>
+    <button onclick={() => app.go('insights')}>{t('session.backToInsights')}</button>
   {/if}
 </section>
