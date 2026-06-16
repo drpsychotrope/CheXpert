@@ -1,8 +1,11 @@
 <script lang="ts">
   import { app } from '../state/app.svelte';
   import { clearAllData } from '../store/playerModel';
+  import ConfirmDialog from './ConfirmDialog.svelte';
 
   const settings = $derived(app.settings);
+  // Themed, non-blocking confirmations instead of native confirm() (audit v2 W14/H39).
+  let confirmKind = $state<null | 'network' | 'wipe'>(null);
 
   async function toggleCoached() {
     if (!settings) return;
@@ -20,27 +23,30 @@
     if (!settings) return;
     const wantOn = (e.currentTarget as HTMLInputElement).checked;
     if (wantOn) {
-      const ok = confirm(
-        'Allow network access?\n\nThis lets the Endgame trainer query the Lichess Syzygy tablebase ' +
-          '(tablebase.lichess.ovh) for perfect endgame feedback. Only the board position (a FEN) is sent — ' +
-          'no identity, no account, nothing else. Results are cached locally. You can turn this off any time.',
-      );
-      if (!ok) {
-        (e.currentTarget as HTMLInputElement).checked = false;
-        return;
-      }
+      // Revert the optimistic check and ask first; enable only on confirm.
+      (e.currentTarget as HTMLInputElement).checked = false;
+      confirmKind = 'network';
+      return;
     }
-    settings.allowNetwork = wantOn;
+    settings.allowNetwork = false;
     await app.persistSettings();
   }
 
-  async function wipe() {
-    const ok = confirm(
-      'This permanently deletes ALL local data: your ratings, games, puzzle history, and settings. This cannot be undone. Continue?',
-    );
-    if (!ok) return;
-    await clearAllData();
-    location.reload();
+  function wipe() {
+    confirmKind = 'wipe';
+  }
+
+  async function onConfirm() {
+    const kind = confirmKind;
+    confirmKind = null;
+    if (kind === 'network') {
+      if (!settings) return;
+      settings.allowNetwork = true;
+      await app.persistSettings();
+    } else if (kind === 'wipe') {
+      await clearAllData();
+      location.reload();
+    }
   }
 </script>
 
@@ -97,4 +103,16 @@
     <button class="ghost" onclick={() => app.go('coach')}>Re-run coaching assessment</button>
     <button onclick={wipe} style="background:var(--bad)">Delete all my data</button>
   </div>
+
+  <ConfirmDialog
+    open={confirmKind !== null}
+    title={confirmKind === 'wipe' ? 'Delete all data?' : 'Allow network access?'}
+    body={confirmKind === 'wipe'
+      ? 'This permanently deletes ALL local data — ratings, games, puzzle history, and settings. This cannot be undone.'
+      : 'This lets the Endgame trainer query the Lichess Syzygy tablebase for perfect endgame feedback. Only the board position (a FEN) is sent — no identity, no account. Results are cached locally; you can turn this off any time.'}
+    confirmLabel={confirmKind === 'wipe' ? 'Delete everything' : 'Allow'}
+    danger={confirmKind === 'wipe'}
+    onConfirm={onConfirm}
+    onCancel={() => (confirmKind = null)}
+  />
 </section>

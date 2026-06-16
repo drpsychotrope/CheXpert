@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
+  import ConfirmDialog from './ConfirmDialog.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { TacticalTrainer } from '../trainer/TacticalTrainer';
   import {
@@ -10,6 +11,7 @@
   import type { WoodpeckerSet } from '../woodpecker/types';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  let pendingDelete = $state<string | null>(null); // themed delete confirm (audit v2 W14/H39)
 
   let mode = $state<'list' | 'run'>('list');
   let sets = $state<WoodpeckerSet[]>([]);
@@ -121,8 +123,13 @@
     cycleDone = true;
   }
 
-  async function remove(id: string) {
-    if (!confirm('Delete this Woodpecker set?')) return;
+  function remove(id: string) {
+    pendingDelete = id;
+  }
+  async function confirmRemove() {
+    const id = pendingDelete;
+    pendingDelete = null;
+    if (!id) return;
     await deleteSet(id);
     await refresh();
   }
@@ -225,6 +232,16 @@
       <button class="ghost" onclick={() => (mode = 'list')}>Pause (progress saved)</button>
     {/if}
   {/if}
+
+  <ConfirmDialog
+    open={pendingDelete !== null}
+    title="Delete this set?"
+    body="This Woodpecker set and its cycle history will be removed. This can't be undone."
+    confirmLabel="Delete"
+    danger
+    onConfirm={confirmRemove}
+    onCancel={() => (pendingDelete = null)}
+  />
 </section>
 
 <style>
