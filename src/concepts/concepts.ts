@@ -4,6 +4,7 @@
 // src/opening/eco.ts. CURATED static content only — never generated (no LLM).
 
 import { MOTIF_PRECEDENCE } from '../analysis/motif';
+import type { Locale } from '../i18n/translate';
 
 export interface ConceptExample {
   /** Legal FEN with the SOLVER to move. */
@@ -72,32 +73,38 @@ export function cardForThemes(themes: string[], cards: ConceptCard[]): ConceptCa
 
 // --- runtime loader (bundled JSON; mirrors eco.ts + PuzzleRepo) ---------------
 type Fetcher = (url: string) => Promise<Response>;
-let cache: ConceptCard[] | null = null;
+// Cached PER locale: fr → concepts.fr.json, en → concepts.json (English canonical).
+const cache = new Map<Locale, ConceptCard[]>();
 
 /**
- * Fetch + cache the committed seed. Returns [] on ANY failure — a missing/broken
+ * Fetch + cache the committed seed for `locale` (fr → concepts.fr.json, else the
+ * English canonical concepts.json). Returns [] on ANY failure — a missing/broken
  * asset must never break Tactics (the "Learn the pattern" link simply won't appear).
- * `fetchFn` is injectable for tests; the seed asset itself is validated by the
- * disk-read test (concepts.seed.test.ts), NOT through this loader.
+ * `fetchFn` is injectable for tests; the seed assets themselves are validated by the
+ * disk-read tests (concepts.seed.test.ts / concepts.fr-parity.test.ts), NOT this loader.
  */
-export async function loadConcepts(fetchFn: Fetcher = (u) => fetch(u)): Promise<ConceptCard[]> {
-  if (cache) return cache;
+export async function loadConcepts(locale: Locale, fetchFn: Fetcher = (u) => fetch(u)): Promise<ConceptCard[]> {
+  const cached = cache.get(locale);
+  if (cached) return cached;
+  let result: ConceptCard[];
   try {
     const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
-    const res = await fetchFn(`${base}concepts/concepts.json`);
+    const file = locale === 'fr' ? 'concepts/concepts.fr.json' : 'concepts/concepts.json';
+    const res = await fetchFn(`${base}${file}`);
     if (!res.ok) {
-      cache = [];
+      result = [];
     } else {
       const data = (await res.json()) as { cards?: ConceptCard[] } | ConceptCard[];
-      cache = Array.isArray(data) ? data : (data.cards ?? []);
+      result = Array.isArray(data) ? data : (data.cards ?? []);
     }
   } catch {
-    cache = [];
+    result = [];
   }
-  return cache;
+  cache.set(locale, result);
+  return result;
 }
 
-/** Test-only: reset the module cache between cases. */
+/** Test-only: reset the per-locale module cache between cases. */
 export function __resetConceptsCacheForTests(): void {
-  cache = null;
+  cache.clear();
 }

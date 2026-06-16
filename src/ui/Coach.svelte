@@ -169,7 +169,7 @@
         baseRating: baseline(),
         now: Date.now(),
       });
-      gameDimensions = buildWeaknessProfile([analysis], baseline()).dimensions;
+      gameDimensions = buildWeaknessProfile([analysis], baseline(), getLocale()).dimensions;
     } catch { /* fall through with no game dims */ }
     await commit(gameDimensions);
   }

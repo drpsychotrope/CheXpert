@@ -40,7 +40,7 @@ describe('buildStudyPlan', () => {
 
   // ADR-0043: due vision squares retarget the warm-up.
   it('targets weak squares in the vision step when provided', () => {
-    const plan = buildStudyPlan([], null, 30, { visionWeakSquares: ['a8', 'h1', 'e4'] });
+    const plan = buildStudyPlan([], null, 30, { visionWeakSquares: ['a8', 'h1', 'e4'], locale: 'en' });
     const vision = plan.find((i) => i.activity === 'vision')!;
     expect(vision.focus).toBe('targeted recall');
     expect(vision.reason).toContain('3 squares');

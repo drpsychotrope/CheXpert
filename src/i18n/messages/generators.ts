@@ -153,4 +153,40 @@ export const generators: Messages = {
     fr: 'Aucune faiblesse nette — gardez votre reconnaissance de motifs affûtée.',
     en: 'No clear weakness surfaced — keep your pattern recognition sharp.',
   },
+
+  // ── studyPlan.ts plan-item reasons (focus/activity stay English routing keys) ──
+  'studyPlan.warmupTargeted': { fr: '{n} cases à réviser — rappel ciblé.', en: '{n} squares due — targeted recall.' },
+  'studyPlan.warmupVision': {
+    fr: 'Échauffement : repérez tous les échecs, prises et pièces en prise.',
+    en: 'Warm-up: spot all checks, captures, and hanging pieces.',
+  },
+  'studyPlan.resilience': {
+    fr: 'La résilience est votre dimension la plus faible — entraînez-vous à tenir des positions inférieures.',
+    en: 'Resilience is your weakest dimension — practise holding worse positions.',
+  },
+  'studyPlan.leak': { fr: '{count}× (perte moy. −{wpl} %) — travaillez cette fuite.', en: '{count}× (avg −{wpl}% win) — drill this leak.' },
+
+  // ── weakness.ts DimensionScore.detail (measured + unmeasured) ────────────
+  'weakness.tacticsDetail': { fr: '{n} coups de milieu de partie analysés', en: '{n} middlegame moves analysed' },
+  'weakness.tacticsUnmeasured': { fr: 'Trop peu de coups de milieu de partie pour évaluer', en: 'Too few middlegame moves to assess' },
+  'weakness.openingDetail': { fr: "ACPL d'ouverture {acpl} vs ~{exp} attendu", en: 'Opening ACPL {acpl} vs ~{exp} expected' },
+  'weakness.openingUnmeasured': { fr: "Trop peu de coups d'ouverture pour évaluer", en: 'Too few opening moves to assess' },
+  'weakness.endgameDetail': { fr: 'ACPL de finale {acpl} vs ~{exp} attendu', en: 'Endgame ACPL {acpl} vs ~{exp} expected' },
+  'weakness.endgameUnmeasured': { fr: 'Aucune finale atteinte — jouez des parties plus longues pour évaluer', en: 'No endgame reached — play longer games to assess' },
+  'weakness.timeDetail': { fr: '{n} gaffes vérifiées pour précipitation', en: '{n} blunders checked for rushing' },
+  'weakness.timeUnmeasured': { fr: 'Pas assez de données de pendule pour évaluer', en: 'Not enough clock data to assess' },
+  'weakness.resilienceDetail': { fr: '{n} fois en difficulté ; taux de récupération', en: '{n} times behind; recovery rate' },
+  'weakness.resilienceUnmeasured': { fr: 'Rarement en difficulté — pas assez pour évaluer la récupération', en: 'Rarely behind — not enough to assess recovery' },
+
+  // ── scenarios.ts (weakness-derived; library names/goals carry nameFr/goalFr inline) ──
+  'scenario.weakName': { fr: 'Votre fuite : {motif}', en: 'Your leak: {motif}' },
+  'scenario.weakGoal': {
+    fr: "Vous vous êtes trompé ici ({motif}). Trouvez la bonne continuation contre un bot à votre niveau.",
+    en: 'You went wrong here ({motif}). Find the right continuation against a bot at your level.',
+  },
+
+  // ── Phase labels (standalone, for Insights leak rows) ────────────────────
+  'phaseLabel.opening': { fr: 'Ouverture', en: 'Opening' },
+  'phaseLabel.middlegame': { fr: 'Milieu de partie', en: 'Middlegame' },
+  'phaseLabel.endgame': { fr: 'Finale', en: 'Endgame' },
 };

@@ -5,7 +5,11 @@
   import { ENDGAME_DRILLS, type EndgameDrill } from '../endgame/drills';
   import { TablebaseClient, withinTablebase, NetworkNotAllowedError, type TablebaseResult } from '../endgame/syzygy';
   import { tbCacheGet, tbCacheSet } from '../endgame/tablebaseCache';
-  import { t } from '../i18n';
+  import { t, getLocale } from '../i18n';
+
+  // Locale-aware drill name/goal: follows the runtime locale switch (getLocale is reactive).
+  const dn = (d: EndgameDrill) => (getLocale() === 'fr' ? d.nameFr : d.name);
+  const dg = (d: EndgameDrill) => (getLocale() === 'fr' ? d.goalFr : d.goal);
 
   let drill = $state<EndgameDrill | null>(null);
   let game = $state(new ChessGame());
@@ -170,13 +174,13 @@
     <div class="drills">
       {#each ENDGAME_DRILLS as d}
         <button class="drill-card" onclick={() => start(d)}>
-          <b>{d.name}</b>
-          <span class="muted">{d.goal}</span>
+          <b>{dn(d)}</b>
+          <span class="muted">{dg(d)}</span>
         </button>
       {/each}
     </div>
   {:else}
-    <p><b>{drill.name}</b> — <span class="muted">{drill.goal}</span></p>
+    <p><b>{dn(drill)}</b> — <span class="muted">{dg(drill)}</span></p>
     <div class="board-wrap">
       <Board
         {fen}

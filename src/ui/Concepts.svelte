@@ -2,14 +2,19 @@
   import { app } from '../state/app.svelte';
   import ConceptCard from './ConceptCard.svelte';
   import { loadConcepts, type ConceptCard as Card } from '../concepts/concepts';
-  import { t } from '../i18n';
+  import { t, getLocale } from '../i18n';
 
   let cards = $state<Card[]>([]);
   // Optional focus motif handed over by a contextual "Learn the pattern" link.
   const focus = $derived(app.conceptFocusMotif);
 
-  loadConcepts().then((c) => {
-    cards = c;
+  // Load (and re-load on language switch): reading getLocale() inside the effect
+  // tracks the reactive locale, so flipping FR/EN refetches the matching seed.
+  $effect(() => {
+    const loc = getLocale();
+    loadConcepts(loc).then((c) => {
+      cards = c;
+    });
   });
 
   const visible = $derived(focus ? cards.filter((c) => c.motif === focus) : cards);

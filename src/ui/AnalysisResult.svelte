@@ -8,7 +8,7 @@
   import EvalGraph from './EvalGraph.svelte';
   import { explainPly } from '../analysis/explain';
   import { criticalMoments } from '../analysis/criticalMoments';
-  import { describeOpening, type OpeningName } from '../opening/eco';
+  import { describeOpening, localizedOpeningName, type OpeningName } from '../opening/eco';
   import { buildLine, saveLine } from '../repertoire/repertoire';
   import type { GameAnalysis } from '../analysis/types';
   import { t, tn, fmtPct, getLocale } from '../i18n';
@@ -58,7 +58,7 @@
 
 {#if opening}
   <p class="muted" style="font-size:0.85rem">
-    {t('analysisResult.opening')} <b>{opening.name}</b> ({opening.eco}) · {t('analysisResult.leftBook', { move: Math.floor(opening.plyInBook / 2) + 1 })}
+    {t('analysisResult.opening')} <b>{localizedOpeningName(opening, getLocale())}</b> ({opening.eco}) · {t('analysisResult.leftBook', { move: Math.floor(opening.plyInBook / 2) + 1 })}
     {#if repAdded}
       <span style="color:var(--good)">{t('analysisResult.addedToRep')}</span>
     {:else}

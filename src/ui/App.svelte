@@ -59,6 +59,11 @@
 
   let booted = $state(false);
 
+  // Keep the document <title> in sync with the language (V2-W18).
+  $effect(() => {
+    document.title = t('shell.docTitle');
+  });
+
   onMount(async () => {
     await app.boot(Date.now());
     booted = true;

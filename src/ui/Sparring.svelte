@@ -9,7 +9,11 @@
   import { poolOpponent } from '../store/playerModel';
   import { loadAllAnalyses } from '../analysis/runAnalysis';
   import { IMBALANCE_LIBRARY, scenariosFromWeakness, type Scenario } from '../analysis/scenarios';
-  import { t } from '../i18n';
+  import { t, getLocale } from '../i18n';
+
+  // Library scenarios carry nameFr/goalFr (reactive); weakness-derived ones are localized at build.
+  const sName = (s: Scenario) => (getLocale() === 'fr' && s.nameFr ? s.nameFr : s.name);
+  const sGoal = (s: Scenario) => (getLocale() === 'fr' && s.goalFr ? s.goalFr : s.goal);
 
   let scenarios = $state<Scenario[]>([...IMBALANCE_LIBRARY]);
   let current = $state<Scenario | null>(null);
@@ -27,7 +31,7 @@
 
   onMount(async () => {
     try {
-      const w = scenariosFromWeakness(await loadAllAnalyses());
+      const w = scenariosFromWeakness(await loadAllAnalyses(), getLocale());
       scenarios = [...IMBALANCE_LIBRARY, ...w];
     } catch {
       /* library still works */
@@ -131,12 +135,12 @@
     <div class="col" style="gap:0.3rem;width:100%;max-width:560px">
       {#each scenarios as s (s.id)}
         <button class="scenario panel" onclick={() => start(s)}>
-          <span><b>{s.name}</b> <span class="muted" style="font-size:0.78rem">{s.category}</span><br /><span class="muted" style="font-size:0.82rem">{s.goal}</span></span>
+          <span><b>{sName(s)}</b> <span class="muted" style="font-size:0.78rem">{s.category}</span><br /><span class="muted" style="font-size:0.82rem">{sGoal(s)}</span></span>
         </button>
       {/each}
     </div>
   {:else if current}
-    <p class="muted" style="max-width:480px">{current.name} — {current.goal}</p>
+    <p class="muted" style="max-width:480px">{sName(current)} — {sGoal(current)}</p>
     <p class="muted" style="font-size:0.82rem">{t('sparring.youPlay', { color: orientation === 'white' ? t('color.white') : t('color.black') })}</p>
     <div class="board-wrap">
       <Board
