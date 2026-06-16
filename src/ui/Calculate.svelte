@@ -9,7 +9,7 @@
   import { gradeCalcLine, firstWrongUserMove, formatSanLine } from '../calc/calc';
   import type { Puzzle } from '../trainer/puzzle';
   import { putAttempt, getAttempt } from '../store/attemptsRepo';
-  import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
+  import { SELF_TAGS, type Confidence, type SelfTag } from '../metacog/metacog';
   import { t, tn } from '../i18n';
 
   let puzzle = $state<Puzzle | null>(null);
@@ -240,7 +240,7 @@
       <span class="muted metacog-label">{t('calc.whyMiss')}</span>
       <div class="row center" style="flex-wrap:wrap">
         {#each SELF_TAGS as tag}
-          <button type="button" class="chip {selfTag === tag ? 'on' : ''}" onclick={() => updateSelfTag(tag)}>{SELF_TAG_LABELS[tag]}</button>
+          <button type="button" class="chip {selfTag === tag ? 'on' : ''}" onclick={() => updateSelfTag(tag)}>{t('selfTag.' + tag)}</button>
         {/each}
       </div>
     </div>

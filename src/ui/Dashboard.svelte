@@ -11,14 +11,7 @@
 
   const model = $derived(app.model);
 
-  const dimLabels: Record<Dimension, string> = {
-    tactics: 'Tactics',
-    openingAccuracy: 'Opening accuracy',
-    endgameConversion: 'Endgame conversion',
-    timeManagement: 'Time management',
-    resilience: 'Resilience',
-  };
-
+  // Dimension labels resolve through the bilingual catalogue (dim.* — full labels), single-sourced (V2-W18).
   $effect(() => {
     void load();
   });
@@ -75,7 +68,7 @@
         <div class="dim-row panel">
           <div style="flex:1">
             <div class="row" style="justify-content:space-between">
-              <b>{dimLabels[d.dimension]}</b>
+              <b>{t('dim.' + d.dimension)}</b>
               <span style="color:{scoreColor(d.score)};font-weight:700">{d.score}</span>
             </div>
             <span class="muted" style="font-size:0.85rem">{d.detail}</span>
@@ -93,7 +86,7 @@
 
     {#if profile.weakest}
       <p class="feedback">
-        {t('dashboard.biggestOpportunity')} <b>{dimLabels[profile.weakest]}</b>.
+        {t('dashboard.biggestOpportunity')} <b>{t('dim.' + profile.weakest)}</b>.
         <button class="link" onclick={() => drill(profile!.weakest!)}>{t('dashboard.trainItNow')}</button>
       </p>
     {/if}

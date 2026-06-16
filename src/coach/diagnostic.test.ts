@@ -19,6 +19,7 @@ describe('buildCoachProfile — puzzle-only (no game)', () => {
       probes: [probe('fork', 1000), probe('pin', 1400)],
       gameDimensions: null,
       assessedAt: 42,
+      locale: 'en',
     });
     expect(p.motifs.find((m) => m.theme === 'fork')!.delta).toBe(-200);
     expect(p.motifs.find((m) => m.theme === 'pin')!.delta).toBe(200);
@@ -33,12 +34,13 @@ describe('buildCoachProfile — puzzle-only (no game)', () => {
       probes: [probe('fork', 800), probe('mate', 1200, 0)],
       gameDimensions: null,
       assessedAt: 1,
+      locale: 'en',
     });
     expect(p.motifs.map((m) => m.theme)).toEqual(['fork']);
   });
 
   it('marks the four game-only dimensions as unsampled placeholders', () => {
-    const p = buildCoachProfile({ puzzleRating: 1200, probes: [probe('fork', 1200)], gameDimensions: null, assessedAt: 1 });
+    const p = buildCoachProfile({ puzzleRating: 1200, probes: [probe('fork', 1200)], gameDimensions: null, assessedAt: 1, locale: 'en' });
     const opening = p.dimensions.find((d) => d.dimension === 'openingAccuracy')!;
     expect(opening.sampleSize).toBe(0);
     expect(opening.detail).toMatch(/calibration game/i);
@@ -50,14 +52,27 @@ describe('buildCoachProfile — puzzle-only (no game)', () => {
       probes: [probe('fork', 900), probe('skewer', 1000), probe('pin', 1700)],
       gameDimensions: null,
       assessedAt: 1,
+      locale: 'en',
     });
     expect(p.weaknesses[0]).toBe('Forks');     // -300, worst first
     expect(p.weaknesses).toContain('Skewers'); // -200
     expect(p.strengths).toContain('Pins');     // +500
   });
 
+  it('localizes the labels when locale is fr (V2-W18)', () => {
+    const p = buildCoachProfile({
+      puzzleRating: 1200,
+      probes: [probe('fork', 900), probe('pin', 1700)],
+      gameDimensions: null,
+      assessedAt: 1,
+      locale: 'fr',
+    });
+    expect(p.weaknesses).toContain('Fourchettes'); // "Forks" → "Fourchettes"
+    expect(p.strengths).toContain('Clouages');     // "Pins" → "Clouages"
+  });
+
   it('returns an honest empty profile when no probe has data', () => {
-    const p = buildCoachProfile({ puzzleRating: 1200, probes: [probe('fork', 0, 0)], gameDimensions: null, assessedAt: 1 });
+    const p = buildCoachProfile({ puzzleRating: 1200, probes: [probe('fork', 0, 0)], gameDimensions: null, assessedAt: 1, locale: 'en' });
     expect(p.motifs).toEqual([]);
     expect(p.weaknesses).toEqual([]);
     expect(p.source.ladders).toBe(false);
@@ -79,6 +94,7 @@ describe('buildCoachProfile — with game dimensions', () => {
       probes: [probe('fork', 1600)],
       gameDimensions: dims,
       assessedAt: 1,
+      locale: 'en',
     });
     expect(p.source.game).toBe(true);
     const tac = p.dimensions.find((d) => d.dimension === 'tactics')!;

@@ -15,7 +15,7 @@
   import type { TacticalTrainer } from '../trainer/TacticalTrainer';
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
-  import { t } from '../i18n';
+  import { t, getLocale } from '../i18n';
 
   type Step = 'intro' | 'ladders' | 'offer-game' | 'game' | 'analysing' | 'result';
   let step = $state<Step>('intro');
@@ -179,9 +179,9 @@
   }
 
   async function commit(gameDimensions: DimensionScore[] | null) {
-    const p = buildCoachProfile({ puzzleRating: baseline(), probes, gameDimensions, assessedAt: Date.now() });
+    const p = buildCoachProfile({ puzzleRating: baseline(), probes, gameDimensions, assessedAt: Date.now(), locale: getLocale() });
     profile = p;
-    programPreview = buildCoachProgram(p, 30);
+    programPreview = buildCoachProgram(p, 30, getLocale());
     if (app.model) {
       // Reload from DB so any weaknessCounters fold written by runAnalysis(source:'played')
       // in finishGame() is preserved — persisting the stale boot snapshot would discard it (I-1).
@@ -210,7 +210,7 @@
     {#if app.puzzles.size === 0}<p class="muted">{t('coach.loadingPuzzles')}</p>{/if}
 
   {:else if step === 'ladders'}
-    <p class="muted">{t('coach.themeProgress', { current: themeIdx + 1, total: THEMES.length })}<b>{THEMES[themeIdx].theme}</b>{t('coach.themeProgressSuffix')}</p>
+    <p class="muted">{t('coach.themeProgress', { current: themeIdx + 1, total: THEMES.length })}<b>{t('motif.' + THEMES[themeIdx].theme)}</b>{t('coach.themeProgressSuffix')}</p>
     <div class="board-wrap">
       <Board {fen} {orientation}
         turnColor={display.turn === 'w' ? 'white' : 'black'}

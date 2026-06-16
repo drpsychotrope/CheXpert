@@ -3,9 +3,14 @@
 // AGGREGATES the collected results into a CoachProfile. The UI (Coach.svelte)
 // owns the engine/ladder/Date side and injects gameDimensions (already computed
 // by buildWeaknessProfile) so this core needs no GameAnalysis fixture to test.
+//
+// V2-W18 (F3): bilingual — motif/dimension labels + details resolve via an INJECTED
+// `locale` (gt); the keys (motif 'fork', dimension 'tactics') stay stable.
 
 import type { Dimension, DimensionScore } from '../analysis/weakness';
 import type { CoachProfile, MotifScore, ThemeProbeResult } from './types';
+import { gt } from '../i18n/gen';
+import type { Locale } from '../i18n/translate';
 
 export const COACH_MOTIF_PROBES = ['fork', 'pin', 'skewer', 'hangingPiece', 'discoveredAttack', 'mate'] as const;
 // Two puzzles per theme: the coach samples each motif (+ endgame) twice — ≈14 puzzles total,
@@ -33,29 +38,19 @@ export function motifAggregateScore(motifs: MotifScore[]): number {
   return clamp(Math.round(50 + mean / 5), 0, 100);
 }
 
-function placeholderDim(dimension: Dimension): DimensionScore {
-  return { dimension, score: 50, detail: 'Play the calibration game to assess this', sampleSize: 0 };
+function placeholderDim(dimension: Dimension, locale: Locale): DimensionScore {
+  return { dimension, score: 50, detail: gt('diag.placeholderDim', locale), sampleSize: 0 };
 }
-
-const MOTIF_LABELS: Record<string, string> = {
-  fork: 'Forks', pin: 'Pins', skewer: 'Skewers', hangingPiece: 'Hanging pieces',
-  discoveredAttack: 'Discovered attacks', mate: 'Mating patterns', endgame: 'Endgames',
-};
-function motifLabel(theme: string): string {
-  return MOTIF_LABELS[theme] ?? theme;
-}
-const DIM_LABELS: Record<Dimension, string> = {
-  tactics: 'Tactics', openingAccuracy: 'Opening accuracy', endgameConversion: 'Endgame conversion',
-  timeManagement: 'Time management', resilience: 'Resilience',
-};
 
 export function buildCoachProfile(args: {
   puzzleRating: number;
   probes: ThemeProbeResult[];
   gameDimensions: DimensionScore[] | null;
   assessedAt: number;
+  /** UI locale for the display labels in strengths/weaknesses/detail (V2-W18). */
+  locale: Locale;
 }): CoachProfile {
-  const { puzzleRating, probes, gameDimensions, assessedAt } = args;
+  const { puzzleRating, probes, gameDimensions, assessedAt, locale } = args;
 
   // n=0 guard: a theme with no in-band puzzle is dropped, never scored.
   const scored = probes.filter((p) => p.n > 0);
@@ -70,14 +65,19 @@ export function buildCoachProfile(args: {
   const aggregate = motifAggregateScore(motifs);
   const tacticsDim: DimensionScore =
     motifs.length > 0
-      ? { dimension: 'tactics', score: aggregate, detail: `${motifs.length} motifs probed (${totalPuzzles} puzzles)`, sampleSize: totalPuzzles }
-      : placeholderDim('tactics');
+      ? {
+          dimension: 'tactics',
+          score: aggregate,
+          detail: gt('diag.motifsProbed', locale, { n: motifs.length, puzzles: totalPuzzles }),
+          sampleSize: totalPuzzles,
+        }
+      : placeholderDim('tactics', locale);
 
   let dimensions: DimensionScore[];
   if (gameDimensions) {
     dimensions = gameDimensions.map((d) => (d.dimension === 'tactics' && motifs.length > 0 ? tacticsDim : d));
   } else {
-    dimensions = ALL_DIMS.map((dim) => (dim === 'tactics' ? tacticsDim : placeholderDim(dim)));
+    dimensions = ALL_DIMS.map((dim) => (dim === 'tactics' ? tacticsDim : placeholderDim(dim, locale)));
   }
 
   // Strengths / weaknesses. Per-motif covers the tactics granularity, so the dim
@@ -85,12 +85,12 @@ export function buildCoachProfile(args: {
   const sortedMotifs = [...motifs].sort((a, b) => a.delta - b.delta); // weakest first
   const weaknesses: string[] = [];
   const strengths: string[] = [];
-  for (const m of sortedMotifs) if (m.delta <= WEAKNESS_DELTA) weaknesses.push(motifLabel(m.theme));
-  for (const m of [...sortedMotifs].reverse()) if (m.delta >= STRENGTH_DELTA) strengths.push(motifLabel(m.theme));
+  for (const m of sortedMotifs) if (m.delta <= WEAKNESS_DELTA) weaknesses.push(gt('motif.' + m.theme, locale));
+  for (const m of [...sortedMotifs].reverse()) if (m.delta >= STRENGTH_DELTA) strengths.push(gt('motif.' + m.theme, locale));
 
   const sortedDims = dimensions.filter((d) => d.sampleSize > 0 && d.dimension !== 'tactics').sort((a, b) => a.score - b.score);
-  for (const d of sortedDims) if (d.score <= WEAKNESS_DIM) weaknesses.push(DIM_LABELS[d.dimension]);
-  for (const d of [...sortedDims].reverse()) if (d.score >= STRENGTH_DIM) strengths.push(DIM_LABELS[d.dimension]);
+  for (const d of sortedDims) if (d.score <= WEAKNESS_DIM) weaknesses.push(gt('dim.' + d.dimension, locale));
+  for (const d of [...sortedDims].reverse()) if (d.score >= STRENGTH_DIM) strengths.push(gt('dim.' + d.dimension, locale));
 
   return {
     assessedAt,

@@ -10,16 +10,18 @@
   import { motifEfficacy, type EfficacyReadout } from '../analysis/efficacy';
   import { poolRating } from '../store/playerModel';
   import { allAttempts } from '../store/attemptsRepo';
-  import { calibration, SELF_TAG_LABELS, type Calibration, type MetacogAttempt } from '../metacog/metacog';
-  import { t, fmtPct } from '../i18n';
+  import { calibration, type MetacogAttempt } from '../metacog/metacog';
+  import { t, fmtPct, getLocale } from '../i18n';
 
   let loading = $state(true);
   let leaks = $state<Leak[]>([]);
   let trend = $state<TrendPoint[]>([]);
   let weakest = $state<Dimension | null>(null);
   let minutes = $state(30);
-  let cal = $state<Calibration | null>(null);
+  let attempts = $state<MetacogAttempt[]>([]);
   let analysesAll = $state<import('../analysis/types').GameAnalysis[]>([]);
+  // Derived so the calibration readout follows the language switch (recomputes on locale change).
+  const cal = $derived(calibration(attempts, { locale: getLocale() }));
 
   // Descriptive before/after miss-rate for the top ~3 leaks (Q-D windows + minMoves gate).
   const efficacy = $derived<EfficacyReadout[]>(
@@ -31,9 +33,6 @@
   const plan = $derived(buildStudyPlan(leaks, weakest, minutes));
 
   const DIMS: Dimension[] = ['tactics', 'openingAccuracy', 'endgameConversion', 'timeManagement', 'resilience'];
-  const dimLabel: Record<Dimension, string> = {
-    tactics: 'Tactics', openingAccuracy: 'Opening', endgameConversion: 'Endgame', timeManagement: 'Time', resilience: 'Resilience',
-  };
 
   onMount(async () => {
     const analyses = await loadAllAnalyses();
@@ -43,8 +42,7 @@
       trend = weaknessTrend(analyses, { window: 5, rating: model ? poolRating(model, 'classical').rating : 1200 });
       weakest = buildWeaknessProfile(analyses, model ? poolRating(model, 'classical').rating : 1200).weakest;
     }
-    const attempts = (await allAttempts()) as MetacogAttempt[];
-    cal = calibration(attempts);
+    attempts = (await allAttempts()) as MetacogAttempt[];
     loading = false;
   });
 
@@ -152,7 +150,7 @@
       <div class="col" style="gap:0.3rem">
         {#each DIMS as d}
           <div class="row" style="align-items:center;gap:0.6rem">
-            <span style="width:90px;font-size:0.82rem">{dimLabel[d]}</span>
+            <span style="width:90px;font-size:0.82rem">{t('dimShort.' + d)}</span>
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:120px;height:24px;background:var(--panel-2);border-radius:3px">
               <polyline points={spark(d)} fill="none" stroke="var(--accent)" stroke-width="3" vector-effect="non-scaling-stroke" />
             </svg>
@@ -171,7 +169,7 @@
           <div class="col" style="gap:0.15rem">
             {#each cal.byConfidence as r}
               <div class="row" style="align-items:center;gap:0.6rem">
-                <span style="width:80px;font-size:0.82rem;text-transform:capitalize">{r.confidence}</span>
+                <span style="width:80px;font-size:0.82rem;text-transform:capitalize">{t(r.confidence === 'sure' ? 'metacog.wordSure' : r.confidence === 'unsure' ? 'metacog.wordUnsure' : 'metacog.wordGuess')}</span>
                 <span style="font-size:0.82rem">{r.n ? fmtPct(r.accuracy * 100) : '—'}</span>
                 <span class="muted" style="font-size:0.78rem">({r.correct}/{r.n})</span>
               </div>
@@ -179,13 +177,13 @@
           </div>
           {#if cal.readout.topCause}
             <p style="font-size:0.85rem">{t('insights.topCause')}
-              <b>{SELF_TAG_LABELS[cal.readout.topCause.tag]}</b> {t('insights.topCausePct', { pct: fmtPct(cal.readout.topCause.pct * 100) })}
+              <b>{t('selfTag.' + cal.readout.topCause.tag)}</b> {t('insights.topCausePct', { pct: fmtPct(cal.readout.topCause.pct * 100) })}
             </p>
           {/if}
           {#if cal.selfTags.length}
             <div class="col" style="gap:0.1rem">
               {#each cal.selfTags as tag}
-                <span class="muted" style="font-size:0.8rem">{t('insights.selfTagLine', { label: SELF_TAG_LABELS[tag.tag], n: tag.n, pct: fmtPct(tag.pct * 100) })}</span>
+                <span class="muted" style="font-size:0.8rem">{t('insights.selfTagLine', { label: t('selfTag.' + tag.tag), n: tag.n, pct: fmtPct(tag.pct * 100) })}</span>
               {/each}
             </div>
           {/if}
