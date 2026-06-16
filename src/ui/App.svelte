@@ -31,6 +31,31 @@
   };
   const viewLoader = $derived(loaders[app.view] ?? loaders.home);
 
+  // Single nav list (audit v2 W13/W16): one <nav> landmark, aria-current on the active view,
+  // wraps instead of overflowing the viewport.
+  const NAV: Array<{ view: View; label: string }> = [
+    { view: 'home', label: 'Home' },
+    { view: 'play', label: 'Play' },
+    { view: 'sparring', label: 'Spar' },
+    { view: 'tactics', label: 'Tactics' },
+    { view: 'review', label: 'Review' },
+    { view: 'woodpecker', label: 'Woodpecker' },
+    { view: 'import', label: 'Analyse' },
+    { view: 'analysis-board', label: 'Board' },
+    { view: 'dashboard', label: 'Dashboard' },
+    { view: 'insights', label: 'Insights' },
+    { view: 'coach', label: 'Coach' },
+    { view: 'session', label: 'Session' },
+    { view: 'endgames', label: 'Endgames' },
+    { view: 'repertoire', label: 'Repertoire' },
+    { view: 'explorer', label: 'Explorer' },
+    { view: 'guess', label: 'Guess' },
+    { view: 'vision', label: 'Vision' },
+    { view: 'concepts', label: 'Concepts' },
+    { view: 'calculate', label: 'Calculate' },
+    { view: 'settings', label: 'Settings' },
+  ];
+
   let booted = $state(false);
 
   onMount(async () => {
@@ -51,36 +76,23 @@
   });
 </script>
 
+<a class="skip-link" href="#main-content">Skip to content</a>
 <header class="topbar">
-  <span class="brand" role="button" tabindex="0" onclick={() => app.go('home')} onkeydown={(e) => e.key === 'Enter' && app.go('home')}>
-    ♞ Chess Trainer
-  </span>
-  <span class="spacer"></span>
+  <button class="brand" onclick={() => app.go('home')}>♞ Chess Trainer</button>
   {#if booted && app.model?.onboarded}
-    <button onclick={() => app.go('home')}>Home</button>
-    <button onclick={() => app.go('play')}>Play</button>
-    <button onclick={() => app.go('sparring')}>Spar</button>
-    <button onclick={() => app.go('tactics')}>Tactics</button>
-    <button onclick={() => app.go('review')}>Review{#if app.dueReview > 0} ({app.dueReview}){/if}</button>
-    <button onclick={() => app.go('woodpecker')}>Woodpecker</button>
-    <button onclick={() => app.go('import')}>Analyse</button>
-    <button onclick={() => app.go('analysis-board')}>Board</button>
-    <button onclick={() => app.go('dashboard')}>Dashboard</button>
-    <button onclick={() => app.go('insights')}>Insights</button>
-    <button onclick={() => app.go('coach')}>Coach</button>
-    <button onclick={() => app.go('session')}>Session</button>
-    <button onclick={() => app.go('endgames')}>Endgames</button>
-    <button onclick={() => app.go('repertoire')}>Repertoire</button>
-    <button onclick={() => app.go('explorer')}>Explorer</button>
-    <button onclick={() => app.go('guess')}>Guess</button>
-    <button onclick={() => app.go('vision')}>Vision</button>
-    <button onclick={() => app.go('concepts')}>Concepts</button>
-    <button onclick={() => app.go('calculate')}>Calculate</button>
-    <button onclick={() => app.go('settings')}>Settings</button>
+    <nav class="nav" aria-label="Main">
+      {#each NAV as item (item.view)}
+        <button
+          onclick={() => app.go(item.view)}
+          class:active={app.view === item.view}
+          aria-current={app.view === item.view ? 'page' : undefined}
+        >{item.label}{#if item.view === 'review' && app.dueReview > 0} ({app.dueReview}){/if}</button>
+      {/each}
+    </nav>
   {/if}
 </header>
 
-<main class="app-main">
+<main id="main-content" class="app-main">
   {#if !booted}
     <p class="center muted">Loading…</p>
   {:else if app.bootError}

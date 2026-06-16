@@ -9,6 +9,9 @@
   --muted: #9a9aa6;
   --border: #3d3d46;
   --accent: #5b8def;
+  /* Dark foreground for text/icons ON an --accent fill: white-on-accent is only 3.23:1 (fails
+     WCAG AA); near-black is ~6.5:1 (audit v2 W13/P2-01). */
+  --on-accent: #0b1220;
   --good: #6fbf73;
   --bad: #e2686d;
   --light-sq: #f0d9b5;
@@ -40,27 +43,64 @@ button {
   border-radius: 10px;
   border: none;
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
   cursor: pointer;
   transition: filter 0.15s ease;
 }
 button:hover { filter: brightness(1.08); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* Visible keyboard focus everywhere (audit v2 W13 / WCAG 2.4.7): the custom dark theme otherwise
+   loses the UA default ring on many controls. */
+:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skip-to-content link for keyboard users (audit v2 W13): off-screen until focused. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.8rem;
+}
+.skip-link:focus { left: 0.5rem; top: 0.5rem; }
+
+/* Respect the OS "reduce motion" preference (audit v2 W13 / WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 .app-main { flex: 1; padding: 1.5rem 1rem 3rem; }
 
 .topbar {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  flex-wrap: wrap; /* 20 nav items must wrap, not overflow the viewport (audit v2 W16/H37) */
+  gap: 0.4rem 0.75rem;
   padding: 0.75rem 1rem;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
 }
-.topbar .brand { font-weight: 700; }
-.topbar .spacer { flex: 1; }
+.topbar .brand { font-weight: 700; color: var(--text); font-size: 1rem; }
+/* The nav takes its own full row and wraps its buttons there, so 20 items never overflow the
+   viewport regardless of width (audit v2 W16/H37). */
+.topbar .nav { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 0.25rem; }
 .topbar button { background: transparent; color: var(--muted); padding: 0.4rem 0.7rem; }
 .topbar button:hover { color: var(--text); }
+/* Active view indicator (audit v2 W13 aria-current / W16 H31). */
+.topbar button.active { color: var(--text); font-weight: 700; }
 
 .panel {
   background: var(--panel);
