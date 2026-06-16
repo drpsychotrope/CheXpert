@@ -87,6 +87,9 @@ export interface SettingsRecord {
   lastTimeControl?: { initialSec: number; incrementSec: number };
   /** Opt-in: show confidence/error-cause chips on puzzles (default false). ADR-0037. */
   metacogEnabled?: boolean;
+  /** UI language (V2-W18, ADR-0053 — supersedes ADR-0052 Q3 mono-locale). Additive; a
+   *  legacy/absent value reads as the default 'fr'. No DB_VERSION bump (read-site `?? 'fr'`). */
+  locale?: 'fr' | 'en';
   /** Data-shape revision (audit W13). See PlayerModel.schemaRev. */
   schemaRev?: number;
 }

@@ -2,8 +2,13 @@
   import { app } from '../state/app.svelte';
   import { clearAllData } from '../store/playerModel';
   import ConfirmDialog from './ConfirmDialog.svelte';
+  import { t, getLocale, type Locale } from '../i18n';
 
   const settings = $derived(app.settings);
+
+  async function changeLocale(e: Event) {
+    await app.setLocale((e.currentTarget as HTMLSelectElement).value as Locale);
+  }
   // Themed, non-blocking confirmations instead of native confirm() (audit v2 W14/H39).
   let confirmKind = $state<null | 'network' | 'wipe'>(null);
 
@@ -51,66 +56,62 @@
 </script>
 
 <section class="col" style="max-width:560px;margin:0 auto">
-  <h2>Settings</h2>
+  <h2>{t('settings.title')}</h2>
 
   <div class="panel col">
-    <h3>Coaching</h3>
+    <h3>{t('settings.language')}</h3>
+    <label class="row" style="flex-direction:row;align-items:center;gap:0.6rem">
+      {t('settings.languageLabel')}
+      <select value={getLocale()} onchange={changeLocale}>
+        <option value="fr">{t('settings.languageFr')}</option>
+        <option value="en">{t('settings.languageEn')}</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="panel col">
+    <h3>{t('settings.coaching')}</h3>
     <label class="row" style="flex-direction:row;align-items:center;gap:0.6rem">
       <input type="checkbox" checked={settings?.coachedMode ?? false} onchange={toggleCoached} />
-      Coached mode — flag an obvious blunder right after I play it (take it back or keep going)
+      {t('settings.coachedLabel')}
     </label>
-    <p class="muted" style="font-size:0.85rem">
-      Best-effort in Phase 1 (a quick engine check). Full pre-move gaffe alerts + mandatory post-game
-      review come with Phase 2.
-    </p>
+    <p class="muted" style="font-size:0.85rem">{t('settings.coachedHint')}</p>
   </div>
 
   <div class="panel col">
-    <h3>Metacognition</h3>
+    <h3>{t('settings.metacog')}</h3>
     <label class="row" style="flex-direction:row;align-items:center;gap:0.6rem">
       <input type="checkbox" checked={settings?.metacogEnabled ?? false} onchange={toggleMetacog} />
-      Track confidence & error cause on puzzles
+      {t('settings.metacogLabel')}
     </label>
-    <p class="muted" style="font-size:0.85rem">
-      When on, Tactics and Calculation show optional chips: how sure you were (before the reveal) and,
-      after a miss, why you think you missed. Insights then shows a descriptive calibration readout —
-      how your confidence lines up with your results. Off by default; the chips are always skippable and
-      never block solving.
-    </p>
+    <p class="muted" style="font-size:0.85rem">{t('settings.metacogHint')}</p>
   </div>
 
   <div class="panel col">
-    <h3>Privacy</h3>
-    <p class="muted">
-      Everything stays on this device. Your games, puzzle history, and player model live in your
-      browser's IndexedDB. Nothing is sent anywhere by default.
-    </p>
+    <h3>{t('settings.privacy')}</h3>
+    <p class="muted">{t('settings.privacyBody')}</p>
     <label class="row" style="flex-direction:row;align-items:center;gap:0.6rem">
       <input type="checkbox" checked={settings?.allowNetwork ?? false} onchange={toggleNetwork} />
-      Allow network for the Syzygy endgame tablebase
+      {t('settings.networkLabel')}
     </label>
     <p class="muted" style="font-size:0.85rem">
-      The endgame trainer's perfect feedback comes from the Lichess Syzygy API. With this off, endgame
-      drills still work against the engine — you just won't get tablebase-perfect move grading. When on,
-      only the position (a FEN) is sent; results are cached so each position is fetched at most once.
-      <br /><b>Network: {settings?.allowNetwork ? 'on' : 'off'}</b>
+      {t('settings.networkHint')}
+      <br /><b>{t('settings.networkStatus', { state: settings?.allowNetwork ? t('settings.on') : t('settings.off') })}</b>
     </p>
   </div>
 
   <div class="panel col">
-    <h3>Your data</h3>
-    <button onclick={() => app.go('onboarding')} style="background:var(--panel-2)">Re-run skill evaluation</button>
-    <button class="ghost" onclick={() => app.go('coach')}>Re-run coaching assessment</button>
-    <button onclick={wipe} style="background:var(--bad)">Delete all my data</button>
+    <h3>{t('settings.yourData')}</h3>
+    <button onclick={() => app.go('onboarding')} style="background:var(--panel-2)">{t('settings.rerunEval')}</button>
+    <button class="ghost" onclick={() => app.go('coach')}>{t('settings.rerunCoach')}</button>
+    <button onclick={wipe} style="background:var(--bad)">{t('settings.deleteData')}</button>
   </div>
 
   <ConfirmDialog
     open={confirmKind !== null}
-    title={confirmKind === 'wipe' ? 'Delete all data?' : 'Allow network access?'}
-    body={confirmKind === 'wipe'
-      ? 'This permanently deletes ALL local data — ratings, games, puzzle history, and settings. This cannot be undone.'
-      : 'This lets the Endgame trainer query the Lichess Syzygy tablebase for perfect endgame feedback. Only the board position (a FEN) is sent — no identity, no account. Results are cached locally; you can turn this off any time.'}
-    confirmLabel={confirmKind === 'wipe' ? 'Delete everything' : 'Allow'}
+    title={confirmKind === 'wipe' ? t('settings.wipeTitle') : t('settings.allowTitle')}
+    body={confirmKind === 'wipe' ? t('settings.wipeBody') : t('settings.allowBody')}
+    confirmLabel={confirmKind === 'wipe' ? t('settings.wipeConfirm') : t('settings.allowConfirm')}
     danger={confirmKind === 'wipe'}
     onConfirm={onConfirm}
     onCancel={() => (confirmKind = null)}

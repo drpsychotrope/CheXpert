@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, type Component } from 'svelte';
   import { app, type View } from '../state/app.svelte';
+  import { t } from '../i18n';
 
   // Lazy-load each view so the initial bundle is the shell + first view, not all 23 (audit W15).
   // Vite emits one chunk per view; the browser fetches a view's code on first navigation to it.
@@ -33,27 +34,27 @@
 
   // Single nav list (audit v2 W13/W16): one <nav> landmark, aria-current on the active view,
   // wraps instead of overflowing the viewport.
-  const NAV: Array<{ view: View; label: string }> = [
-    { view: 'home', label: 'Home' },
-    { view: 'play', label: 'Play' },
-    { view: 'sparring', label: 'Spar' },
-    { view: 'tactics', label: 'Tactics' },
-    { view: 'review', label: 'Review' },
-    { view: 'woodpecker', label: 'Woodpecker' },
-    { view: 'import', label: 'Analyse' },
-    { view: 'analysis-board', label: 'Board' },
-    { view: 'dashboard', label: 'Dashboard' },
-    { view: 'insights', label: 'Insights' },
-    { view: 'coach', label: 'Coach' },
-    { view: 'session', label: 'Session' },
-    { view: 'endgames', label: 'Endgames' },
-    { view: 'repertoire', label: 'Repertoire' },
-    { view: 'explorer', label: 'Explorer' },
-    { view: 'guess', label: 'Guess' },
-    { view: 'vision', label: 'Vision' },
-    { view: 'concepts', label: 'Concepts' },
-    { view: 'calculate', label: 'Calculate' },
-    { view: 'settings', label: 'Settings' },
+  const NAV: Array<{ view: View; key: string }> = [
+    { view: 'home', key: 'nav.home' },
+    { view: 'play', key: 'nav.play' },
+    { view: 'sparring', key: 'nav.spar' },
+    { view: 'tactics', key: 'nav.tactics' },
+    { view: 'review', key: 'nav.review' },
+    { view: 'woodpecker', key: 'nav.woodpecker' },
+    { view: 'import', key: 'nav.analyse' },
+    { view: 'analysis-board', key: 'nav.board' },
+    { view: 'dashboard', key: 'nav.dashboard' },
+    { view: 'insights', key: 'nav.insights' },
+    { view: 'coach', key: 'nav.coach' },
+    { view: 'session', key: 'nav.session' },
+    { view: 'endgames', key: 'nav.endgames' },
+    { view: 'repertoire', key: 'nav.repertoire' },
+    { view: 'explorer', key: 'nav.explorer' },
+    { view: 'guess', key: 'nav.guess' },
+    { view: 'vision', key: 'nav.vision' },
+    { view: 'concepts', key: 'nav.concepts' },
+    { view: 'calculate', key: 'nav.calculate' },
+    { view: 'settings', key: 'nav.settings' },
   ];
 
   let booted = $state(false);
@@ -76,17 +77,17 @@
   });
 </script>
 
-<a class="skip-link" href="#main-content">Skip to content</a>
+<a class="skip-link" href="#main-content">{t('shell.skipToContent')}</a>
 <header class="topbar">
-  <button class="brand" onclick={() => app.go('home')}>♞ Chess Trainer</button>
+  <button class="brand" onclick={() => app.go('home')}>{t('shell.brand')}</button>
   {#if booted && app.model?.onboarded}
-    <nav class="nav" aria-label="Main">
+    <nav class="nav" aria-label={t('shell.navLabel')}>
       {#each NAV as item (item.view)}
         <button
           onclick={() => app.go(item.view)}
           class:active={app.view === item.view}
           aria-current={app.view === item.view ? 'page' : undefined}
-        >{item.label}{#if item.view === 'review' && app.dueReview > 0} ({app.dueReview}){/if}</button>
+        >{t(item.key)}{#if item.view === 'review' && app.dueReview > 0} ({app.dueReview}){/if}</button>
       {/each}
     </nav>
   {/if}
@@ -94,16 +95,13 @@
 
 <main id="main-content" class="app-main">
   {#if !booted}
-    <p class="center muted">Loading…</p>
+    <p class="center muted">{t('shell.loading')}</p>
   {:else if app.bootError}
     <section class="col center" style="max-width:480px;margin:3rem auto;text-align:center">
-      <h2>⚠️ Storage unavailable</h2>
+      <h2>{t('shell.storageTitle')}</h2>
       <p class="muted">{app.bootError}</p>
-      <p class="muted" style="font-size:0.85rem">
-        Chess Trainer keeps everything on your device using your browser's storage (IndexedDB).
-        Try a normal (non-private) window, allow site data for this page, then reload.
-      </p>
-      <button onclick={() => location.reload()}>Reload</button>
+      <p class="muted" style="font-size:0.85rem">{t('shell.storageHint')}</p>
+      <button onclick={() => location.reload()}>{t('shell.reload')}</button>
     </section>
   {:else}
     {#await viewLoader() then mod}
@@ -111,11 +109,9 @@
       <Comp />
     {:catch}
       <section class="col center" style="max-width:480px;margin:3rem auto;text-align:center">
-        <h2>⚠️ Couldn't load this screen</h2>
-        <p class="muted">
-          A part of the app failed to load — this can happen after an update. Reloading usually fixes it.
-        </p>
-        <button onclick={() => location.reload()}>Reload</button>
+        <h2>{t('shell.loadErrorTitle')}</h2>
+        <p class="muted">{t('shell.loadErrorBody')}</p>
+        <button onclick={() => location.reload()}>{t('shell.reload')}</button>
       </section>
     {/await}
   {/if}
