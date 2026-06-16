@@ -206,6 +206,13 @@ Chaque workstream = une branche/PR isolée → `git revert` du merge suffit. W1/
 | V2-W10 — closers de boucle (badge cartes dues P1-07) | ✅ livré | boot smoke · `test` 487 | (W10) |
 | V2-W11 — `next()` async par index (ripple 8 appelants en lockstep) | ✅ livré | `test` 488 · Tactics live · guard P1-02 | (W11, PR séparée) |
 | V2-W12 — confirm coach non bloquant + asymétrie horloge (F5/F6) ✓ ; **décomposition (DoD lignes) → part 2** | 🟡 partiel | `check` 0/0 · `test` 488 · coached live | (W12 part 1, PR séparée) |
-| V2-W13…W19 | ◻️ à venir (P2 + docs) | — | — |
+| V2-P1-05 — reprise crash moteur (Play : Retry au lieu de figer) | ✅ livré | `check` 0 · build vert | #28 |
+| V2-W13 — a11y baseline + nav overflow/active (absorbe W16) | ✅ livré | overflow 0px @1280/375 live · `check` 0/0 | #25 |
+| V2-W14 — clic-pour-jouer + ConfirmDialog (les 5 `confirm()` supprimés) | ✅ livré | dialog live · `test` 488 | #26 |
+| V2-W15 — parcours (Home découvrable, sortie onboarding, feedback calibration) | ✅ livré | Home live · `test` 488 | #27 |
+| V2-W17 — tokens design + composants partagés promus (partiel) | ✅ livré | `check` 0/0 · build | #29 |
+| V2-W19 — reconcile docs (README tests/coaching, ADR-0052) | ✅ livré | ce commit | (W19) |
+| V2-W12 part 2 — décomposition `Play.svelte` (DoD < 300 l.) | ◻️ reste (structurel) | — | — |
+| V2-W18 — **chantier UI français** (i18n + ~316 chaînes + JSON + SAN + tests) | ◻️ reste (chantier dédié) | — | — |
 
-> **Avancement (2026-06-10)** : **P0 4/4** + **P1 W5/W6/W7/W8/W9/W10** livrés, commités et **poussés** (PR [#22](https://github.com/drpsychotrope/Chess/pull/22)) ; `svelte-check` 0 erreur, `vitest` **487 verts**, `vite build` vert. Restent **P1 : W11 + W12 (structurels)**, **P1-05** (reprise crash moteur, différé de W5) et **tout P2 (W13–W19)**.
+> **Avancement final (2026-06-16, run autonome)** : **P0 4/4 + tout P1 + P2 W13/W14/W15/W17 + W19** livrés, commités et **mergés sur `main`** (PRs #22–#29) ; `svelte-check` **0/0**, `vitest` **488 verts**, `vite build` vert. **Restent** (cf. ADR-0052) : **W18** (conversion FR complète — chantier dédié, trop large pour un run continu sans bâcler) et **W12 part 2** (extraction du god-component) ; plus suivis mécaniques (suppression des copies scoppées `button.ghost`/`.link`, siblings reprise-crash Sparring/Comeback/Endgames, polish parcours / `aria-live`).

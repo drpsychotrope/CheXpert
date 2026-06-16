@@ -57,7 +57,7 @@
     <h3>Coaching</h3>
     <label class="row" style="flex-direction:row;align-items:center;gap:0.6rem">
       <input type="checkbox" checked={settings?.coachedMode ?? false} onchange={toggleCoached} />
-      Coached mode — warn me before an obvious blunder while playing
+      Coached mode — flag an obvious blunder right after I play it (take it back or keep going)
     </label>
     <p class="muted" style="font-size:0.85rem">
       Best-effort in Phase 1 (a quick engine check). Full pre-move gaffe alerts + mandatory post-game
