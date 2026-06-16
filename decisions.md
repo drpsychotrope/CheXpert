@@ -900,3 +900,45 @@ themed confirm dialogs, W15 UX journeys, W17 design tokens + promoted shared com
 state machine + clock controller to meet the `<300`-line DoD. Plus mechanical W17 scoped-dup deletion,
 the Sparring/Comeback/Endgames crash-recovery siblings of P1-05, and assorted journey / aria-live
 polish. Cross-links: ADR-0032 (CSP), ADR-0050/0051 (board reactivity — preserved throughout).
+
+## ADR-0053 — W18: bilingual FR/EN UI with a runtime language switch (supersedes ADR-0052 Q3)
+**Date:** 2026-06-16 · **Status:** accepted
+
+**Supersedes ADR-0052 Q3** (which chose a *mono-locale* French catalogue, no runtime i18n). The user
+asked for a **language toggle (FR ↔ EN)**, so the app is now **bilingual with a runtime switch,
+default French**. A switch requires both locales complete and a reactive current-locale, so English is
+no longer left inline — it is captured into the catalogue alongside the French. ADR-0052 Q4 (SAN stays
+English, the international convention) is **unchanged** and holds in both locales.
+
+**Mechanism (`src/i18n/`).** No runtime i18n library (ADR-0052 Q3a intent kept). Each message carries
+*both* locales — `{ fr, en }` — so `keys(fr) === keys(en)` is structural (a key can't exist in one
+locale only). A pure `translate(messages, key, locale, params)` core (interpolation + a missing-key →
+fallback → key guard + a missing-param guard) is importable by pure cores and tests. The reactive
+current locale lives in `locale.svelte.ts` (`$state`); UI calls `t()`/`tn()`/`fmtPct()` which read it,
+so flipping the language re-renders every `t()` output live (the ADR-0050/0051 reactivity lesson — a
+tracked `$state` dependency). Pure generators (`explain`/`positional`/`program`/`metacog`/`diagnostic`)
+take an **injected `locale`** and resolve via the catalogue (`gt`), staying pure/unit-testable; the UI
+passes `getLocale()` reactively. Locale persists as the additive `SettingsRecord.locale` (read
+`?? 'fr'`, **no `DB_VERSION` bump** — precedent ADR-0035/0037/0040/0043); a Settings toggle sets it and
+mirrors `<html lang>`.
+
+**Number/typography (W18 I3):** locale-aware `formatNumber`/`formatPercent` — FR `78 %` (no-break space)
+/ comma decimal, EN `78%` / dot. Honest, measurable DoD (W18 I1): a structural completeness test
+(`keys(fr) === keys(en)`, no cross-domain key collision) replaces an "is it all French?" eyeball; the
+catalogue is the single source, so the consolidation of duplicated dimension-label maps (Radar / Coach /
+Dashboard / Insights) fell out for free. Fixes P3-19 (coach-program reason routed the raw motif key —
+now via the motif label).
+
+**Delivered (merged; svelte-check 0/0, 500 Vitest green, build green, runtime-verified FR default +
+live FR↔EN switch):** the i18n infra + switch; all **31 views** translated; the TS generator + label
+layer (move explanations, coach diagnostic/program, metacog calibration, dimension/motif/severity/
+self-tag labels); `lang="fr"` + FR `<title>`.
+
+**Deferred (tracked in `specs/audit-v2-w18-french-ui-spec.md` §10), residual English in FR mode —
+a clean "deeper data / secondary-generator" boundary, all additive:** the data-content JSON
+(`concepts.{fr,en}.json`, `eco.json` opening names + the `build-eco.mjs` ETL mapping, `endgame/drills.ts`
+goals) which is async-loaded and needs locale-aware reload; `studyPlan.ts` plan-item reasons + the
+Insights leak motif/phase labels + `DimensionScore.detail` (weakness.ts) + `scenarios.ts` names/goals;
+and the static `<title>` (set at load, not reactive). None block use; each is a follow-up. Cross-links:
+ADR-0052 (the FR decision this implements + supersedes Q3), ADR-0050/0051 (reactivity), ADR-0037 (additive
+field precedent).

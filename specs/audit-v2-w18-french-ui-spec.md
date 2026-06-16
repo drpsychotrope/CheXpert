@@ -179,3 +179,17 @@ Sous-PRs par vague → `git revert` granulaire. **Additif** (catalogue + champ `
 - **Supersession** : ce chantier **supersède ADR-0052 Q3** (mono → bilingue runtime) ; **Q4 (SAN EN) conservée**.
 
 **Acté (rappel — pas un arbitrage).** SAN anglaise dans les deux locales (ADR-0052 Q4=a). Variantes SAN française/figurines **écartées**. Pas de lib runtime i18n (catalogue maison). Multi-locale au-delà de FR/EN = Follow-up.
+
+## 12. Statut de livraison (2026-06-16)
+
+**Livré, mergé, vérifié** (`svelte-check` 0/0 · `vitest` **500** · `vite build` vert · runtime : défaut FR + bascule FR↔EN **live** vérifiée au preview, `<html lang>` suit, 0 erreur console) :
+- Infra bilingue `src/i18n/` (`translate` pur + `locale.svelte.ts` réactif + catalogue `{fr,en}` par domaine + `t`/`tn`/`fmtPct`/`fmtNum`) ; **garde de complétude `keys(fr)===keys(en)`** (I1) ; ADR-0053.
+- `SettingsRecord.locale` additif (`?? 'fr'`, sans bump DB) + **bascule dans Réglages** + `<html lang>`/`lang="fr"` défaut + `<title>` FR.
+- **Les 31 vues** traduites (toutes les chaînes UI → `t()`).
+- **Couche TS (F3)** : générateurs `explain`/`positional` (explication des coups), `metacog` (calibration), `coach/diagnostic` + `coach/program` (profil/programme), et les maps de libellés (motif/dimension/sévérité/phase/self-tag) — toutes bilingues, source unique catalogue (doublons Radar/Coach/Dashboard/Insights consolidés). Fix **P3-19**.
+- Conventions typographiques FR (I3) ; fidélité SVG (I2 : libellés Radar via `dimShort`).
+
+**Résiduel anglais en mode FR — différé (cf. §10, ADR-0053 ; frontière « contenu data / générateurs secondaires », tout additif, n'empêche pas l'usage) :**
+- Contenu **JSON data** : `concepts.json` (cartes), `eco.json` (noms d'ouvertures + mapping ETL `build-eco.mjs`), `endgame/drills.ts` (objectifs) — chargés en async, nécessitent un rechargement locale-aware (Q-W18-4/N5 à finir).
+- Phrases de **générateurs secondaires** : `studyPlan.ts` (raisons du plan d'étude, rendues dans Insights/Session), `scenarios.ts` (noms/objectifs Sparring), libellés de fuite `leak.motif`/`leak.phase` (Insights), `DimensionScore.detail` (weakness.ts).
+- `<title>` statique (fixé au chargement, non réactif au switch).

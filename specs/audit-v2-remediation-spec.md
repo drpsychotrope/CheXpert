@@ -213,6 +213,6 @@ Chaque workstream = une branche/PR isolée → `git revert` du merge suffit. W1/
 | V2-W17 — tokens design + composants partagés promus (partiel) | ✅ livré | `check` 0/0 · build | #29 |
 | V2-W19 — reconcile docs (README tests/coaching, ADR-0052) | ✅ livré | ce commit | (W19) |
 | V2-W12 part 2 — décomposition `Play.svelte` (DoD < 300 l.) | ◻️ reste (structurel) | — | — |
-| V2-W18 — **chantier UI français** (i18n + ~316 chaînes + JSON + SAN + tests) | ◻️ reste (chantier dédié) | — | — |
+| V2-W18 — **UI bilingue FR/EN + bascule de langue** (infra i18n + 31 vues + générateurs/maps TS + ADR-0053) | ✅ livré (résiduel data différé) | `check` 0/0 · `test` 500 · build · switch FR↔EN vérifié live | (W18) |
 
 > **Avancement final (2026-06-16, run autonome)** : **P0 4/4 + tout P1 + P2 W13/W14/W15/W17 + W19** livrés, commités et **mergés sur `main`** (PRs #22–#29) ; `svelte-check` **0/0**, `vitest` **488 verts**, `vite build` vert. **Restent** (cf. ADR-0052) : **W18** (conversion FR complète — chantier dédié, trop large pour un run continu sans bâcler) et **W12 part 2** (extraction du god-component) ; plus suivis mécaniques (suppression des copies scoppées `button.ghost`/`.link`, siblings reprise-crash Sparring/Comeback/Endgames, polish parcours / `aria-live`).
