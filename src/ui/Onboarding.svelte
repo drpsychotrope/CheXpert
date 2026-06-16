@@ -63,13 +63,13 @@
     nextLadderPuzzle();
   }
 
-  function nextLadderPuzzle() {
+  async function nextLadderPuzzle() {
     if (!ladder) return;
     if (ladder.isDone()) {
       finishLadder();
       return;
     }
-    const t = ladder.next(Date.now());
+    const t = await ladder.next(Date.now());
     if (!t) {
       finishLadder();
       return;

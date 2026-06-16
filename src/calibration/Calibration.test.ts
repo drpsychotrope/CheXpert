@@ -76,7 +76,7 @@ describe('PuzzleLadder', () => {
 
     let guard = 0;
     while (!ladder.isDone() && guard < 50) {
-      const t = ladder.next(0);
+      const t = await ladder.next(0);
       if (!t) break;
       // Simulate: solve everything (all-correct run).
       ladder.report(true);
@@ -97,7 +97,7 @@ describe('PuzzleLadder', () => {
 
     const up = new PuzzleLadder(await make(), defaultRating(1200, 300, 0.06));
     for (let i = 0; i < 8; i++) {
-      up.next(0);
+      await up.next(0);
       up.report(true);
     }
 
@@ -105,7 +105,7 @@ describe('PuzzleLadder', () => {
 
     const down = new PuzzleLadder(await make(), defaultRating(1200, 300, 0.06));
     for (let i = 0; i < 8; i++) {
-      down.next(0);
+      await down.next(0);
       down.report(false);
     }
     expect(up.rating.rating).toBeGreaterThan(down.rating.rating);
@@ -119,15 +119,15 @@ describe('PuzzleLadder', () => {
     const ladder = new PuzzleLadder(repo, defaultRating(1200, 300, 0.06), { min: 3, max: 5 });
 
     // After 2 puzzles (count < min=3), ladder should not yet be done.
-    ladder.next(0); ladder.report(true);
-    ladder.next(0); ladder.report(true);
+    await ladder.next(0); ladder.report(true);
+    await ladder.next(0); ladder.report(true);
     expect(ladder.count).toBe(2);
     expect(ladder.isDone()).toBe(false);
 
     // After 5 puzzles (count === max=5), ladder must be done regardless of RD.
-    ladder.next(0); ladder.report(true);
-    ladder.next(0); ladder.report(true);
-    ladder.next(0); ladder.report(true);
+    await ladder.next(0); ladder.report(true);
+    await ladder.next(0); ladder.report(true);
+    await ladder.next(0); ladder.report(true);
     expect(ladder.count).toBe(5);
     expect(ladder.isDone()).toBe(true);
   });

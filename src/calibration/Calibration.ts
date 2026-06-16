@@ -80,9 +80,9 @@ export class PuzzleLadder {
   }
 
   /** Get the next ladder puzzle near the current rating, or null when done. */
-  next(now: number): TacticalTrainer | null {
+  async next(now: number): Promise<TacticalTrainer | null> {
     if (this.isDone()) return null;
-    const puzzle = this.repo.next({ rating: this.rating.rating, window: this.window, exclude: this.attempted, themes: this.themes, phase: this.phase });
+    const puzzle = await this.repo.next({ rating: this.rating.rating, window: this.window, exclude: this.attempted, themes: this.themes, phase: this.phase });
     if (!puzzle) return null;
     this.attempted.add(puzzle.id);
     this.current = { trainer: new TacticalTrainer(puzzle, now), puzzle };

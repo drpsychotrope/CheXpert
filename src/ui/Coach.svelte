@@ -72,9 +72,9 @@
     nextProbePuzzle();
   }
 
-  function nextProbePuzzle() {
+  async function nextProbePuzzle() {
     if (!ladder) return;
-    const t = ladder.next(Date.now());
+    const t = await ladder.next(Date.now());
     if (!t) return finishThemeLadder();
     trainer = t;
     display = new ChessGame(t.getFen());

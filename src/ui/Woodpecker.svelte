@@ -39,7 +39,7 @@
     const ids: string[] = [];
     const seen = new Set<string>();
     for (let i = 0; i < setSize; i++) {
-      const p = app.puzzles.next({ rating: model.puzzleRating.rating, window: 400, exclude: seen });
+      const p = await app.puzzles.next({ rating: model.puzzleRating.rating, window: 400, exclude: seen });
       if (!p) break;
       seen.add(p.id);
       ids.push(p.id);

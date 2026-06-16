@@ -23,6 +23,7 @@ type Fetcher = (url: string) => Promise<Response>;
 export class PuzzleRepo {
   private loaded = false;
   private cache: Puzzle[] = [];
+  private total = 0;
 
   constructor(private fetchFn: Fetcher = (u) => fetch(u)) {}
 
@@ -47,22 +48,14 @@ export class PuzzleRepo {
     // Load all personal puzzles (few) + a rating-spread sample of curated instead of all ~80k rows,
     // to keep the heap bounded (audit W3). byId() falls back to a DB get for any id outside this
     // working set (e.g. an old curated puzzle resurfacing from the SRS/Woodpecker queue).
+    // Only personal puzzles (few) live in memory; curated puzzles are queried from the DB per
+    // request in next(), centered on the target rating — so the heap stays bounded AND the served
+    // puzzles are actually on-target instead of biased to each band's low end (audit v2 W11/P1-02,
+    // replacing the band-floor sampleCurated). byId() falls back to a DB get for anything else.
     const personal = await db.getAllFromIndex('puzzles', 'source', 'personal');
-    this.cache = [...personal, ...(await this.sampleCurated(db))];
+    this.cache = [...personal];
+    this.total = (await db.countFromIndex('puzzles', 'source', 'curated')) + personal.length;
     this.loaded = true;
-  }
-
-  /** A rating-spread sample of curated puzzles (capped per band) so next() has candidates near any
-   *  rating without holding the whole ~80k set in memory (audit W3). */
-  private async sampleCurated(db: Awaited<ReturnType<typeof openTrainerDB>>, perBand = 700): Promise<Puzzle[]> {
-    const BANDS = [0, 800, 1100, 1400, 1700, 2000, 2300, 4000];
-    const out: Puzzle[] = [];
-    for (let i = 0; i < BANDS.length - 1; i++) {
-      const range = IDBKeyRange.bound(BANDS[i], BANDS[i + 1] - 1);
-      const band = await db.getAllFromIndex('puzzles', 'rating', range, perBand);
-      for (const p of band) if (p.source === 'curated') out.push(p);
-    }
-    return out;
   }
 
   /** Seed puzzles in bounded transactions so a fresh ~80k-row import doesn't freeze the
@@ -77,9 +70,10 @@ export class PuzzleRepo {
     }
   }
 
-  /** Number of puzzles available. */
+  /** Total puzzles available (curated counted at init + personal). Kept SYNC because the UI reads
+   *  it reactively in markup for `>0` empty-state gating. */
   get size(): number {
-    return this.cache.length;
+    return this.total;
   }
 
   /** Fetch the ETL subset, falling back to the seed set. */
@@ -108,6 +102,7 @@ export class PuzzleRepo {
     await Promise.all(puzzles.map((p) => tx.store.put(p)));
     await tx.done;
     this.cache.push(...puzzles);
+    this.total += puzzles.length;
   }
 
   /** Look up a puzzle by id — the in-memory working set first, then a DB get for any id outside it
@@ -139,20 +134,26 @@ export class PuzzleRepo {
   }
 
   /**
-   * Pick the next puzzle nearest the requested rating, honoring theme/phase/source
-   * filters and exclusions. Pure selection over the in-memory cache.
+   * Pick the next puzzle nearest the requested rating, honoring theme/phase/source/exclude.
+   * Curated candidates are queried from the DB centered on the target rating (not a band-floor
+   * sample), personal puzzles come from the small in-memory set (audit v2 W11 / P1-02). Async
+   * because curated candidates are fetched per request.
    */
-  next(q: PuzzleQuery): Puzzle | null {
+  async next(q: PuzzleQuery): Promise<Puzzle | null> {
     const window = q.window ?? 150;
     const exclude = q.exclude ?? new Set<string>();
-
-    const pool = this.cache.filter((p) => {
+    const accept = (p: Puzzle): boolean => {
       if (exclude.has(p.id)) return false;
-      if (q.source && p.source !== q.source) return false;
       if (q.themes && q.themes.length && !q.themes.some((t) => p.themes.includes(t))) return false;
       if (q.phase && phaseOf(p.fen) !== q.phase) return false;
       return true;
-    });
+    };
+
+    const personal =
+      q.source === 'curated' ? [] : this.cache.filter((p) => p.source === 'personal' && accept(p));
+    const curated = q.source === 'personal' ? [] : await this.curatedNear(q.rating, accept);
+
+    const pool = [...personal, ...curated];
     if (pool.length === 0) return null;
 
     // Prefer within the rating window; otherwise nearest by absolute distance.
@@ -165,6 +166,40 @@ export class PuzzleRepo {
     const topN = candidates.slice(0, Math.min(8, candidates.length));
     const pick = topN[hashId(q.rating + (q.themes?.join() ?? '')) % topN.length];
     return pick ?? candidates[0];
+  }
+
+  /** Curated puzzles nearest the target rating, scanning the `rating` index outward in BOTH
+   *  directions (centered, not biased to a band's low end), keeping only those the caller accepts.
+   *  Bounded by `limit` matches and `maxScan` rows so a rare theme can't walk the whole DB. */
+  private async curatedNear(
+    rating: number,
+    accept: (p: Puzzle) => boolean,
+    limit = 200,
+    maxScan = 4000,
+  ): Promise<Puzzle[]> {
+    const db = await openTrainerDB();
+    const tx = db.transaction('puzzles');
+    const idx = tx.store.index('rating');
+    const out: Puzzle[] = [];
+    let scanned = 0;
+    let up = await idx.openCursor(IDBKeyRange.lowerBound(rating)); // ≥ rating, ascending
+    let down = await idx.openCursor(IDBKeyRange.upperBound(rating, true), 'prev'); // < rating, descending
+    while ((up || down) && out.length < limit && scanned < maxScan) {
+      if (up) {
+        scanned++;
+        const p = up.value as Puzzle;
+        if (p.source === 'curated' && accept(p)) out.push(p);
+        up = await up.continue();
+      }
+      if (down && out.length < limit && scanned < maxScan) {
+        scanned++;
+        const p = down.value as Puzzle;
+        if (p.source === 'curated' && accept(p)) out.push(p);
+        down = await down.continue();
+      }
+    }
+    await tx.done;
+    return out;
   }
 }
 
