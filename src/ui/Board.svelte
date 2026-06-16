@@ -139,7 +139,9 @@
       lastMove: lastMove ? (lastMove as Key[]) : undefined,
       // ADR-0043: when onSelect is set, enable square selection so an empty-square tap fires
       // `events.select` (chessground does not emit it otherwise).
-      selectable: { enabled: !!onSelect },
+      // Always enabled so click/tap-to-move works on every board (drag alone left tap-tap dead,
+      // esp. on touch — audit v2 H38). onSelect (empty-square drills) still fires via events.select.
+      selectable: { enabled: true },
       movable: {
         free: false,
         color: movableColor,

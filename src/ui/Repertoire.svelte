@@ -1,5 +1,6 @@
 <script lang="ts">
   import Board from './Board.svelte';
+  import ConfirmDialog from './ConfirmDialog.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { buildLine, saveLine, listLines, deleteLine, RepertoireDrill } from '../repertoire/repertoire';
   import type { RepertoireLine } from '../repertoire/types';
@@ -10,6 +11,7 @@
 
   let lines = $state<RepertoireLine[]>([]);
   let mode = $state<'list' | 'build' | 'drill'>('list');
+  let pendingDelete = $state<string | null>(null); // themed delete confirm (audit v2 W14/H39)
 
   // Builder.
   let name = $state('');
@@ -65,8 +67,13 @@
     mode = 'list';
   }
 
-  async function remove(id: string) {
-    if (!confirm('Delete this repertoire line and its review card?')) return;
+  function remove(id: string) {
+    pendingDelete = id;
+  }
+  async function confirmRemove() {
+    const id = pendingDelete;
+    pendingDelete = null;
+    if (!id) return;
     await deleteLine(id);
     await refresh();
   }
@@ -136,7 +143,7 @@
             </div>
             <div class="row">
               <button onclick={() => startDrill(l)}>Drill</button>
-              <button class="ghost" onclick={() => remove(l.id)}>✕</button>
+              <button class="ghost" onclick={() => remove(l.id)} aria-label="Delete line">✕</button>
             </div>
           </div>
         {/each}
@@ -181,6 +188,16 @@
       <button class="ghost" onclick={() => (mode = 'list')}>← Lines</button>
     </div>
   {/if}
+
+  <ConfirmDialog
+    open={pendingDelete !== null}
+    title="Delete this line?"
+    body="The repertoire line and its review card will be removed. This can't be undone."
+    confirmLabel="Delete"
+    danger
+    onConfirm={confirmRemove}
+    onCancel={() => (pendingDelete = null)}
+  />
 </section>
 
 <style>
