@@ -85,8 +85,8 @@
   let blindAnswer: string | null = null;
   let blindPhase = $state<'show' | 'ask'>('show');
   let blindTimer: ReturnType<typeof setTimeout> | null = null;
-  function newBlindfold() {
-    const p = app.model ? app.puzzles.next({ rating: app.model.puzzleRating.rating, window: 600, exclude: new Set() }) : null;
+  async function newBlindfold() {
+    const p = app.model ? await app.puzzles.next({ rating: app.model.puzzleRating.rating, window: 600, exclude: new Set() }) : null;
     blindFen = p?.fen ?? FALLBACK_FENS[Math.floor(rnd() * FALLBACK_FENS.length)];
     const weak = app.visionWeakSquares;
     blindSquare = weak && weak.length ? nextSquare() : genBlindfold(blindFen, rnd()).square;
@@ -149,8 +149,8 @@
   let faTargets: string[] = [];
   let faAnswer = $state('');
   const faLabel = { checks: 'checking moves', captures: 'captures', hanging: 'pieces you can win' };
-  function newFindAll() {
-    const p = app.model ? app.puzzles.next({ rating: app.model.puzzleRating.rating, window: 600, exclude: new Set() }) : null;
+  async function newFindAll() {
+    const p = app.model ? await app.puzzles.next({ rating: app.model.puzzleRating.rating, window: 600, exclude: new Set() }) : null;
     faFen = p?.fen ?? FALLBACK_FENS[Math.floor(rnd() * FALLBACK_FENS.length)];
     const tasks = ['checks', 'captures', 'hanging'] as const;
     faTask = tasks[Math.floor(rnd() * 3)];

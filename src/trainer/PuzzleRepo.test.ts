@@ -36,21 +36,42 @@ describe('PuzzleRepo', () => {
   it('returns a puzzle near the requested rating', async () => {
     const repo = new PuzzleRepo(fakeFetch(fakePuzzles()));
     await repo.init();
-    const p = repo.next({ rating: 1000, window: 150 });
+    const p = await repo.next({ rating: 1000, window: 150 });
     expect(p?.id).toBe('p1000');
   });
 
   it('filters by theme', async () => {
     const repo = new PuzzleRepo(fakeFetch(fakePuzzles()));
     await repo.init();
-    const p = repo.next({ rating: 2000, themes: ['pin'] });
+    const p = await repo.next({ rating: 2000, themes: ['pin'] });
     expect(p?.id).toBe('p1400');
+  });
+
+  it('serves puzzles centered on the target rating, not a band floor (audit v2 P1-02)', async () => {
+    // A dense band 1400..1990: the old band-floor sample fed a 1550 player ~1416 puzzles.
+    const many: Puzzle[] = [];
+    for (let r = 1400; r < 2000; r += 10) {
+      many.push({
+        id: `c${r}`,
+        fen: '6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1',
+        moves: ['a1a8'],
+        rating: r,
+        ratingDeviation: 80,
+        themes: ['fork'],
+        source: 'curated',
+      });
+    }
+    const repo = new PuzzleRepo(fakeFetch(many));
+    await repo.init();
+    const p = await repo.next({ rating: 1550, window: 150 });
+    expect(p).not.toBeNull();
+    expect(Math.abs((p as Puzzle).rating - 1550)).toBeLessThanOrEqual(150); // on-target, not the 1400 floor
   });
 
   it('honors exclusions', async () => {
     const repo = new PuzzleRepo(fakeFetch(fakePuzzles()));
     await repo.init();
-    const p = repo.next({ rating: 600, exclude: new Set(['p600']) });
+    const p = await repo.next({ rating: 600, exclude: new Set(['p600']) });
     expect(p?.id).not.toBe('p600');
   });
 

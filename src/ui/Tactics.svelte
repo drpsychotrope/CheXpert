@@ -106,7 +106,7 @@
   }
   onDestroy(stopTimer);
 
-  function loadNext() {
+  async function loadNext() {
     if (!model) return;
     feedback = '';
     feedbackKind = '';
@@ -120,16 +120,16 @@
     // fall back to the curated set in the player's rating zone.
     let p =
       drillThemes && drillThemes.length
-        ? app.puzzles.next({ rating: model.puzzleRating.rating, window: 400, exclude: seen, themes: drillThemes })
+        ? await app.puzzles.next({ rating: model.puzzleRating.rating, window: 400, exclude: seen, themes: drillThemes })
         : null;
     if (p) mode = 'themed';
 
     if (!p) {
-      p = app.puzzles.next({ rating: model.puzzleRating.rating, window: 600, exclude: seen, source: 'personal' });
+      p = await app.puzzles.next({ rating: model.puzzleRating.rating, window: 600, exclude: seen, source: 'personal' });
       if (p) mode = 'personal';
     }
     if (!p) {
-      p = app.puzzles.next({ rating: model.puzzleRating.rating, window: 250, exclude: seen });
+      p = await app.puzzles.next({ rating: model.puzzleRating.rating, window: 250, exclude: seen });
       if (p) mode = 'mixed';
     }
 

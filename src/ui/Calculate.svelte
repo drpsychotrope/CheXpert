@@ -44,12 +44,12 @@
   }
   onDestroy(clearRevealTimer);
 
-  function load() {
+  async function load() {
     if (!model) return;
     clearRevealTimer();
     const p =
-      app.puzzles.next({ rating: model.puzzleRating.rating, window: 400, exclude: seen, source: 'personal' }) ??
-      app.puzzles.next({ rating: model.puzzleRating.rating, window: 300, exclude: seen });
+      (await app.puzzles.next({ rating: model.puzzleRating.rating, window: 400, exclude: seen, source: 'personal' })) ??
+      (await app.puzzles.next({ rating: model.puzzleRating.rating, window: 300, exclude: seen }));
     if (!p) { feedback = 'No puzzles in range.'; return; }
     seen.add(p.id);
     puzzle = p;
