@@ -131,6 +131,9 @@
 
   async function onGameMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
     if (!opponent || game.turn !== gameSide || gameThinking) return;
+    // Disable the board + show feedback across BOTH eval round-trips (not just the bot reply), so it
+    // never sits silently frozen and a fast second move can't double-count ACPL (audit v2 H25/L9).
+    gameThinking = true;
 
     // Ensure standard mode (onboarding is never 960; guard against leaked state).
     await app.engine.resetVariant();
@@ -143,7 +146,10 @@
     } catch { /* ignore */ }
 
     const san = game.move(from, to, promo);
-    if (!san) return;
+    if (!san) {
+      gameThinking = false;
+      return;
+    }
     gameFen = game.fen;
 
     try {
@@ -157,6 +163,7 @@
     } catch { /* ignore */ }
 
     if (game.terminal().over || game.history().length >= GAME_MOVE_LIMIT) {
+      gameThinking = false;
       finishGame();
       return;
     }
@@ -274,6 +281,7 @@
       />
     </div>
     <p class="feedback">{ladderFeedback}</p>
+    <button style="background:transparent;border:1px solid var(--border)" onclick={skipEvaluation}>Skip the rest →</button>
 
   {:else if step === 'offer-game'}
     <div class="panel col center">
@@ -303,7 +311,8 @@
         onMove={onGameMove}
       />
     </div>
-    {#if gameThinking}<p class="feedback">Bot thinking…</p>{/if}
+    {#if gameThinking}<p class="feedback">Thinking…</p>{/if}
+    <button style="background:transparent;border:1px solid var(--border)" onclick={finishWithoutGame} disabled={gameThinking}>End game &amp; skip →</button>
 
   {:else if step === 'done'}
     <div class="panel col center">
