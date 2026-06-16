@@ -34,6 +34,9 @@
   let status = $state<'idle' | 'playing' | 'thinking' | 'over'>('idle');
   let result = $state('');
   let thinking = $state(false);
+  // Set when the bot's move throws (worker crash / timeout): offer Retry instead of freezing the
+  // game on the bot's turn (audit v2 P1-05).
+  let engineError = $state(false);
   // Non-blocking coached take-back prompt (audit v2 W12/F5). While it's open the player's own clock
   // keeps running — fair, it's their decision time — and the opponent isn't charged (F6).
   let coachOpen = $state(false);
@@ -130,6 +133,7 @@
     playedUci = [];
     gameFinished = false;
     coachOpen = false;
+    engineError = false;
 
     if (variant === 'chess960') {
       // Distinguish an invalid entry from a deliberate 0: NaN → random, not silently SP 0 (audit W6).
@@ -317,6 +321,7 @@
     if (!opponent) return;
     status = 'thinking';
     thinking = true;
+    engineError = false;
     try {
       // In 960, feed the engine X-FEN/Shredder rights via fenForEngine(); standard uses game.fen.
       const engineFen = variant === 'chess960' ? game.fenForEngine() : game.fen;
@@ -353,11 +358,28 @@
         lastMove = [uci.slice(0, 2), uci.slice(2, 4)];
         if (clock) clock = press(clock, botSide);
       }
-    } catch (e) {
-      result = 'Engine error: ' + String(e);
+    } catch {
+      // The bot's move threw (worker crash / timeout). Don't fall back to 'playing' on the bot's
+      // turn — that strands the game on a frozen board. Offer an explicit Retry (audit v2 P1-05).
+      result = 'Engine error — the bot could not move. Retry, or start a new game.';
+      engineError = true;
+      thinking = false;
+      return;
     }
     thinking = false;
     if (!checkEnd()) status = 'playing';
+  }
+
+  /** Recover from a bot-move engine error: drop any stuck search and try the move again (P1-05). */
+  async function retryEngineMove() {
+    engineError = false;
+    result = '';
+    try {
+      await app.engine.interrupt();
+    } catch {
+      /* respawn is best-effort */
+    }
+    await engineMove();
   }
 
   function checkEnd(): boolean {
@@ -585,6 +607,9 @@
   {/if}
 
   <div class="row center">
+    {#if engineError}
+      <button onclick={retryEngineMove}>↻ Retry the bot's move</button>
+    {/if}
     {#if status === 'idle' || status === 'over'}
       <button onclick={newGame}>New game</button>
     {:else}
