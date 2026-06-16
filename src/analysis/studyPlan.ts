@@ -5,6 +5,8 @@
 
 import { leakTarget, type Leak } from './fingerprint';
 import type { Dimension } from './weakness';
+import { gt } from '../i18n/gen';
+import type { Locale } from '../i18n/translate';
 
 export interface PlanItem {
   activity: 'tactics' | 'endgames' | 'repertoire' | 'comeback' | 'vision' | 'sparring' | 'play-steered';
@@ -27,6 +29,8 @@ function activityForLeak(leak: Leak): { activity: PlanItem['activity']; focus: s
 export interface StudyPlanOpts {
   /** Due vision squares (ADR-0043). When present, the warm-up becomes targeted recall. */
   visionWeakSquares?: string[];
+  /** UI locale for the `reason` display strings (V2-W18). `focus`/`activity` stay English routing keys. */
+  locale?: Locale;
 }
 
 /** Build a single day's plan (≤ minutesPerDay), worst-impact leaks first. */
@@ -38,21 +42,22 @@ export function buildStudyPlan(
 ): PlanItem[] {
   const plan: PlanItem[] = [];
   let used = 0;
+  const locale: Locale = opts.locale ?? 'fr';
 
   const warmup = Math.min(3, minutesPerDay);
   if (warmup > 0) {
     const weak = opts.visionWeakSquares ?? [];
     plan.push(
       weak.length
-        ? { activity: 'vision', focus: 'targeted recall', minutes: warmup, reason: `${weak.length} squares due — targeted recall.` }
-        : { activity: 'vision', focus: 'board vision', minutes: warmup, reason: 'Warm-up: spot all checks, captures, and hanging pieces.' },
+        ? { activity: 'vision', focus: 'targeted recall', minutes: warmup, reason: gt('studyPlan.warmupTargeted', locale, { n: weak.length }) }
+        : { activity: 'vision', focus: 'board vision', minutes: warmup, reason: gt('studyPlan.warmupVision', locale) },
     );
     used += warmup;
   }
 
   if (weakest === 'resilience' && used < minutesPerDay) {
     const m = Math.min(10, minutesPerDay - used);
-    plan.push({ activity: 'comeback', focus: 'defend & recover', minutes: m, reason: 'Resilience is your weakest dimension — practise holding worse positions.' });
+    plan.push({ activity: 'comeback', focus: 'defend & recover', minutes: m, reason: gt('studyPlan.resilience', locale) });
     used += m;
   }
 
@@ -61,7 +66,7 @@ export function buildStudyPlan(
     const { activity, focus } = activityForLeak(leak);
     const m = Math.min(Math.max(5, Math.round(leak.count)), minutesPerDay - used);
     if (m <= 0) break;
-    plan.push({ activity, focus, minutes: m, reason: `${leak.count}× (avg −${Math.round(leak.avgWpl)}% win) — drill this leak.` });
+    plan.push({ activity, focus, minutes: m, reason: gt('studyPlan.leak', locale, { count: leak.count, wpl: Math.round(leak.avgWpl) }) });
     used += m;
   }
 

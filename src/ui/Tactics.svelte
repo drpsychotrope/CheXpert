@@ -11,7 +11,7 @@
   import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
   import { cardForThemes, loadConcepts, type ConceptCard as ConceptCardData } from '../concepts/concepts';
   import { failCountByPuzzle, isLeech } from '../srs/schedule';
-  import { t } from '../i18n';
+  import { t, getLocale } from '../i18n';
 
   let trainer = $state<TacticalTrainer | null>(null);
   let puzzle = $state<Puzzle | null>(null);
@@ -36,8 +36,15 @@
   let leech = $state(false);
   const LEECH_THRESHOLD = 3; // Q-B
 
-  loadConcepts().then((c) => {
-    cards = c;
+  // Load (and re-load on language switch): reading getLocale() inside the effect
+  // tracks the reactive locale, so flipping FR/EN refetches the matching seed and
+  // re-resolves the open card's prose for the current puzzle (geometry unchanged).
+  $effect(() => {
+    const loc = getLocale();
+    loadConcepts(loc).then((c) => {
+      cards = c;
+      if (puzzle) card = cardForThemes(puzzle.themes, c);
+    });
   });
 
   // Timed mode (the time-management drill): a per-puzzle clock; running out = a miss.

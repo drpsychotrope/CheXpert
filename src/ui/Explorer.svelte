@@ -4,8 +4,8 @@
   // (that's a follow-up needing a stats DB).
   import { onMount } from 'svelte';
   import { Chess } from 'chess.js';
-  import { loadEco, nameOpening, type EcoEntry, type OpeningName } from '../opening/eco';
-  import { t } from '../i18n';
+  import { loadEco, nameOpening, localizedOpeningName, type EcoEntry, type OpeningName } from '../opening/eco';
+  import { t, getLocale } from '../i18n';
 
   let input = $state('1. e4 c5 2. Nf3 d6');
   let table: EcoEntry[] = [];
@@ -51,7 +51,7 @@
   {#if err}
     <p class="feedback bad">{err}</p>
   {:else if done && named}
-    <p>{t('explorer.line')} <b>{named.name}</b> <span class="muted">({named.eco})</span></p>
+    <p>{t('explorer.line')} <b>{localizedOpeningName(named, getLocale())}</b> <span class="muted">({named.eco})</span></p>
   {:else if done}
     <p class="muted">{t('explorer.notInBookBefore')}<code>npm run etl:eco</code>{t('explorer.notInBookAfter')}</p>
   {/if}
@@ -59,7 +59,7 @@
   {#if conts.length}
     <h4>{t('explorer.bookContinuations')}</h4>
     <ul>
-      {#each conts as c (c.name)}<li>{c.name} <span class="muted">({c.eco})</span></li>{/each}
+      {#each conts as c (c.name)}<li>{localizedOpeningName(c, getLocale())} <span class="muted">({c.eco})</span></li>{/each}
     </ul>
   {/if}
 </section>

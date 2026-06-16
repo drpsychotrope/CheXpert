@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "license": "CC0. Positions et textes didactiques sélectionnés. Compatible avec la base de puzzles Lichess (CC0).",
+  "cards": [
+    {
+      "motif": "mate",
+      "title": "Échec et mat (dont le mat du couloir)",
+      "idea": "Attaquez le roi adverse pour qu'il n'ait plus aucun coup légal. Un roi piégé sur sa rangée de fond par ses propres pions est le schéma classique.",
+      "examples": [
+        { "fen": "6k1/5ppp/8/8/8/8/5PPP/4R1K1 w - - 0 1", "keyMove": "e1e8", "why": "Mat du couloir : le roi est enfermé par ses propres pions ; Te8# sur la colonne ouverte conclut la partie." },
+        { "fen": "6k1/5ppp/8/8/8/8/5PPP/3Q2K1 w - - 0 1", "keyMove": "d1d8", "why": "Même idée avec la dame : Dd8# donne mat sur la rangée de fond non défendue." },
+        { "fen": "6k1/R7/1R6/8/8/8/8/6K1 w - - 0 1", "keyMove": "b6b8", "why": "Mat de l'escalier : Tb8# pendant que la tour en a7 couvre la 7e rangée — le roi n'a aucune case de fuite." }
+      ]
+    },
+    {
+      "motif": "hangingPiece",
+      "title": "Pièce en prise (matériel gratuit)",
+      "idea": "Une pièce adverse non défendue peut être prise sans contrepartie. Cherchez toujours les pièces que l'adversaire a laissées sans protection.",
+      "examples": [
+        { "fen": "6k1/5ppp/8/8/8/n7/5PPP/R3R1K1 w - - 0 1", "keyMove": "a1a3", "why": "Le cavalier en a3 n'est pas défendu ; Txa3 gagne une pièce entière sans rien donner." },
+        { "fen": "6k1/5ppp/8/r7/8/8/5PPP/R5K1 w - - 0 1", "keyMove": "a1a5", "why": "La tour en a5 est en prise ; Txa5 gagne une tour entière." }
+      ]
+    },
+    {
+      "motif": "fork",
+      "title": "Fourchette (double attaque)",
+      "idea": "Une seule pièce attaque deux cibles à la fois ; l'adversaire ne peut en sauver qu'une. Les cavaliers et les pions font particulièrement bien la fourchette.",
+      "examples": [
+        { "fen": "6kr/8/8/4N3/8/8/8/6K1 w - - 0 1", "keyMove": "e5f7", "why": "Fourchette de cavalier : Cf7+ fait échec au roi et attaque la tour en h8 — après le déplacement du roi, on prend la tour." },
+        { "fen": "3r2k1/8/8/4N3/8/8/5PPP/6K1 w - - 0 1", "keyMove": "e5f7", "why": "Même fourchette de cavalier sur le roi et la tour : Cf7 frappe g8 (échec) et d8 simultanément." },
+        { "fen": "4k3/3r1n2/8/4P3/8/8/8/4K3 w - - 0 1", "keyMove": "e5e6", "why": "Fourchette de pion : e6 attaque la tour en d7 et le cavalier en f7 en même temps — l'une des deux tombe." }
+      ]
+    },
+    {
+      "motif": "pin",
+      "title": "Clouage (absolu et relatif)",
+      "idea": "Une pièce ne peut pas (ou ne devrait pas) bouger car une pièce plus précieuse — ou le roi — se trouve derrière elle sur la même ligne.",
+      "examples": [
+        { "fen": "4k3/8/2n5/8/8/8/8/5BK1 w - - 0 1", "keyMove": "f1b5", "why": "Clouage absolu : Fb5 cloue le cavalier en c6 sur le roi en e8 — le cavalier est figé." },
+        { "fen": "4k3/8/8/4n3/8/8/8/R5K1 w - - 0 1", "keyMove": "a1e1", "why": "Clouage absolu sur la colonne : Te1 cloue le cavalier en e5 sur le roi en e8." },
+        { "fen": "4r1k1/8/8/3n4/8/8/8/5BK1 w - - 0 1", "keyMove": "f1c4", "why": "Clouage relatif : Fc4 cloue le cavalier en d5 — le déplacer ferait perdre du matériel sur la diagonale." }
+      ]
+    },
+    {
+      "motif": "skewer",
+      "title": "Enfilade (le clouage inversé)",
+      "idea": "Attaquez une pièce précieuse sur une ligne ; lorsqu'elle s'écarte, capturez la pièce de moindre valeur placée derrière elle. Le roi est souvent la pièce de devant.",
+      "examples": [
+        { "fen": "4q3/8/8/8/4k3/8/8/R5K1 w - - 0 1", "keyMove": "a1e1", "why": "Te1+ enfile le roi en e4 et la dame en e8 — le roi doit bouger, puis Txe8 gagne la dame." },
+        { "fen": "8/8/8/q3k3/8/8/8/6KR w - - 0 1", "keyMove": "h1h5", "why": "Th5+ enfile le roi en e5 et la dame en a5 sur la rangée ; le roi s'écarte et Txa5 gagne la dame." }
+      ]
+    },
+    {
+      "motif": "discoveredAttack",
+      "title": "Attaque à la découverte (dont l'échec à la découverte)",
+      "idea": "Déplacez une pièce pour dévoiler l'attaque de la pièce située derrière elle. Quand l'attaque dévoilée est un échec, la pièce qui bouge peut prendre du matériel avec gain de temps.",
+      "examples": [
+        { "fen": "6k1/8/8/8/6N1/8/8/6RK w - - 0 1", "keyMove": "g4e5", "why": "Ce5 quitte la colonne g et découvre l'échec de la tour en g1 — un échec à la découverte, et le cavalier se pose activement." },
+        { "fen": "7k/8/8/4N3/8/8/8/B5K1 w - - 0 1", "keyMove": "e5c4", "why": "Cc4 dévoile le fou en a1, qui fait échec sur la grande diagonale au roi en h8 pendant que le cavalier s'échappe avec gain de temps." }
+      ]
+    },
+    {
+      "motif": "doubleCheck",
+      "title": "Échec double",
+      "idea": "Deux pièces font échec en même temps — l'une qui bouge, l'autre découverte. Le roi DOIT bouger ; rien ne peut bloquer ni capturer les deux pièces qui font échec.",
+      "examples": [
+        { "fen": "6k1/8/8/8/6N1/8/8/6RK w - - 0 1", "keyMove": "g4f6", "why": "Cf6+ fait échec au roi en g8 et découvre simultanément la tour en g1 — échec double, le roi est donc forcé de bouger." },
+        { "fen": "7k/8/8/4N3/8/8/8/B5K1 w - - 0 1", "keyMove": "e5g6", "why": "Cg6+ fait échec au roi en h8 et découvre le fou en a1 sur la diagonale — échec double ; seul un coup de roi est légal." }
+      ]
+    }
+  ]
+}

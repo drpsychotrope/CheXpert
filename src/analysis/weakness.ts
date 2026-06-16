@@ -7,6 +7,8 @@
 // "where to focus", not as a precise grade.
 
 import type { GameAnalysis, GamePhase, PlyAnalysis } from './types';
+import { gt } from '../i18n/gen';
+import type { Locale } from '../i18n/translate';
 
 export type Dimension =
   | 'tactics'
@@ -199,7 +201,7 @@ function dimensionScore(
     : { dimension, score: 50, detail: unmeasuredDetail, sampleSize: 0 };
 }
 
-export function buildWeaknessProfile(analyses: GameAnalysis[], playerRating: number): WeaknessProfile {
+export function buildWeaknessProfile(analyses: GameAnalysis[], playerRating: number, locale: Locale = 'fr'): WeaknessProfile {
   const expected = expectedAcpl(playerRating);
 
   const opening = phaseAcpl(analyses, 'opening');
@@ -211,30 +213,30 @@ export function buildWeaknessProfile(analyses: GameAnalysis[], playerRating: num
   const dimensions: DimensionScore[] = [
     dimensionScore(
       'tactics', tactics.n >= MIN_TACTICS_PLIES,
-      tactics.score, `${tactics.n} middlegame moves analysed`,
-      tactics.n, 'Too few middlegame moves to assess',
+      tactics.score, gt('weakness.tacticsDetail', locale, { n: tactics.n }),
+      tactics.n, gt('weakness.tacticsUnmeasured', locale),
     ),
     dimensionScore(
       'openingAccuracy', opening.n >= MIN_PHASE_PLIES,
       acplToScore(opening.acpl, expected),
-      `Opening ACPL ${Math.round(opening.acpl)} vs ~${Math.round(expected)} expected`,
-      opening.n, 'Too few opening moves to assess',
+      gt('weakness.openingDetail', locale, { acpl: Math.round(opening.acpl), exp: Math.round(expected) }),
+      opening.n, gt('weakness.openingUnmeasured', locale),
     ),
     dimensionScore(
       'endgameConversion', endgame.n >= MIN_PHASE_PLIES,
       acplToScore(endgame.acpl, expected),
-      `Endgame ACPL ${Math.round(endgame.acpl)} vs ~${Math.round(expected)} expected`,
-      endgame.n, 'No endgame reached — play longer games to assess',
+      gt('weakness.endgameDetail', locale, { acpl: Math.round(endgame.acpl), exp: Math.round(expected) }),
+      endgame.n, gt('weakness.endgameUnmeasured', locale),
     ),
     dimensionScore(
       'timeManagement', time.n >= MIN_TIME_BLUNDERS,
-      time.score, `${time.n} blunders checked for rushing`,
-      time.n, 'Not enough clock data to assess',
+      time.score, gt('weakness.timeDetail', locale, { n: time.n }),
+      time.n, gt('weakness.timeUnmeasured', locale),
     ),
     dimensionScore(
       'resilience', resilience.n >= MIN_BEHIND_EPISODES,
-      resilience.score, `${resilience.n} times behind; recovery rate`,
-      resilience.n, 'Rarely behind — not enough to assess recovery',
+      resilience.score, gt('weakness.resilienceDetail', locale, { n: resilience.n }),
+      resilience.n, gt('weakness.resilienceUnmeasured', locale),
     ),
   ];
 

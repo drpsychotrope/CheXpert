@@ -12,6 +12,7 @@
   import { allAttempts } from '../store/attemptsRepo';
   import { calibration, type MetacogAttempt } from '../metacog/metacog';
   import { t, fmtPct, getLocale } from '../i18n';
+  import { motifLabelOrRaw } from '../i18n/gen';
 
   let loading = $state(true);
   let leaks = $state<Leak[]>([]);
@@ -30,7 +31,7 @@
   const metacog = $derived(app.settings?.metacogEnabled ?? false);
 
   const model = $derived(app.model);
-  const plan = $derived(buildStudyPlan(leaks, weakest, minutes));
+  const plan = $derived(buildStudyPlan(leaks, weakest, minutes, { locale: getLocale() }));
 
   const DIMS: Dimension[] = ['tactics', 'openingAccuracy', 'endgameConversion', 'timeManagement', 'resilience'];
 
@@ -40,7 +41,7 @@
     if (analyses.length) {
       leaks = buildFingerprint(analyses).leaks;
       trend = weaknessTrend(analyses, { window: 5, rating: model ? poolRating(model, 'classical').rating : 1200 });
-      weakest = buildWeaknessProfile(analyses, model ? poolRating(model, 'classical').rating : 1200).weakest;
+      weakest = buildWeaknessProfile(analyses, model ? poolRating(model, 'classical').rating : 1200, getLocale()).weakest;
     }
     attempts = (await allAttempts()) as MetacogAttempt[];
     loading = false;
@@ -85,7 +86,7 @@
         {#each leaks as l (l.key)}
           <div class="row panel" style="justify-content:space-between;align-items:center;gap:1rem">
             <div>
-              <b>{l.motif}</b> <span class="muted" style="font-size:0.8rem">{l.phase}</span><br />
+              <b>{motifLabelOrRaw(l.motif, getLocale())}</b> <span class="muted" style="font-size:0.8rem">{t('phaseLabel.' + l.phase)}</span><br />
               <span class="muted" style="font-size:0.82rem">{t('insights.leakStat', { count: l.count, pct: fmtPct(l.avgWpl) })}</span>
             </div>
             <button onclick={() => drillLeak(l)}>{t('insights.drill')}</button>

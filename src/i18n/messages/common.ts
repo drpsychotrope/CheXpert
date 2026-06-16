@@ -6,6 +6,7 @@ export const common: Messages = {
   // App shell / topbar (App.svelte)
   'shell.brand': { fr: '♞ Chess Trainer', en: '♞ Chess Trainer' },
   'shell.skipToContent': { fr: 'Aller au contenu', en: 'Skip to content' },
+  'shell.docTitle': { fr: "Chess Trainer — la progression d'abord", en: 'Chess Trainer — progression first' },
   'shell.navLabel': { fr: 'Principal', en: 'Main' },
   'shell.loading': { fr: 'Chargement…', en: 'Loading…' },
   'shell.storageTitle': { fr: '⚠️ Stockage indisponible', en: '⚠️ Storage unavailable' },

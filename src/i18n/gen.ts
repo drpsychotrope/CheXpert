@@ -13,3 +13,8 @@ export function gt(key: string, locale: Locale, params?: TParams): string {
 export function gtHas(key: string): boolean {
   return key in generators;
 }
+
+/** A motif's localized label, or the raw key when there's no catalogue entry (phase-fallback leaks). */
+export function motifLabelOrRaw(motif: string, locale: Locale): string {
+  return gtHas('motif.' + motif) ? gt('motif.' + motif, locale) : motif;
+}

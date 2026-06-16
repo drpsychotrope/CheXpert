@@ -4,7 +4,7 @@
   import { loadAllAnalyses } from '../analysis/runAnalysis';
   import { buildWeaknessProfile, drillTarget, type WeaknessProfile, type Dimension } from '../analysis/weakness';
   import { poolRating } from '../store/playerModel';
-  import { t, tn } from '../i18n';
+  import { t, tn, getLocale } from '../i18n';
 
   let profile = $state<WeaknessProfile | null>(null);
   let loading = $state(true);
@@ -13,6 +13,7 @@
 
   // Dimension labels resolve through the bilingual catalogue (dim.* — full labels), single-sourced (V2-W18).
   $effect(() => {
+    void getLocale(); // re-localize dimension detail on a language switch
     void load();
   });
 
@@ -20,7 +21,7 @@
     loading = true;
     const analyses = await loadAllAnalyses();
     const rating = model ? poolRating(model, 'classical').rating : 1200;
-    profile = analyses.length ? buildWeaknessProfile(analyses, rating) : null;
+    profile = analyses.length ? buildWeaknessProfile(analyses, rating, getLocale()) : null;
     loading = false;
   }
 

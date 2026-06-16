@@ -22,7 +22,7 @@
   import { dueCount, dueCards } from '../srs/SrsStore';
   import { weakSquares } from '../vision/weakSquares';
   import { poolRating } from '../store/playerModel';
-  import { t } from '../i18n';
+  import { t, getLocale } from '../i18n';
 
   let loading = $state(true);
   let now = $state(0);
@@ -66,14 +66,14 @@
         const analyses = await loadAllAnalyses();
         const leaks = analyses.length ? buildFingerprint(analyses).leaks : [];
         const weakest = analyses.length
-          ? buildWeaknessProfile(analyses, model ? poolRating(model, 'classical').rating : 1200).weakest
+          ? buildWeaknessProfile(analyses, model ? poolRating(model, 'classical').rating : 1200, getLocale()).weakest
           : null;
         const nowMs = Date.now();
         // ADR-0043: surface due vision squares for the warm-up, and seed the trainer with them.
         const visionCards = await dueCards(nowMs, 'vision-square', 200);
         const weak = weakSquares(visionCards, nowMs, 12);
         app.visionWeakSquares = weak.length ? weak : null;
-        const plan = buildStudyPlan(leaks, weakest, minutes, { visionWeakSquares: weak });
+        const plan = buildStudyPlan(leaks, weakest, minutes, { visionWeakSquares: weak, locale: getLocale() });
         // Scope the Review gate to the kinds the Review path actually covers (puzzle + repertoire),
         // so due vision-square cards never reserve a Review slot. (Q-A = exclude-vision-only.)
         const includeReview = ((await dueCount(nowMs, 'puzzle')) + (await dueCount(nowMs, 'repertoire'))) > 0;
