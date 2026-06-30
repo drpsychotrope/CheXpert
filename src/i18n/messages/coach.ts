@@ -118,6 +118,17 @@ export const coach: Messages = {
   },
 
   'coach.startingEngine': { fr: 'Démarrage du moteur…', en: 'Starting engine…' },
+  // CF8: the calibration game's engine failed to boot. The message shown immediately (info slot) +
+  // the honest result note, so a failure is never mistaken for a deliberate Skip (AP-CFUNNEL-4),
+  // symmetric with Onboarding's engineFailedSkipping.
+  'coach.engineFailed': {
+    fr: "Impossible de démarrer le moteur — évaluation sur les problèmes uniquement.",
+    en: "Couldn't start the engine — assessed puzzles only.",
+  },
+  'coach.engineFailedNote': {
+    fr: "La partie n'a pas pu démarrer (erreur du moteur) — ce profil repose sur les problèmes seuls, pas sur une partie passée.",
+    en: 'The game could not start (engine error) — this profile is from puzzles only, not a skipped game.',
+  },
   'coach.yourMove': { fr: 'À vous de jouer — jouez naturellement.', en: 'Your move — play naturally.' },
   'coach.youPlayWhite': { fr: 'Vous jouez les Blancs', en: 'You play White' },
   'coach.youPlayBlack': { fr: 'Vous jouez les Noirs', en: 'You play Black' },
@@ -139,6 +150,16 @@ export const coach: Messages = {
   'coach.programItemMeta': { fr: '({minutes} min · {reason})', en: '({minutes}m · {reason})' },
   'coach.startSession': { fr: '▶ Démarrer la session de coaching', en: '▶ Start coaching session' },
   'coach.later': { fr: 'Plus tard', en: 'Later' },
+  // CF10: export the current coach profile as a JSON snapshot (client-side; a snapshot, not a
+  // printable report — AP-CFUNNEL-5). Surfaced on the result panel and in Settings → Your data.
+  'coach.exportProfile': { fr: '⤓ Exporter le profil (JSON)', en: '⤓ Export profile (JSON)' },
+
+  // ── CF4 mid-assessment resume (coach.*) — the in-memory resume banner + start-over (FOLD-C1). ──
+  'coach.resumedNote': {
+    fr: 'Évaluation reprise là où vous en étiez.',
+    en: 'Resumed your assessment where you left off.',
+  },
+  'coach.startOver': { fr: 'Tout recommencer', en: 'Start over' },
 
   // ── C1: saved-profile intro card + progress trend + staleness (coach.*) ───
   // Surfaces the write-only coachProfile/Prev/assessedAt (ADR-0045). Directional, never a grade

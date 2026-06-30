@@ -1897,3 +1897,77 @@ no `DB_VERSION`, no `buildStudyPlan`/`OPENING_BOOK` change → nothing to undo i
 ADR-0027 (study-plan/budget), ADR-0028 (eco naming), P4 (opening-steering symmetry — owns `OPENING_BOOK`),
 C5 (intake goal — the 4th arg), C1 (profile persistence — owns the persisted-mastery follow-up),
 `specs/coach-program-v2-spec.md` §4/§5/§6/§9, `enhancements-architecture-spec.md` (C7).
+
+## C8 — coach funnel + mid-assessment resume + engine-fail message + profile export (no new ADR; reuse ADR-0045/0053/0054)
+
+`specs/coach-funnel-robustness-spec.md` (V1). The C8 *closure* leaf of the Coach stack: makes the coach
+**findable, resumable, honest-on-failure, and portable** without adding coaching content. Records the spec's
+RESOLVED arbitrages Q-A..Q-F (the V1 defaults). **No new ADR**, **no `DB_VERSION` bump** (db.ts untouched),
+Insights byte-identical (no selection/studyPlan/session/weakness file touched).
+
+**Q-A — funnel surfaces (CO20), BOTH/gentle.** Two consented, dismissible entries to the (existing) `coach`
+view — no new top-level View (AP-CFUNNEL-9). (1) **Onboarding-end offer**: a "Get a full coaching read →"
+action on the `done` step next to "Go home" — catches the new user with momentum (the same calibration
+engine the coach builds on just ran). (2) **Home rough-patch card**: a single dismissible soft card gated on
+the pure `shouldOfferCoach(model, now)`; "Not now" sets an **in-memory** cooldown (`app.coachOfferDismissed`)
+so it never re-nags in-session (AP-CFUNNEL-1). The `Date.now()` boundary lives in `Home.svelte` (the core
+takes `now` — AP-CFUNNEL-2). **Auto-launch rejected** (nagging) — every offer is consented.
+
+**Q-A2 — rough-patch signal.** A NEW pure total predicate `src/coach/funnel.ts → shouldOfferCoach(model, now)`:
+true iff a **losing streak** (trailing run of ≥ `STREAK_LEN`=3 `'loss'` in any `opponentByPool[*].recent` —
+the already-persisted rolling outcomes, **no new state**, AP-CFUNNEL-3) AND **no fresh** `coachProfile`
+(`now - assessedAt > FRESH_MS`=14d, the staleness guard). Total: null model / empty pools / sub-threshold
+streak / recovering streak (win after losses) / just-assessed → **false** (FOLD-C5). `coachProfileFilename(assessedAt)`
+(pure, `coach-profile-YYYY-MM-DD.json`) lives here too.
+
+**Q-B — mid-assessment resume (CF4), in-memory.** Lift the wizard cursor into a NEW in-memory singleton
+`app.coachAssessment = { step, plan, themeIdx, probes }` — **mirrors `activeSession`** (survives view swaps,
+lost on reload; **NOT persisted → no schema change**). `Coach.svelte` snapshots it at each step transition
+(`startGoals`/`startNextLadder`/`afterLadders`/`startTimedBlock`/`finishTimedBlock`) and **resumes on mount**:
+a parked `ladders` rebuilds the ladder at the saved `themeIdx`; a parked `timed` (live rAF can't be
+serialised) resumes at the safe `offer-game`; `goals`/`offer-game` restore directly. **Start over** (FOLD-C1)
+clears the singleton and re-enters `intro`; `commit()` clears it (assessment complete). **FOLD-C2
+(DB-persisted resume) NOT taken** — in-memory parity with `activeSession` is the shipped default, so
+**ADR-0059 stays unallocated** (only spend it if a future PR adds durable resume additively).
+
+**Q-C — engine-fail message (CF8), via the `info` slot.** In `beginGame`'s `catch`, the even-game path now
+sets `info = t('coach.engineFailed')` ("Couldn't start the engine — assessed puzzles only.") and a
+`gameFailed` flag **before** `finishWithoutGame()` — previously a silent skip indistinguishable from the
+deliberate Skip button (AP-CFUNNEL-4). FOLD-C3: the result panel renders `coach.engineFailedNote` when
+`gameFailed`, so the profile is honestly labelled puzzles-only, not a skipped game. Symmetric with
+Onboarding's `engineFailedSkipping`. (A probe keeps its own `probeAborted` message — unchanged.)
+
+**Q-D — export (CF10), JSON now.** `exportCoachProfile()` (glue in `Coach.svelte` + `Settings.svelte`)
+`JSON.stringify`s the **live `coachProfile` verbatim** (no lossy projection — AP-CFUNNEL-6) and downloads it
+via the shared primitive; filename from `coachProfileFilename(assessedAt)` (pure). **Export-only** (Q-E;
+import → §11). It is a **snapshot**, JSON, client-side — not a printable report and not a server share
+(AP-CFUNNEL-5/7); printable/PDF DEFER (no print path exists). Buttons: the Coach **result** panel and
+**Settings → Your data**, both guarded on `app.model?.coachProfile` existing.
+
+**Q-D/FOLD-C6 — one download primitive.** F5 had shipped `src/ui/pgnDownload.ts`, so it was **generalised**
+(not duplicated — AP-CFUNNEL-11, reuse-if-shipped): a new generic `downloadText(content, filename, mime =
+'application/json')` (Blob → object-URL → anchor click → revoke, feature-detected for SSR/jsdom) is now the
+one primitive; `downloadPgn` delegates to it with the chess-PGN mime (byte-identical behaviour, F5 tests
+unchanged). The future F5 reconciliation is already done (§11).
+
+**No new ADR.** Every change is additive/in-memory: a pure predicate module, a generalised existing helper,
+two in-memory `app` fields (`coachAssessment`, `coachOfferDismissed`), consented dismissible surfaces, and
+new FR+EN i18n keys (FOLD-C4 — gentle tone in both locales, parity by construction). Reuses ADR-0045 (coach
+mode), ADR-0053 (bilingual), ADR-0054/0056 (F5 client-side download primitive).
+
+**Files:** `coach/funnel.ts` (NEW pure: `shouldOfferCoach`/`hasLosingStreak`/`hasFreshProfile`/
+`coachProfileFilename` + `STREAK_LEN`/`FRESH_MS`), `ui/pgnDownload.ts` (generic `downloadText`; `downloadPgn`
+delegates), `state/app.svelte.ts` (`coachAssessment` + `coachOfferDismissed`, both in-memory),
+`ui/Coach.svelte` (resume snapshot/restore + Start over, engine-fail message + `gameFailed` result note,
+Export button), `ui/Home.svelte` (rough-patch card), `ui/Onboarding.svelte` (end offer),
+`ui/Settings.svelte` (Export in Your data), i18n (`coach.engineFailed`/`engineFailedNote`/`exportProfile`/
+`resumedNote`/`startOver`; `home.roughPatch`/`roughPatchCta`/`roughPatchDismiss`; `onboarding.coachOfferBody`/
+`coachOffer`), all FR+EN. **Tests:** `coach/funnel.test.ts` (NEW, 22: streak/staleness/total branches +
+filename purity), `ui/pgnDownload.test.ts` (+4: `downloadText` generic + delegated mime), `ui/coach-funnel-wiring.test.ts`
+(NEW, 8: static presence of the singleton/resume/engine-fail/export/funnel wiring) → **961 green** (927 + 34),
+svelte-check **0/0** (435 files), build green. **Rollback** (§10): pure-additive, no schema/migration — drop
+`funnel.ts`+test, the `downloadText`/`exportCoachProfile` glue, the two `app` fields, the Coach resume/Start-
+over/engine-fail/export edits, the Home card, the Onboarding offer, the Settings button, and the new i18n
+keys; nothing to undo in IndexedDB. Cross-links: ADR-0045 (coach mode), ADR-0053 (bilingual), ADR-0054/0056
+(F5 download), C1 (shares the freshness predicate for its staleness nudge — §11), F5 (PGN export — now folded
+onto the one primitive), `specs/coach-funnel-robustness-spec.md`, `enhancements-architecture-spec.md` (C8).

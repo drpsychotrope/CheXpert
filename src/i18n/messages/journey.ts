@@ -56,6 +56,13 @@ export const journey: Messages = {
     en: '(rough seed — it sharpens as you play)',
   },
   'onboarding.goToHome': { fr: "Aller à l'accueil →", en: 'Go to home →' },
+  // CO20 (C8): the onboarding-end coaching offer. Gentle, optional — the coach builds on the same
+  // calibration engine that just ran, so this is the natural next step for a motivated new user.
+  'onboarding.coachOfferBody': {
+    fr: 'Envie d’aller plus loin ? Le coaching analyse vos points faibles et propose un programme ciblé.',
+    en: 'Want to go deeper? Coaching reads your weak spots and builds a focused program.',
+  },
+  'onboarding.coachOffer': { fr: 'Faire une évaluation de coaching →', en: 'Get a full coaching read →' },
 
   // ── Session (practice session runner) ──────────────────────────────────────
   'session.title': { fr: 'Session de pratique', en: 'Practice session' },

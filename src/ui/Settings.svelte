@@ -2,6 +2,8 @@
   import { app } from '../state/app.svelte';
   import { clearAllData, DEFAULT_DAILY_GOAL } from '../store/playerModel';
   import ConfirmDialog from './ConfirmDialog.svelte';
+  import { coachProfileFilename } from '../coach/funnel';
+  import { downloadText } from './pgnDownload';
   import { t, getLocale, type Locale } from '../i18n';
 
   const settings = $derived(app.settings);
@@ -64,6 +66,15 @@
 
   function wipe() {
     confirmKind = 'wipe';
+  }
+
+  // CF10: export the saved coach profile as a JSON snapshot from Settings → Your data. Same client-
+  // side, lossless export as the Coach result panel (JSON.stringify verbatim — AP-CFUNNEL-6), via the
+  // shared downloadText primitive (FOLD-C6); filename derived from assessedAt (pure helper).
+  function exportCoachProfile() {
+    const p = model?.coachProfile;
+    if (!p) return;
+    downloadText(JSON.stringify(p, null, 2), coachProfileFilename(p.assessedAt));
   }
 
   async function onConfirm() {
@@ -163,6 +174,10 @@
     <h3>{t('settings.yourData')}</h3>
     <button onclick={() => app.go('onboarding')} style="background:var(--panel-2)">{t('settings.rerunEval')}</button>
     <button class="ghost" onclick={() => app.go('coach')}>{t('settings.rerunCoach')}</button>
+    <!-- CF10: export the coach profile as JSON — only when one exists (guarded). Client-side snapshot. -->
+    {#if model?.coachProfile}
+      <button class="ghost" onclick={exportCoachProfile}>{t('coach.exportProfile')}</button>
+    {/if}
     <button onclick={wipe} style="background:var(--bad)">{t('settings.deleteData')}</button>
   </div>
 

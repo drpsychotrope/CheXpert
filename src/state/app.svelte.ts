@@ -58,6 +58,21 @@ class AppState {
    *  instead of a hardcoded 30 (AP-CPROG-1). Optional — Insights' generic session path omits it
    *  (Session falls back to 30). In-memory only → no DB_VERSION concern. */
   activeSession = $state<{ plan: SessionPlan; current: number; startedAt: number; reflection: string; budgetMin?: number } | null>(null);
+  /** In-progress coach assessment (C8/CF4, in-memory; survives view swaps; NOT persisted by default
+   *  — mirrors `activeSession`). Lets the wizard RESUME after navigating away mid-assessment instead
+   *  of silently losing every probe. Carries the wizard cursor: `step`, the built à-la-carte `plan`
+   *  (C2/CF7 — needed to re-enter the right ladder), `themeIdx`, and the probe results so far.
+   *  In-memory only → NO DB_VERSION concern (AP-CFUNNEL-3). */
+  coachAssessment = $state<{
+    step: string;
+    plan: import('../coach/probePlan').ProbeSpec[];
+    themeIdx: number;
+    probes: import('../coach/types').ThemeProbeResult[];
+  } | null>(null);
+  /** CF/CO20 (C8): the Home rough-patch coaching card was dismissed this session. In-memory cooldown
+   *  (mirrors the other ephemeral flags here) so "Not now" doesn't re-nag during the session and the
+   *  prompt stays gentle (AP-CFUNNEL-1). Resets on reload by design — no schema change. */
+  coachOfferDismissed = $state(false);
   /** Set by a coach 'sparring' program step; consumed once by Sparring.svelte to auto-open a scenario. */
   sparringScenarioId = $state<string | null>(null);
   /** Set by a coach 'play-steered' program step; consumed once by Play.svelte to override the steer dimension. */

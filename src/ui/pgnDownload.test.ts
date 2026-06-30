@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { pgnFilename, downloadPgn } from './pgnDownload';
+import { pgnFilename, downloadPgn, downloadText } from './pgnDownload';
 
 describe('pgnFilename (F5) — pure, derived from playedAt (no Date.now, AP-GAMES-6)', () => {
   it('is deterministic for a fixed epoch and ends with .pgn', () => {
@@ -76,6 +76,60 @@ describe('downloadPgn (F5) — client-side, SSR/jsdom-safe', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith(url);
     expect(clicked).toEqual(['game-2026-06-30-win.pgn']);
 
+    clickSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('downloadText (C8 FOLD-C6) — generic primitive shared by PGN + coach-profile export', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('no-ops on empty content — never touches the DOM', () => {
+    const create = vi.fn();
+    vi.stubGlobal('URL', { createObjectURL: create, revokeObjectURL: vi.fn() });
+    expect(() => downloadText('', 'coach-profile-2026-06-30.json')).not.toThrow();
+    expect(create).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('feature-detects: does not throw when URL.createObjectURL is absent (SSR/jsdom-safe)', () => {
+    vi.stubGlobal('URL', {} as unknown as typeof URL);
+    expect(() => downloadText('{"a":1}', 'coach-profile-2026-06-30.json')).not.toThrow();
+    vi.unstubAllGlobals();
+  });
+
+  it('creates/revokes an object URL and clicks an anchor with the given filename + mime (jsdom)', () => {
+    const url = 'blob:test';
+    const createObjectURL = vi.fn((_blob: Blob) => url);
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+    const clicked: string[] = [];
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        clicked.push(this.download);
+      });
+
+    downloadText('{"assessedAt":1}', 'coach-profile-2026-06-30.json');
+
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    // The blob carries the default JSON mime (the arg the coach export relies on).
+    const blob = createObjectURL.mock.calls[0][0] as Blob;
+    expect(blob.type).toBe('application/json');
+    expect(revokeObjectURL).toHaveBeenCalledWith(url);
+    expect(clicked).toEqual(['coach-profile-2026-06-30.json']);
+
+    clickSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('honours a custom mime (downloadPgn delegates with the chess-PGN type)', () => {
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:x');
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL: vi.fn() });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    downloadPgn('1. e4 *', 'game-2026-06-30-win.pgn');
+    const blob = createObjectURL.mock.calls[0][0] as Blob;
+    expect(blob.type).toBe('application/x-chess-pgn');
     clickSpy.mockRestore();
     vi.unstubAllGlobals();
   });

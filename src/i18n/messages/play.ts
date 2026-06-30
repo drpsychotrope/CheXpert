@@ -16,6 +16,14 @@ export const play: Messages = {
   },
   // T3/TR8: training-day streak shown beside the Review badge (re-engagement signal).
   'home.streak': { fr: '🔥 Série de {n} jours', en: '🔥 {n}-day streak' },
+  // CO20 (C8): the dismissible rough-patch coaching card on Home. Gentle, opt-in (AP-CFUNNEL-1) —
+  // surfaced only on a losing streak with no fresh profile (shouldOfferCoach).
+  'home.roughPatch': {
+    fr: 'Passage difficile ? Une évaluation de coaching peut cibler ce qui coince.',
+    en: 'Rough patch? A coaching read can pinpoint what to work on.',
+  },
+  'home.roughPatchCta': { fr: 'M’évaluer →', en: 'Assess me →' },
+  'home.roughPatchDismiss': { fr: 'Plus tard', en: 'Not now' },
   'home.playBot': { fr: "Jouer contre le bot adaptatif", en: 'Play the adaptive bot' },
   'home.todaysSession': { fr: "Session du jour", en: "Today's session" },
   'home.insights': { fr: 'Bilan', en: 'Insights' },

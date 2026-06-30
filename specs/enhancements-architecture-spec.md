@@ -146,7 +146,7 @@ Foundation PRs are mutually independent → **draftable/buildable in parallel**.
 | **C5 · Intake & metacognition** | Goals/intake step; calibration/metacog coaching; leverage strengths | CO3, CO14, CO18 | metacog, calibration |
 | **C6 · Output & teaching** | Narrative voice; concept-card + game-review teaching; expected-impact prioritization | CO8, CO1, CO13, CO9 | F4 |
 | **C7 · Program v2** | Time-budget toggle; mastery-based steps; closed-loop efficacy; opening→repertoire routing | CO5, CO16, CO10, CO17 | efficacy.ts, repertoire |
-| **C8 · Funnel & robustness** | onboarding→coach + right-moment surfacing; mid-assessment resume; engine-fail msg; profile export | CO20, CF4, CF8, CF10 | F5 |
+| **C8 · Funnel & robustness** ✅ shipped | onboarding→coach + right-moment surfacing; mid-assessment resume (in-memory, mirrors `activeSession`); engine-fail msg; profile export (JSON, via generalised `downloadText` — closes F5's deferred CF10) | CO20, CF4, CF8, CF10 | F5 |
 
 ---
 

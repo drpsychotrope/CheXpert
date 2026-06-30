@@ -47,6 +47,8 @@
   import { resolveColor, type ColorChoice } from '../game/color';
   import { t, getLocale, fmtPct } from '../i18n';
   import { labelOrRaw, gt } from '../i18n/gen';
+  import { coachProfileFilename } from '../coach/funnel';
+  import { downloadText } from './pgnDownload';
 
   type Step = 'intro' | 'goals' | 'ladders' | 'timed' | 'offer-game' | 'game' | 'analysing' | 'result';
   let step = $state<Step>('intro');
@@ -113,6 +115,9 @@
   let opponent: AdaptiveOpponent | null = null;
   let thinking = $state(false);
   let info = $state('');
+  // CF8: set when the calibration game's engine failed to boot, so the result note distinguishes an
+  // engine failure from a deliberate Skip (both reach finishWithoutGame, today silently). Honesty.
+  let gameFailed = $state(false);
   const GAME_MOVE_LIMIT = 48;
   let coachColorChoice = $state<ColorChoice>('random');
   let coachSide = $state<'w' | 'b'>('w');
@@ -238,6 +243,62 @@
   onMount(() => { nowMs = Date.now(); });
   // Stop the timed-block rAF if the view unmounts mid-block (no leaked animation frame).
   onDestroy(() => { if (timedRaf !== null) cancelAnimationFrame(timedRaf); });
+
+  // ── CF4 mid-assessment resume (in-memory, mirrors Session.svelte:54-93) ────────────────────────
+  // The wizard's cursor (step + à-la-carte plan + themeIdx + probes-so-far) is mirrored into the
+  // in-memory singleton `app.coachAssessment` at each step transition, so navigating away and back
+  // RESUMES instead of losing everything (CF4). NOT persisted by default → no schema change
+  // (AP-CFUNNEL-3). `resumed` flags a restored run so the UI offers "Start over" (FOLD-C1).
+  let resumed = $state(false);
+  // Which steps are worth snapshotting/resuming: the declarative, mid-flow ones. `game`/`analysing`
+  // hold a LIVE engine/ladder/rAF that can't be serialised; on re-entry such a run resumes at the
+  // safe `offer-game` step (the assessment continues there) rather than a broken half-game.
+  const RESUMABLE_STEPS = new Set<Step>(['goals', 'ladders', 'timed', 'offer-game']);
+
+  /** Snapshot the current wizard cursor into the singleton (called at each step transition). Only
+   *  resumable steps are stored; transient steps clear nothing (the last resumable snapshot stands). */
+  function saveAssessment() {
+    if (!RESUMABLE_STEPS.has(step)) return;
+    app.coachAssessment = {
+      step,
+      plan: $state.snapshot(plan) as ProbeSpec[],
+      themeIdx,
+      probes: probes.slice(),
+    };
+  }
+
+  /** Drop the in-memory assessment (on a completed commit or an explicit Start over). */
+  function clearAssessment() {
+    app.coachAssessment = null;
+    resumed = false;
+  }
+
+  /** FOLD-C1: discard a resumed assessment and re-enter the intro fresh. */
+  function startOver() {
+    clearAssessment();
+    step = 'intro';
+  }
+
+  // Resume on mount if an in-progress assessment is parked in the singleton (CF4). Restore the plan
+  // and probes, then re-enter at a safe step: a parked `ladders` rebuilds the ladder for the saved
+  // themeIdx via startNextLadder(); a parked `timed` (live rAF can't be restored) resumes at the
+  // offer; `goals`/`offer-game` restore directly. Mirrors Session.svelte's resume-on-mount.
+  onMount(() => {
+    const snap = app.coachAssessment;
+    if (!snap) return;
+    resumed = true;
+    plan = snap.plan;
+    themeIdx = snap.themeIdx;
+    probes.length = 0;
+    probes.push(...snap.probes);
+    if (snap.step === 'ladders') {
+      startNextLadder(); // rebuilds the ladder at themeIdx (re-serves the current theme's puzzles)
+    } else if (snap.step === 'timed' || snap.step === 'offer-game') {
+      step = 'offer-game';
+    } else {
+      step = snap.step as Step; // 'goals'
+    }
+  });
   const savedTrend = $derived(saved ? buildCoachTrend(saved, savedPrev) : null);
   const savedAgeDays = $derived(saved ? profileAgeDays(saved.assessedAt, nowMs) : null);
   const savedStale = $derived(saved ? isStale(saved.assessedAt, nowMs) : false);
@@ -280,6 +341,7 @@
   function startGoals() {
     goal = app.model?.coachProfilePrev?.goal ?? app.model?.coachProfile?.goal;
     step = 'goals';
+    saveAssessment(); // CF4: a started assessment is resumable from the goals step on
   }
 
   function startLadders() {
@@ -314,6 +376,7 @@
     while (themeIdx < plan.length && plan[themeIdx].kind === 'timed') themeIdx += 1;
     if (themeIdx >= plan.length) return afterLadders();
     step = 'ladders';
+    saveAssessment(); // CF4: snapshot the cursor at the start of each themed ladder
     startThemeLadder();
   }
 
@@ -456,6 +519,7 @@
       startTimedBlock();
     } else {
       step = 'offer-game';
+      saveAssessment(); // CF4: resumable at the offer step
     }
   }
 
@@ -468,6 +532,7 @@
 
   function startTimedBlock() {
     step = 'timed';
+    saveAssessment(); // CF4: a parked timed block resumes at the offer step (live rAF can't restore)
     timedState = initTimedProbe();
     timedSolvedCount = 0;
     timedRemainingMs = TIMED_BUDGET_MS;
@@ -531,6 +596,7 @@
     timedClock = null;
     timedDim = timedDimension(timedState, getLocale());
     step = 'offer-game';
+    saveAssessment(); // CF4: resumable at the offer step
   }
 
   // Progress total for the ladders step counts only the THEMED ladders (the timed block runs as its
@@ -581,6 +647,7 @@
    *  game commits without a game (today's behaviour); a probe aborts back to the offer (graceful skip). */
   async function beginGame(seeded: ChessGame) {
     step = 'game';
+    gameFailed = false; // reset; set below only if the even-game engine fails to boot
     game = seeded;
     gameFen = game.fen;
     opponent = new AdaptiveOpponent(app.engine, initOpponentState(baseline()));
@@ -592,7 +659,13 @@
       thinking = false;
       if (coachSide === 'b') await botReply(); // engine (the other side) opens
     } catch {
-      return activeProbe ? abortProbe() : finishWithoutGame();
+      // CF8: a probe aborts with its own message (probeAborted). The even game previously called
+      // finishWithoutGame() SILENTLY — indistinguishable from a deliberate Skip. Surface the failure
+      // via the existing `info` slot and flag it so the result note says "engine failed" (AP-CFUNNEL-4).
+      if (activeProbe) return abortProbe();
+      gameFailed = true;
+      info = t('coach.engineFailed');
+      return finishWithoutGame();
     }
   }
 
@@ -754,6 +827,7 @@
       app.model = fresh;
       await app.persistModel(Date.now());
     }
+    clearAssessment(); // CF4: the assessment completed — drop the in-memory resume snapshot
     step = 'result';
   }
 
@@ -775,6 +849,17 @@
     app.activeSession = { plan: buildSession(programPreview), current: 0, startedAt: Date.now(), reflection: '', budgetMin: budget };
     app.go('session');
   }
+
+  /** CF10: export the live coach profile as a JSON snapshot (Q-D=a). Serialises the persisted
+   *  CoachProfile VERBATIM (no lossy projection — AP-CFUNNEL-6) via the shared downloadText primitive
+   *  (FOLD-C6); filename derived from the profile's assessedAt (pure helper, no Date.now in core).
+   *  Reads the live model so the result panel and Settings export the same current profile. Strictly
+   *  client-side (AP-CFUNNEL-7) — it's a snapshot, not a printable report or a server share. */
+  function exportCoachProfile() {
+    const p = app.model?.coachProfile;
+    if (!p) return;
+    downloadText(JSON.stringify(p, null, 2), coachProfileFilename(p.assessedAt));
+  }
 </script>
 
 {#snippet scopePicker()}
@@ -793,6 +878,16 @@
 
 <section class="col center" style="max-width:680px;margin:0 auto">
   <h2>{t('coach.title')}</h2>
+
+  <!-- CF4/FOLD-C1: a resumed-assessment banner. When the wizard re-mounted onto a parked assessment
+       (navigated away and back), tell the user we resumed and offer to start over. Shown only on the
+       in-progress steps (not intro/result). -->
+  {#if resumed && step !== 'intro' && step !== 'result'}
+    <p class="feedback" style="font-size:0.85rem">
+      {t('coach.resumedNote')}
+      <button class="link resume-startover" onclick={startOver}>{t('coach.startOver')}</button>
+    </p>
+  {/if}
 
   {#if step === 'intro'}
     {#if saved}
@@ -950,6 +1045,11 @@
       <h3>{t('coach.profileTitle')}</h3>
       <Radar dimensions={profile.dimensions} />
       <p class="muted" style="font-size:0.8rem">{t('coach.directional', { source: provenanceSource })}</p>
+      <!-- CF8/FOLD-C3: when the calibration game's engine failed to boot, say so HONESTLY — the
+           profile is puzzles-only, not the result of a deliberate Skip (AP-CFUNNEL-4). -->
+      {#if gameFailed}
+        <p class="feedback" style="font-size:0.82rem">{t('coach.engineFailedNote')}</p>
+      {/if}
 
       <!-- C6/CO8 + CO9: a DIRECTIONAL prose read (strengths, weaknesses) + the leverage-ranked
            "start here" focus. PURE templated catalogue phrases (narrative.ts) — no grade, no invented
@@ -1087,6 +1187,11 @@
 
       <div class="row center">
         <button onclick={startCoaching}>{t('coach.startSession')}</button>
+        <!-- CF10: export the current profile as a JSON snapshot (guarded on a persisted profile,
+             which always exists on the result screen). Client-side, lossless (AP-CFUNNEL-5/6). -->
+        {#if app.model?.coachProfile}
+          <button style="background:transparent;border:1px solid var(--border)" onclick={exportCoachProfile}>{t('coach.exportProfile')}</button>
+        {/if}
         <button style="background:transparent;border:1px solid var(--border)" onclick={() => app.go('home')}>{t('coach.later')}</button>
       </div>
     </div>
@@ -1134,6 +1239,17 @@
   .tag-leverage { border-color: var(--accent, #6aa); color: var(--accent, #6aa); }
   /* C7 mastery criterion + cap badge on a program step (criterion-or-cap, AP-CPROG-2/3). */
   .tag-mastery { font-variant-numeric: tabular-nums; }
+
+  /* CF4/FOLD-C1: "Start over" inline link in the resumed-assessment banner. */
+  .resume-startover {
+    background: none;
+    border: none;
+    color: var(--accent, #6aa);
+    text-decoration: underline;
+    cursor: pointer;
+    font: inherit;
+    padding: 0 0 0 0.4rem;
+  }
 
   /* C6 coach-output: "Learn the pattern" toggle (mirrors ConceptCard's button.link). */
   .learn-toggle {
