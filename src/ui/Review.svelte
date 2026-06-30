@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
+  import SolutionReveal from './SolutionReveal.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { TacticalTrainer, gradeAttempt } from '../trainer/TacticalTrainer';
   import type { Puzzle } from '../trainer/puzzle';
@@ -9,7 +10,8 @@
   import { allAttempts } from '../store/attemptsRepo';
   import { interleave, buildLapseSet } from '../srs/schedule';
   import { createSet, saveSet } from '../woodpecker/woodpecker';
-  import { t, tn } from '../i18n';
+  import { missWhy } from '../concepts/concepts';
+  import { t, tn, getLocale } from '../i18n';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -30,6 +32,9 @@
   let missesMsg = $state('');
   let scheduledCount = $state(0);
   let nextDue = $state('');
+  // F4: opt-in "Show solution" on a miss (Q-D / AP-TEACH-4). Reset per card so it never
+  // carries over; toggled on only when the user taps the button.
+  let showSolution = $state(false);
 
   const model = $derived(app.model);
 
@@ -61,6 +66,7 @@
   async function loadCurrent() {
     feedback = '';
     feedbackKind = '';
+    showSolution = false;
     while (index < queue.length) {
       const p = await findPuzzle(queue[index]);
       if (p) {
@@ -202,6 +208,22 @@
       />
     </div>
     <p class="feedback {feedbackKind}">{feedback}</p>
+    {#if trainer.state.status === 'failed' && puzzle}
+      <!-- F4: opt-in "Show solution" on a miss (Q-D), identical to Tactics. Non-blocking;
+           theme-derived pattern hint via missWhy (null when no high-confidence motif). -->
+      <button class="link" onclick={() => (showSolution = !showSolution)}>
+        {showSolution ? t('reveal.hideSolution') : t('reveal.showSolution')}
+      </button>
+      {#if showSolution}
+        <SolutionReveal
+          fen={puzzle.fen}
+          moves={puzzle.moves}
+          {orientation}
+          why={missWhy(puzzle.themes, getLocale())}
+          autoplay
+        />
+      {/if}
+    {/if}
     {#if trainer.state.status !== 'solving'}
       <button onclick={nextCard}>{t('review.next')}</button>
     {/if}
@@ -210,4 +232,5 @@
 
 <style>
   button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  button.link { background: none; border: none; color: var(--accent); padding: 0 0 0 0.4rem; text-decoration: underline; cursor: pointer; }
 </style>

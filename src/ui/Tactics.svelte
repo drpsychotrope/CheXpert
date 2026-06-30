@@ -3,13 +3,14 @@
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
   import ConceptCard from './ConceptCard.svelte';
+  import SolutionReveal from './SolutionReveal.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { TacticalTrainer, gradeAttempt } from '../trainer/TacticalTrainer';
   import type { Puzzle } from '../trainer/puzzle';
   import { putAttempt, getAttempt, attemptsByPuzzle, recordTacticsAttempt } from '../store/attemptsRepo';
   import { resultToGrade } from '../srs/fsrs';
   import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
-  import { cardForThemes, loadConcepts, type ConceptCard as ConceptCardData } from '../concepts/concepts';
+  import { cardForThemes, loadConcepts, missWhy, type ConceptCard as ConceptCardData } from '../concepts/concepts';
   import { failCountByPuzzle, isLeech } from '../srs/schedule';
   import { steerFromWeakness } from '../trainer/weaknessSelect';
   import { t, getLocale } from '../i18n';
@@ -82,6 +83,9 @@
   }
 
   let showCard = $state(false);
+  // F4: opt-in "Show solution" on a miss (Q-D / AP-TEACH-4). Reset on every load/retry so
+  // it never auto-spoils a Retry; toggled on only when the user taps the button.
+  let showSolution = $state(false);
 
   async function openLearn(): Promise<void> {
     showCard = true;
@@ -124,6 +128,7 @@
     selfTag = undefined;
     lastAttemptId = undefined;
     showCard = false;
+    showSolution = false;
 
     // Selection priority closes the loop: a dashboard drill filter wins; else
     // prefer the player's own personal puzzles (from their real mistakes); else
@@ -322,6 +327,7 @@
     confidence = undefined;
     selfTag = undefined;
     lastAttemptId = undefined;
+    showSolution = false; // AP-TEACH-4: a fresh Retry must not show the answer
     startTimer();
   }
 </script>
@@ -379,6 +385,24 @@
   </div>
 
   <p class="feedback {feedbackKind}">{feedback}</p>
+
+  {#if trainer?.state.status === 'failed' && puzzle}
+    <!-- F4: opt-in "Show solution" on a miss (Q-D). Non-blocking & Retry-safe (AP-TEACH-4):
+         the board reset + Retry above stay; this only animates the line when tapped, with a
+         theme-derived pattern hint (missWhy — null when no high-confidence motif; AP-TEACH-2). -->
+    <button class="link" onclick={() => (showSolution = !showSolution)}>
+      {showSolution ? t('reveal.hideSolution') : t('reveal.showSolution')}
+    </button>
+    {#if showSolution}
+      <SolutionReveal
+        fen={puzzle.fen}
+        moves={puzzle.moves}
+        {orientation}
+        why={missWhy(puzzle.themes, getLocale())}
+        autoplay
+      />
+    {/if}
+  {/if}
 
   {#if showLearn && card}
     <p class="feedback">

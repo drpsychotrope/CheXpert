@@ -217,4 +217,13 @@ export const generators: Messages = {
   'phaseLabel.opening': { fr: 'Ouverture', en: 'Opening' },
   'phaseLabel.middlegame': { fr: 'Milieu de partie', en: 'Middlegame' },
   'phaseLabel.endgame': { fr: 'Finale', en: 'Endgame' },
+
+  // ── teach-explain (F4): the trainer-miss "why", framed as a pattern HINT (FOLD-5 /
+  // AP-TEACH-2) — a cue, NOT a verdict and NOT the Coach's engine-backed review. Resolved
+  // by the PURE missWhy core via gt (injected locale); {motif} = family label (motif.*),
+  // {what} = the existing motifExpl.* idiom. A complete per-locale template (AP-TEACH-5). ──
+  'reveal.themeWhy': {
+    fr: 'Indice : le bon coup {what} ({motif}).',
+    en: 'Hint: the right move {what} ({motif}).',
+  },
 };

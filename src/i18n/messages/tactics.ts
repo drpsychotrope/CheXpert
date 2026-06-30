@@ -36,6 +36,13 @@ export const tactics: Messages = {
   'tactics.themesEmpty': { fr: '—', en: '—' },
   'tactics.fromYourGameTag': { fr: ' · ★ issu de votre partie', en: ' · ★ from your game' },
 
+  // ── SolutionReveal toggle (reveal.*) — Trainer-miss "Show solution" (F4, Q-F) ──
+  // Opt-in (Q-D / AP-TEACH-4): never auto-spoils a Retry. reveal.themeWhy lives in
+  // generators.ts (resolved by the pure missWhy core via gt); calc.solution is reused
+  // for the SAN line. These two are the UI toggle labels (resolved by t in-component).
+  'reveal.showSolution': { fr: 'Voir la solution', en: 'Show solution' },
+  'reveal.hideSolution': { fr: 'Masquer la solution', en: 'Hide solution' },
+
   // ── Calculate.svelte (calc.*) ────────────────────────────────────────────
   'calc.title': { fr: 'Calcul', en: 'Calculation' },
   // Intro split to preserve the three inline <b> emphases from the original markup.

@@ -1007,3 +1007,60 @@ ADR-0035/0037/0040/0043/0053). Adds no user-facing string. Delivered: svelte-che
 build green. Rollback is per-half independent (recording A2 and selection A3 revert separately); existing
 `coachProbe: true` rows read harmlessly. Cross-links: ADR-0045 (coach diagnostic/program), ADR-0037
 (additive-field precedent), ADR-0053 (i18n — no new strings here).
+
+## F4 — Reusable `SolutionReveal` + "show solution" & "why" on a trainer miss (no new ADR)
+**Date:** 2026-06-30 · **Status:** accepted · **No ADR allocated** (Q-E default — reuse under
+ADR-0040/0044/0021/0052/0053; the extraction was not judged decision-worthy enough to pre-spend ADR-0054).
+
+**Spec:** `specs/teach-explain-surfacing-spec.md` (V1, Foundation F4). **Parent:**
+`specs/enhancements-architecture-spec.md` §2 (F4). Folds TR1 core; the Coach game-review consumption
+(EvalGraph + turning points) is **deferred to C6** per the DAG.
+
+**One concern: make the existing "solution + why" capability reusable and surface it on a Trainer miss.**
+The 350 ms animated reveal lived trapped in `Calculate.revealSolution` (AP-TEACH-1). F4 **extracts** it into
+a prop-driven `src/ui/SolutionReveal.svelte` (view-only `<Board>` stepper + `formatSanLine` SAN line +
+an optional source-agnostic `why?`), refactors `Calculate` to **consume** it byte-equivalently (same SAN
+line, same 350 ms cadence — Calculate's `calc.test.ts`/`explain.test.ts` byte-identity anchors stay green),
+and wires it as the proof consumer on **both** structurally-identical trainer-miss paths (`Tactics.svelte`
+**and** `Review.svelte`) behind an opt-in "Show solution" toggle.
+
+**Arbitrages (defaults applied).** **Q-A** new shared component both consume (not extend-in-place).
+**Q-B** depth-of-why is **per consumer**: trainer-miss → a theme/motif-derived line (no engine; honest);
+Coach → EvalGraph **[C6]**. **Q-C** component + BOTH trainer-miss consumers now; Coach deferred. **Q-D** an
+opt-in toggle (Retry-safe), not auto-reveal — Calculate keeps its existing auto-reveal-on-Submit (it has no
+Retry). **Q-G** the "why" reuses the existing bilingual `motifExpl.*`/`motif.*` catalogue keyed off the
+puzzle's highest-precedence theme — **no new prose content, only a mapping.**
+
+**The trainer "why" is theme-derived, never engine-derived (the load-bearing honesty invariant).** A
+trainer miss has **no `PlyAnalysis`** at solve time (puzzle lines are pre-verified; no live engine), so
+F4 does **not** call `explainPly` and does **not** fabricate eval facts (AP-TEACH-3). New PURE
+`missWhy(themes, locale)` + `primaryMotifFamily(themes)` in `concepts.ts` reuse `familyKey`/`CARD_PRECEDENCE`
+(so they can't desync from `cardForThemes`), resolve the primary motif family, and render the existing
+`motifExpl.*` idiom framed as a **pattern HINT** (`reveal.themeWhy`), **returning `null` when no
+high-precedence family resolves** → no asserted reason shown (AP-TEACH-2, mirrors `explain.ts`). `explainPly`
+remains the Coach path (C6), which will pass its richer line through the **same** `why?` prop (FOLD-4) — C6
+must not fork the component.
+
+**Premise corrections carried from the empirical scan.** `explain.ts` `uciToSan` is **module-private**;
+SAN for the reveal is derived via `new ChessGame(fen).moveUci(uci)` + `formatSanLine` (exactly as the old
+reveal did) — F4 does **not** widen the export surface. Reveal tolerates empty/short/illegal-mid-line UCI
+(`moveUci(m) ?? m`, clean stop, never throws — FOLD-3), highlights the key move each step via `lastMove`
+(FOLD-1), and honors `prefers-reduced-motion` → instant render via `stepMs=0` (FOLD-2).
+
+**i18n (additive, bilingual).** `reveal.showSolution`/`reveal.hideSolution` (UI toggle labels) in
+`tactics.ts`; `reveal.themeWhy` (the pure-core pattern-hint template, resolved by `missWhy` via `gt`) in
+`generators.ts`. `calc.solution` is **reused** for the SAN line (not redefined). `reveal.why` from Q-F was
+**dropped** — it was conditional ("only if the component prefixes the why line"), and since framing folds
+into `missWhy`/`reveal.themeWhy` the component renders `why` bare, so the key would be dead weight. Every
+new key has FR+EN; the `translate.test.ts` catalogue-integrity + collision guards gate parity automatically.
+
+**Additive, no migration.** No `DB_VERSION`/`schemaRev` bump (precedent ADR-0035/0037/0040/0043/0053); no
+persisted fields; no engine on the trainer path. Pure cores stay pure (locale injected). Delivered:
+svelte-check **0/0**, **543 Vitest green** (533 baseline + 10 new: 6 pure `primaryMotifFamily`/`missWhy`
+incl. honest-null + FR≠EN parity, + 4 FOLD-3 SAN-line tolerance), build green. `SolutionReveal.svelte` is
+verified by build + manual (no component-test harness; the logic that matters is pure and unit-tested).
+Rollback: revert the PR; or revert just A4/A5 (the toggle) and keep A2/A3 — `Calculate` stays
+byte-equivalent, so partial rollback is safe. Cross-links: ADR-0040 (concept cards / `motifExpl.*` reuse),
+ADR-0044 (calculation reveal origin), ADR-0053 (i18n discipline), ADR-0037 (additive-field precedent).
+Follow-ups: **T1** (second-try / alt-move acceptance / self-tag) and **C6** (Coach replay + EvalGraph +
+`explainPly` narrative) both build on `SolutionReveal`.
