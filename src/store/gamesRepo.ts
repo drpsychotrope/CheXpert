@@ -20,3 +20,24 @@ export async function getAnalysis(gameId: string): Promise<GameAnalysis | undefi
   const db = await openTrainerDB();
   return db.get('gameAnalyses', gameId);
 }
+
+/**
+ * All played games, ascending by `playedAt` (F5, ADR-0056). Thin index read over the EXISTING
+ * `games` store + `playedAt` index (created in the v1 upgrade) — NO `DB_VERSION` bump, NO new
+ * store/index (AP-GAMES-1). Callers reverse for newest-first. Reads ONLY `games`; the separate
+ * `importedGames` store is out of scope (AP-GAMES-8).
+ */
+export async function getAllGames(): Promise<GameRecord[]> {
+  const db = await openTrainerDB();
+  return db.getAllFromIndex('games', 'playedAt');
+}
+
+/**
+ * The set of game ids that already have a stored analysis (F5, ADR-0056). Resolved in ONE
+ * `getAllKeys('gameAnalyses')` read so a history list can mark analysed/not without N per-row
+ * `getAnalysis` calls (FOLD-G1 / AP-GAMES-3). `gameAnalyses` is keyed by `gameId`.
+ */
+export async function getAnalyzedGameIds(): Promise<Set<string>> {
+  const db = await openTrainerDB();
+  return new Set(await db.getAllKeys('gameAnalyses'));
+}

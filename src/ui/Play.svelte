@@ -26,6 +26,7 @@
   import { resolveColor, type ColorChoice } from '../game/color';
   import { applyGameResult, botMovetime, flagOutcome } from '../game/playSession';
   import ConfirmDialog from './ConfirmDialog.svelte';
+  import { downloadPgn, pgnFilename } from './pgnDownload';
   import { t } from '../i18n';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
@@ -78,7 +79,7 @@
   const displayPool = $derived<RatingPool>(variant === 'chess960' ? 'chess960' : selectedPool);
 
   // One-click post-game analysis (ADR-0022): no PGN paste needed.
-  let lastGame = $state<{ id: string; pgn: string } | null>(null);
+  let lastGame = $state<{ id: string; pgn: string; playedAt: number; result: 'win' | 'loss' | 'draw' } | null>(null);
   let aStatus = $state<'idle' | 'analyzing' | 'done'>('idle');
   let aResult = $state<GameAnalysis | null>(null);
   let aPuzzles = $state(0);
@@ -435,6 +436,7 @@
       botElo,
       playedAt: now,
       coached,
+      playerColor: playerColor[0] as 'w' | 'b', // F5: persist side for correct history re-analysis
       ...(variant === 'chess960'
         ? { variant: 'chess960', startFen: startFen960 ?? undefined }
         : {
@@ -448,7 +450,7 @@
           }),
     };
     await putGame(rec);
-    lastGame = { id: rec.id, pgn: rec.pgn };
+    lastGame = { id: rec.id, pgn: rec.pgn, playedAt: rec.playedAt, result: rec.result };
     await app.persistModel(now);
   }
 
@@ -619,6 +621,11 @@
     {#if status === 'over' && lastGame && variant !== 'chess960'}
       <button class="ghost" onclick={analyzePlayed} disabled={aStatus === 'analyzing'}>
         {aStatus === 'analyzing' ? t('play.analysing') : aResult ? t('play.reanalyse') : t('play.analyseThisGame')}
+      </button>
+    {/if}
+    {#if status === 'over' && lastGame}
+      <button class="ghost" onclick={() => lastGame && downloadPgn(lastGame.pgn, pgnFilename(lastGame.playedAt, lastGame.result))}>
+        {t('play.exportPgn')}
       </button>
     {/if}
   </div>

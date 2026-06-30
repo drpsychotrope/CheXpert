@@ -120,4 +120,32 @@ export const play: Messages = {
   'play.drawReason': { fr: 'Nulle ({reason}).', en: 'Draw ({reason}).' },
   'play.analysisFailed': { fr: "Échec de l'analyse : ", en: 'Analysis failed: ' },
   'play.youResigned': { fr: 'Vous avez abandonné.', en: 'You resigned.' },
+
+  // Export a played game's PGN (F5, ADR-0056) — Play tail + history rows.
+  'play.exportPgn': { fr: 'Exporter le PGN', en: 'Export PGN' },
+
+  // ---- Played-game history (history.*) — section inside the Import view (F5, ADR-0056) ----
+  'history.title': { fr: 'Vos parties jouées', en: 'Your played games' },
+  'history.subtitle': {
+    fr: 'Les parties jouées contre le bot, les plus récentes en premier. Exportez le PGN ou analysez une partie non analysée.',
+    en: 'Games you played against the bot, newest first. Export the PGN or analyse a game that has not been analysed yet.',
+  },
+  'history.empty': {
+    fr: "Aucune partie jouée pour l'instant. Jouez une partie contre le bot, puis revenez ici.",
+    en: 'No played games yet. Play a game against the bot, then come back here.',
+  },
+  'history.analysed': { fr: 'Analysée', en: 'Analysed' },
+  'history.notAnalysed': { fr: 'Non analysée', en: 'Not analysed' },
+  'history.analyse': { fr: 'Analyser', en: 'Analyse' },
+  'history.export': { fr: 'Exporter le PGN', en: 'Export PGN' },
+  'history.resultWin': { fr: 'Victoire', en: 'Win' },
+  'history.resultLoss': { fr: 'Défaite', en: 'Loss' },
+  'history.resultDraw': { fr: 'Nulle', en: 'Draw' },
+  'history.botElo': { fr: 'Bot {elo} Elo', en: 'Bot {elo} Elo' },
+  'history.chess960': { fr: 'Chess960', en: 'Chess960' },
+  'history.untimed': { fr: 'Sans pendule', en: 'Untimed' },
+  'history.catBullet': { fr: 'Bullet', en: 'Bullet' },
+  'history.catBlitz': { fr: 'Blitz', en: 'Blitz' },
+  'history.catRapid': { fr: 'Rapide', en: 'Rapid' },
+  'history.catClassical': { fr: 'Classique', en: 'Classical' },
 };

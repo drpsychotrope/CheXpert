@@ -31,6 +31,10 @@ export interface GameRecord {
   variant?: 'standard' | 'chess960';
   /** The 960 start FEN, for replay/audit. Present only when variant==='chess960'. */
   startFen?: string;
+  /** Side the human played (F5, ADR-0056). Persisted so re-analysing a game from history attributes
+   *  mistakes to the right colour — the played PGN has no White/Black headers to infer it from.
+   *  Additive optional; legacy records lack it (history derives a fallback). NO DB_VERSION bump. */
+  playerColor?: 'w' | 'b';
 }
 
 export interface PuzzleAttemptRecord {

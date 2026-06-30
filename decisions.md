@@ -1064,3 +1064,74 @@ byte-equivalent, so partial rollback is safe. Cross-links: ADR-0040 (concept car
 ADR-0044 (calculation reveal origin), ADR-0053 (i18n discipline), ADR-0037 (additive-field precedent).
 Follow-ups: **T1** (second-try / alt-move acceptance / self-tag) and **C6** (Coach replay + EvalGraph +
 `explainPly` narrative) both build on `SolutionReveal`.
+
+## ADR-0056 — F5: readable `games` store + client-side PGN export & played-game history
+**Date:** 2026-06-30 · **Status:** accepted
+
+**Spec:** `specs/games-store-pgn-io-spec.md` (V1; the spec named ADR-0054, renumbered to **ADR-0056**
+because F4 noted it would not pre-spend 0054 and F3 took 0055). **Parent:**
+`specs/enhancements-architecture-spec.md` §2 (F5, the infrastructure PR). Lands the **client-side PGN
+I/O primitive** + a minimal history surface; the coach PGN-assessment consumer (CO11) is **deferred to
+C4**, coach profile export (CF10) **to C8**.
+
+**One concern: turn the write-only `games` store into a readable asset + a client-side PGN-out
+primitive.** `putGame` was called once (`Play.svelte`) and read **nowhere** in `src/` (only tests read
+it back) — every played game was persisted then invisible. F5 adds two thin index-backed reads to
+`gamesRepo.ts` — `getAllGames()` (`getAllFromIndex('games','playedAt')`, ascending; the caller reverses
+for newest-first) and `getAnalyzedGameIds()` (`new Set(getAllKeys('gameAnalyses'))`) — surfaces a
+**played-game history `<section>` inside the existing Import view**, and adds a greenfield download
+helper (`src/ui/pgnDownload.ts`).
+
+**Arbitrages (recommended defaults applied — V1).** **Q-A=a** history is a section **inside Import**
+(`view 'import'`), not a new top-level view — Import already owns PGN paste + `AnalysisResult` and is
+nav/Home-reachable, so a new `View`-union/`loaders[]`/`NAV[]` triple-edit + lazy chunk buys nothing
+(AP-GAMES-4). **Q-B=a** PGN import stays **single-game paste**, reusing the EXISTING hardened
+`Import.svelte` flow (multi-game split detection, headers-only + colour-not-detected guards) verbatim —
+no re-parsing; bulk file import deferred (§11). **Q-C=a** F5 lands the **primitive only**
+(read+export+re-analyse-from-history); coach PGN-assessment integration is the hard **C4** boundary
+(AP-GAMES-5). **Q-D=defer** coach profile export (CF10) is a different artifact → **C8**.
+
+**FOLD-G1 — batched analysed markers (AP-GAMES-3).** The history list resolves analysed/not via ONE
+`getAllKeys('gameAnalyses')` set, not N per-row `getAnalysis` calls. **FOLD-G2 — Play-tail export.** An
+"Export PGN" ghost button sits next to "Analyse this game" in the game-over tail (and, unlike Analyse,
+is offered for 960 too — its PGN is valid even though analysis isn't). Each non-960, not-yet-analysed
+history row gets an **Analyse** action reusing the played-analysis pipeline (idempotent via
+`getAnalysis`, `runAnalysis(source:'played')`), rendered through the existing `AnalysisResult.svelte`;
+960 rows keep Analyse disabled (AP-960-4 / AP-GAMES-7).
+
+**PGN export is a download wrapper, never a re-serialisation (AP-GAMES-2).** `GameRecord.pgn` already
+holds a chess.js-serialised PGN, so `downloadPgn(pgn, filename)` is a `Blob` → `createObjectURL` →
+anchor-click → `revokeObjectURL` side-effect — **strictly client-side**, no server (AP-GAMES-9),
+feature-detected for SSR/jsdom, no-op on empty PGN. The filename core `pgnFilename(playedAt, result)`
+is **pure** — `game-YYYY-MM-DD-<result>.pgn` derived from the record's `playedAt`, **never `Date.now()`**
+(AP-GAMES-6) — and unit-tested for determinism + result sanitisation. `getAllGames` reads **only** the
+`games` store; `importedGames` never leaks in (AP-GAMES-8, guarded by a test).
+
+**One additive field — `GameRecord.playerColor?` — to keep history re-analysis correct.** A *played*
+game's PGN (`this.chess.pgn()`) carries **no White/Black headers**, so colour is not inferable from the
+stored PGN, and analysing from the wrong POV corrupts every player-attributed metric (audit v2 P0-02).
+F5 therefore persists the side the human played (`Play.svelte` writes `playerColor[0]`); history reads
+it, with a best-effort fallback for legacy pre-F5 records (terminal-checkmate + result, else White).
+This is the one **deviation** from the spec's read-only framing — the spec's §2.4 re-analyse feature is
+incorrect without it. **Additive optional field; legacy records read `undefined`. NO `DB_VERSION` bump,
+no new store/index** (precedent ADR-0035/0037/0040/0041/0043/0053; the `playedAt` index already exists
+from the v1 upgrade). AP-GAMES-1 held.
+
+**i18n (additive, bilingual).** A `history.*` sub-namespace (title/subtitle/empty/analysed/notAnalysed/
+analyse/export/result{Win,Loss,Draw}/botElo/chess960/untimed/cat{Bullet,Blitz,Rapid,Classical}) +
+`play.exportPgn` in `messages/play.ts`, every key FR+EN; the structural `translate.test.ts` parity +
+collision guards gate it automatically (AP-GAMES-10). The history date is locale-aware via
+`Intl.DateTimeFormat` keyed off `getLocale()`.
+
+**Insights byte-identity.** F5 touches no selection/`studyPlan` logic, so Insights output is unchanged
+(no edit to those files). **Delivered:** svelte-check **0/0**, **555 Vitest green** (543 baseline + 12
+new: 5 `gamesRepo` F5 — ordering, empty, imported-isolation, analysed-set membership/exclusion — + 7
+`pgnDownload` — pure filename determinism/sanitisation/no-`Date.now`, feature-detect, empty-PGN no-op,
+jsdom click+revoke), build green. **Rollback:** additive and isolated — drop the two repo reads, the
+`pgnDownload` util + test, the Import history `<section>`, the Play-tail button, the `playerColor` field
++ write, and the `history.*` keys; no migration was introduced (nothing to undo in IndexedDB).
+Cross-links: ADR-0022 (Play one-click analysis), the Phase-2 import flow, ADR-0041 (960 exclusion),
+ADR-0037 (additive-field precedent), ADR-0053 (i18n discipline), `enhancements-architecture-spec.md`
+F5. Follow-ups: **C4** (coach PGN-assessment consumer), **P1** (auto-queue the last unanalysed game),
+bulk file import, imported-games history, **C8/CF10** (coach profile export), history management
+(delete/paginate/filter).
