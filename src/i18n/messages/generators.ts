@@ -42,6 +42,10 @@ export const generators: Messages = {
   'motif.discoveredAttack': { fr: 'Attaques à la découverte', en: 'Discovered attacks' },
   'motif.mate': { fr: 'Schémas de mat', en: 'Mating patterns' },
   'motif.endgame': { fr: 'Finales', en: 'Endgames' },
+  // C2/CF6 endgame sub-bucket labels (real Lichess theme keys; minorPieceEndgame is the C2 umbrella).
+  'motif.rookEndgame': { fr: 'Finales de tours', en: 'Rook endgames' },
+  'motif.pawnEndgame': { fr: 'Finales de pions', en: 'Pawn endgames' },
+  'motif.minorPieceEndgame': { fr: 'Finales de pièces mineures', en: 'Minor-piece endgames' },
 
   // ── Common Lichess theme sub-tags (F1 Q-B: trainer theme-line coverage) ──
   // The detector (analysis/motif.ts) + bundled puzzles emit these into `puzzle.themes`.
@@ -147,6 +151,9 @@ export const generators: Messages = {
   // ── diagnostic.ts ────────────────────────────────────────────────────────
   'diag.placeholderDim': { fr: 'Jouez la partie de calibration pour évaluer ceci', en: 'Play the calibration game to assess this' },
   'diag.motifsProbed': { fr: '{n} motifs sondés ({puzzles} problèmes)', en: '{n} motifs probed ({puzzles} puzzles)' },
+  // C2/CO15 timed-probe read (timedProbe.ts) — sample-size-labelled, directional, never a grade.
+  'diag.timedRead': { fr: 'Bloc chronométré : {solved}/{attempted} résolus, ~{sec} s/problème', en: 'Timed block: {solved}/{attempted} solved, ~{sec}s/puzzle' },
+  'diag.timedNone': { fr: 'Bloc chronométré ignoré ou aucun problème tenté', en: 'Timed block skipped or no puzzle attempted' },
 
   // ── program.ts coach-program reasons ─────────────────────────────────────
   'program.endgameDrill': {

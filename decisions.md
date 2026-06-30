@@ -1596,3 +1596,21 @@ Cross-links: ADR-0045 (coach mode — extended), ADR-0048 (probe depth), ADR-005
 ADR-0053 (bilingual), `specs/coach-profile-persistence-spec.md` §4/§6/§9. Folds CF2/CO2/CF5/CO19 +
 enrich FOLD-1/FOLD-2. Follow-ups: re-probing / à-la-carte scope (C2), blending played history (C4),
 profile export (C8), multi-day calendar scheduling (portfolio §7).
+
+---
+
+## C2 — coach-probe-engine-v2 (no new ADR; extends ADR-0045, consumes ADR-0055)
+
+The diagnostic probed a fixed 2 puzzles x 6 motifs + a coarse `phase:'endgame'` bucket, all-or-nothing.
+C2 adds a pure `src/coach/probePlan.ts` (`buildProbePlan` replacing the inline THEMES array): adaptive
+depth that extends ONLY borderline motifs, total capped (~20, length honesty); a-la-carte scope (user
+picks which motifs/areas; empty = ALL, AP-CPROBE-4); endgame SUB-TYPES via real Lichess theme keys with
+graceful fallback — the shipped seed set is mate-only, so a bucket with no in-band puzzle records n=0 and
+is dropped, NEVER faked (invisible until the full puzzle DB ships). A short opt-in TIMED block
+(`src/coach/timedProbe.ts`, reuses Clock) feeds a timeManagement DimensionScore into buildCoachProfile.
+Probe attempts record via F3's path with NO rating-pool leak (AP-COACH-8). CO7: the radar is already
+honest (collapses sampleSize:0) — untouched; only a "what skipping the game costs" nudge added. Pure
+cores; no `DB_VERSION` bump; Insights byte-identical; bilingual FR+EN. The timed block adds a 3rd
+interactive Coach board, wired with onMoveText (F2 a11y invariant preserved — wiring test 2->3). 834
+tests green (800 + 34). Cross-links: ADR-0045/0048/0055, `specs/coach-probe-engine-v2-spec.md`.
+Recovered + verified green after a mid-run process restart before commit.

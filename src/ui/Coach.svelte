@@ -1,6 +1,6 @@
 <script lang="ts">
   import { app } from '../state/app.svelte';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import Board from './Board.svelte';
   import Radar from './Radar.svelte';
   import TrendList from './TrendList.svelte';
@@ -12,7 +12,17 @@
   import { recordTacticsAttempt } from '../store/attemptsRepo';
   import { resultToGrade } from '../srs/fsrs';
   import { buildWeaknessProfile, type DimensionScore } from '../analysis/weakness';
-  import { buildCoachProfile, COACH_MOTIF_PROBES, COACH_LADDER_MIN, COACH_LADDER_MAX } from '../coach/diagnostic';
+  import { buildCoachProfile } from '../coach/diagnostic';
+  import {
+    buildProbePlan,
+    borderlineDepth,
+    coarseEndgameSpec,
+    COACH_PROBE_MAX_TOTAL,
+    type ProbeSpec,
+    type ProbeKind,
+  } from '../coach/probePlan';
+  import { initTimedProbe, recordTimed, timedDimension, type TimedProbeState } from '../coach/timedProbe';
+  import { initClock, startClock, stopClock, tick, flagged, type ClockState } from '../clock/Clock';
   import { buildCoachProgram } from '../coach/program';
   import { buildCoachTrend, isStale, profileAgeDays, COACH_STALE_DAYS } from '../coach/coachTrend';
   import { buildSession } from '../analysis/session';
@@ -23,14 +33,27 @@
   import { t, getLocale } from '../i18n';
   import { labelOrRaw } from '../i18n/gen';
 
-  type Step = 'intro' | 'ladders' | 'offer-game' | 'game' | 'analysing' | 'result';
+  type Step = 'intro' | 'ladders' | 'timed' | 'offer-game' | 'game' | 'analysing' | 'result';
   let step = $state<Step>('intro');
 
-  const THEMES: Array<{ theme: string; phase?: 'endgame' }> = [
-    ...COACH_MOTIF_PROBES.map((t) => ({ theme: t as string })),
-    { theme: 'endgame', phase: 'endgame' as const },
-  ];
+  // C2 (CF7): the probe plan is built from the user's à-la-carte scope at startLadders() time.
+  // `plan` replaces the old hard-coded THEMES array (motifs + endgame sub-buckets + optional timed).
+  let plan = $state<ProbeSpec[]>([]);
   let themeIdx = $state(0);
+  // C2/CO4: total probe puzzles spent across the WHOLE assessment — the grand cap (AP-CPROBE-2).
+  let totalSpent = 0;
+  // CF6 graceful fallback bookkeeping: track whether ANY endgame bucket produced an in-zone puzzle,
+  // so we append one coarse phase:'endgame' probe only when ALL theme buckets were empty (seed set) —
+  // endgame is never silently absent when some endgame data exists. Reset per assessment (startLadders).
+  let endgameAnyScored = false;
+  let coarseAppended = false;
+
+  // À-la-carte scope selection (CF7). All three areas checked by default = today's behaviour
+  // (no regression). An empty selection is treated as ALL by buildProbePlan (AP-CPROBE-4).
+  let pickMotifs = $state(true);
+  let pickEndgame = $state(true);
+  let pickTimed = $state(true);
+
   const baseline = () => (app.model ? Math.round(app.model.puzzleRating.rating) : 1200);
 
   let ladder: PuzzleLadder | null = null;
@@ -40,6 +63,21 @@
   let orientation = $state<'white' | 'black'>('white');
   let feedback = $state('');
   const probes: ThemeProbeResult[] = [];
+
+  // C2/CO15: optional timed block. A fixed budget (90s) via the pure Clock; the UI ticks it with
+  // performance.now() deltas (mirrors Play.svelte's rAF loop) and feeds each finished attempt to the
+  // pure timedProbe core. The resulting timeManagement DimensionScore is passed to buildCoachProfile.
+  const TIMED_BUDGET_MS = 90_000;
+  let timedState: TimedProbeState = initTimedProbe();
+  let timedClock = $state<ClockState | null>(null);
+  let timedRemainingMs = $state(TIMED_BUDGET_MS);
+  let timedDim = $state<DimensionScore | null>(null);
+  let timedRaf: number | null = null;
+  let timedLastTs = 0;
+  let timedTrainer = $state<TacticalTrainer | null>(null);
+  let timedDisplay = $state(new ChessGame());
+  let timedFen = $state('');
+  let timedSolvedCount = $state(0);
 
   let game = $state(new ChessGame());
   let gameFen = $state('');
@@ -67,6 +105,8 @@
   const savedPrev = $derived<CoachProfile | undefined>(app.model?.coachProfilePrev);
   let nowMs = $state(0);
   onMount(() => { nowMs = Date.now(); });
+  // Stop the timed-block rAF if the view unmounts mid-block (no leaked animation frame).
+  onDestroy(() => { if (timedRaf !== null) cancelAnimationFrame(timedRaf); });
   const savedTrend = $derived(saved ? buildCoachTrend(saved, savedPrev) : null);
   const savedAgeDays = $derived(saved ? profileAgeDays(saved.assessedAt, nowMs) : null);
   const savedStale = $derived(saved ? isStale(saved.assessedAt, nowMs) : false);
@@ -85,21 +125,44 @@
   }
 
   function startLadders() {
+    // CF7: build the à-la-carte plan from the scope selection. Empty → all (AP-CPROBE-4).
+    const selected: ProbeKind[] = [];
+    if (pickMotifs) selected.push('motif');
+    if (pickEndgame) selected.push('endgame');
+    if (pickTimed) selected.push('timed');
+    plan = buildProbePlan({ selected, includeTimed: pickTimed });
+
     themeIdx = 0;
+    totalSpent = 0;
     probes.length = 0;
+    timedState = initTimedProbe();
+    timedDim = null;
+    timedSolvedCount = 0;
+    endgameAnyScored = false; // reset CF6 fallback bookkeeping for a fresh (or repeat) assessment
+    coarseAppended = false;
+    // Advance past the timed spec for the ladder phase; the timed block runs as its own step after.
+    startNextLadder();
+  }
+
+  /** Run the next non-timed spec as a themed ladder; when the ladders are exhausted, go to the timed
+   *  block (if selected) then the offer-game step. Handles a timed-only selection (no ladders). */
+  function startNextLadder() {
+    // Skip the timed spec(s) here — they run in their own step.
+    while (themeIdx < plan.length && plan[themeIdx].kind === 'timed') themeIdx += 1;
+    if (themeIdx >= plan.length) return afterLadders();
     step = 'ladders';
     startThemeLadder();
   }
 
   function startThemeLadder() {
-    const t = THEMES[themeIdx];
+    const spec = plan[themeIdx];
     const prior = app.model ? app.model.puzzleRating : { rating: 1200, rd: 250, vol: 0.06 };
     ladder = new PuzzleLadder(app.puzzles, prior, {
-      min: COACH_LADDER_MIN,
-      max: COACH_LADDER_MAX,
+      min: spec.min,
+      max: spec.max,
       window: 300,
-      themes: t.phase ? undefined : [t.theme],
-      phase: t.phase,
+      themes: spec.themes,
+      phase: spec.phase,
     });
     nextProbePuzzle();
   }
@@ -121,11 +184,15 @@
     const res = trainer.playUserMove(uci);
     if (res === 'wrong') {
       ladder.report(false);
+      totalSpent += 1;
+      maybeExtend();
       void recordProbe(trainer, false); // capture trainer before nextProbePuzzle reassigns it
       feedback = t('coach.missed');
       setTimeout(nextProbePuzzle, 450);
     } else if (res === 'solved') {
       ladder.report(true);
+      totalSpent += 1;
+      maybeExtend();
       void recordProbe(trainer, true);
       feedback = t('coach.solved');
       setTimeout(nextProbePuzzle, 400);
@@ -133,6 +200,22 @@
       display = new ChessGame(trainer.getFen());
       fen = display.fen;
     }
+  }
+
+  /** Adaptive depth (CO4): after a report, if this motif's running delta is borderline AND its RD is
+   *  still loose AND we're under the grand cap, extend this ladder by one puzzle. Pure decision in
+   *  borderlineDepth(); the ladder is only a min/max counter. No rating-pool mutation (AP-CPROBE-1/2). */
+  function maybeExtend() {
+    if (!ladder) return;
+    const extend = borderlineDepth({
+      spec: plan[themeIdx],
+      currentDelta: ladder.rating.rating - baseline(),
+      currentRd: ladder.rating.rd,
+      countSoFar: ladder.count,
+      totalSpent,
+      cap: COACH_PROBE_MAX_TOTAL,
+    });
+    if (extend) ladder.extend(1);
   }
 
   /**
@@ -185,15 +268,121 @@
 
   function finishThemeLadder() {
     if (!ladder) return;
-    const t = THEMES[themeIdx];
-    probes.push({ theme: t.theme, rating: Math.round(ladder.rating.rating), n: ladder.count });
+    const spec = plan[themeIdx];
+    // Record under the spec's stable key (motif key, endgame bucket key, or 'endgame' for the coarse
+    // fallback). A bucket with n=0 is pushed honestly and dropped by buildCoachProfile's n>0 guard.
+    probes.push({ theme: spec.key, rating: Math.round(ladder.rating.rating), n: ladder.count });
+    if (spec.kind === 'endgame' && spec.themes && ladder.count > 0) endgameAnyScored = true;
     themeIdx += 1;
-    if (themeIdx >= THEMES.length) {
-      step = 'offer-game';
-      return;
+
+    // CF6 fallback: if we've just finished the LAST themed endgame bucket and none scored, append one
+    // coarse phase:'endgame' probe so endgame isn't silently absent when some endgame data exists.
+    const nextIsEndgameBucket = themeIdx < plan.length && plan[themeIdx].kind === 'endgame' && !!plan[themeIdx].themes;
+    const justFinishedLastEndgameBucket = spec.kind === 'endgame' && !!spec.themes && !nextIsEndgameBucket;
+    if (justFinishedLastEndgameBucket && !endgameAnyScored && !coarseAppended) {
+      coarseAppended = true;
+      plan.splice(themeIdx, 0, coarseEndgameSpec());
     }
-    startThemeLadder();
+
+    startNextLadder();
   }
+
+  /** After all motif/endgame ladders: run the timed block if it was selected, else offer the game. */
+  function afterLadders() {
+    if (pickTimed && plan.some((p) => p.kind === 'timed')) {
+      startTimedBlock();
+    } else {
+      step = 'offer-game';
+    }
+  }
+
+  // ── C2/CO15 timed block ──────────────────────────────────────────────────
+  // A short opt-in speed read: serve on-level puzzles back-to-back under a fixed-budget Clock until
+  // it flags, feeding each finished attempt to the pure timedProbe core. Reuses recordProbe() so each
+  // timed solve records through F3's path too (coachProbe:true, no pool leak). The derived
+  // timeManagement DimensionScore is handed to buildCoachProfile via the optional timedDim arg.
+  let timedLadder: PuzzleLadder | null = null;
+
+  function startTimedBlock() {
+    step = 'timed';
+    timedState = initTimedProbe();
+    timedSolvedCount = 0;
+    timedRemainingMs = TIMED_BUDGET_MS;
+    // A dedicated ladder just to SOURCE on-level puzzles (no theme filter); its rating never persists
+    // and we never read its rating as a score — the timed read is speed×accuracy, not Glicko.
+    const prior = app.model ? app.model.puzzleRating : { rating: 1200, rd: 250, vol: 0.06 };
+    timedLadder = new PuzzleLadder(app.puzzles, prior, { min: 1, max: 9999, window: 300 });
+    timedClock = startClock(initClock(TIMED_BUDGET_MS, 0, 'w'));
+    timedLastTs = performance.now();
+    startTimedLoop();
+    void nextTimedPuzzle();
+  }
+
+  function startTimedLoop() {
+    if (timedRaf !== null) return;
+    const stepFn = () => {
+      if (!timedClock || step !== 'timed') { timedRaf = null; return; }
+      const now = performance.now();
+      timedClock = tick(timedClock, now - timedLastTs);
+      timedLastTs = now;
+      timedRemainingMs = timedClock.whiteMs;
+      if (flagged(timedClock)) {
+        timedRaf = null;
+        timedClock = stopClock(timedClock);
+        finishTimedBlock();
+        return;
+      }
+      timedRaf = requestAnimationFrame(stepFn);
+    };
+    timedRaf = requestAnimationFrame(stepFn);
+  }
+
+  async function nextTimedPuzzle() {
+    if (!timedLadder || step !== 'timed') return;
+    const tr = await timedLadder.next(Date.now());
+    if (!tr) return finishTimedBlock(); // pool exhausted before the budget — finish honestly
+    timedTrainer = tr;
+    timedDisplay = new ChessGame(tr.getFen());
+    timedFen = timedDisplay.fen;
+  }
+
+  function onTimedMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
+    if (!timedTrainer || step !== 'timed') return;
+    const uci = from + to + (timedDisplay.isPromotion(from, to) ? promo : '');
+    const res = timedTrainer.playUserMove(uci);
+    if (res === 'solved' || res === 'wrong') {
+      const solved = res === 'solved';
+      const ms = timedTrainer.elapsedMs(Date.now());
+      timedState = recordTimed(timedState, { solved, ms });
+      if (solved) timedSolvedCount += 1;
+      void recordProbe(timedTrainer, solved); // F3 path: coachProbe:true, no pool leak
+      void nextTimedPuzzle();
+    } else {
+      timedDisplay = new ChessGame(timedTrainer.getFen());
+      timedFen = timedDisplay.fen;
+    }
+  }
+
+  function finishTimedBlock() {
+    if (timedRaf !== null) { cancelAnimationFrame(timedRaf); timedRaf = null; }
+    timedClock = null;
+    timedDim = timedDimension(timedState, getLocale());
+    step = 'offer-game';
+  }
+
+  // Progress total for the ladders step counts only the THEMED ladders (the timed block runs as its
+  // own separate step, not a "theme"), so a subset shows an honest "3 / 3" (A4 / AP-CPROBE-4 wording).
+  const ladderCount = $derived(plan.filter((p) => p.kind !== 'timed').length);
+
+  /** Which radar dimensions will read n/a if the calibration game is skipped (CO7 nudge). The timed
+   *  block, when it produced a sample, covers timeManagement — so it drops out of the n/a list. */
+  const skipNaDims = $derived.by(() => {
+    const gameOnly: Array<'openingAccuracy' | 'endgameConversion' | 'timeManagement' | 'resilience'> = [
+      'openingAccuracy', 'endgameConversion', 'timeManagement', 'resilience',
+    ];
+    const covered = timedDim && timedDim.sampleSize > 0 ? new Set(['timeManagement']) : new Set<string>();
+    return gameOnly.filter((d) => !covered.has(d)).map((d) => t('dimShort.' + d));
+  });
 
   async function botReply() {
     if (!opponent) return;
@@ -260,7 +449,7 @@
   }
 
   async function commit(gameDimensions: DimensionScore[] | null) {
-    const p = buildCoachProfile({ puzzleRating: baseline(), probes, gameDimensions, assessedAt: Date.now(), locale: getLocale() });
+    const p = buildCoachProfile({ puzzleRating: baseline(), probes, gameDimensions, assessedAt: Date.now(), locale: getLocale(), timedDim: timedDim ?? undefined });
     profile = p;
     programPreview = buildCoachProgram(p, 30, getLocale());
     if (app.model) {
@@ -281,6 +470,20 @@
     app.go('session');
   }
 </script>
+
+{#snippet scopePicker()}
+  <!-- C2/CF7 à-la-carte scope: pick which areas to probe. All checked = today's full sweep (no
+       regression). Selecting none is treated as all by buildProbePlan (AP-CPROBE-4). -->
+  <fieldset class="scope">
+    <legend>{t('coach.scopeTitle')}</legend>
+    <label><input type="checkbox" bind:checked={pickMotifs} /> {t('coach.scopeMotifs')}</label>
+    <label><input type="checkbox" bind:checked={pickEndgame} /> {t('coach.scopeEndgame')}</label>
+    <label><input type="checkbox" bind:checked={pickTimed} /> {t('coach.scopeTimed')}</label>
+    {#if !pickMotifs && !pickEndgame && !pickTimed}
+      <p class="muted" style="font-size:0.78rem;margin:0.25rem 0 0">{t('coach.scopeEmptyAll')}</p>
+    {/if}
+  </fieldset>
+{/snippet}
 
 <section class="col center" style="max-width:680px;margin:0 auto">
   <h2>{t('coach.title')}</h2>
@@ -303,6 +506,7 @@
         {#if savedTrend && savedTrend.motifs.length}
           <TrendList trend={savedTrend} />
         {/if}
+        {@render scopePicker()}
         <div class="row center">
           <button onclick={resumeProgram}>{t('coach.startProgram')}</button>
           <button style="background:transparent;border:1px solid var(--border)" onclick={startLadders} disabled={app.puzzles.size === 0}>{t('coach.reassess')}</button>
@@ -311,12 +515,13 @@
       </div>
     {:else}
       <p class="muted">{t('coach.intro')}</p>
+      {@render scopePicker()}
       <button onclick={startLadders} disabled={app.puzzles.size === 0}>{t('coach.startAssessment')}</button>
       {#if app.puzzles.size === 0}<p class="muted">{t('coach.loadingPuzzles')}</p>{/if}
     {/if}
 
   {:else if step === 'ladders'}
-    <p class="muted">{t('coach.themeProgress', { current: themeIdx + 1, total: THEMES.length })}<b>{t('motif.' + THEMES[themeIdx].theme)}</b>{t('coach.themeProgressSuffix')}</p>
+    <p class="muted">{t('coach.themeProgress', { current: themeIdx + 1, total: ladderCount })}<b>{labelOrRaw('motif', plan[themeIdx]?.key ?? '', getLocale())}</b>{t('coach.themeProgressSuffix')}</p>
     <div class="board-wrap">
       <Board {fen} {orientation}
         turnColor={display.turn === 'w' ? 'white' : 'black'}
@@ -332,10 +537,33 @@
     </div>
     <p class="feedback">{feedback}</p>
 
+  {:else if step === 'timed'}
+    <!-- C2/CO15 timed block: solve as many on-level puzzles as you can before the budget flags. -->
+    <p class="muted">{t('coach.timedTitle')}</p>
+    <p class="muted" style="font-size:0.95rem">{t('coach.timedRemaining', { sec: Math.ceil(timedRemainingMs / 1000) })}<b>{t('coach.timedSolved', { n: timedSolvedCount })}</b></p>
+    <div class="board-wrap">
+      <Board fen={timedFen}
+        orientation={timedDisplay.turn === 'w' ? 'white' : 'black'}
+        turnColor={timedDisplay.turn === 'w' ? 'white' : 'black'}
+        movableColor={timedDisplay.turn === 'w' ? 'white' : 'black'}
+        dests={timedDisplay.dests()} check={timedDisplay.inCheck()} onMove={onTimedMove}
+        onMoveText={(text) => {
+          if (!timedTrainer) return false;
+          const r = timedDisplay.resolveMove(text);
+          if (!r) return false;
+          onTimedMove(r.from, r.to, r.promo ?? 'q');
+          return true;
+        }} />
+    </div>
+    <button style="background:transparent;border:1px solid var(--border)" onclick={finishTimedBlock}>{t('coach.timedDone')}</button>
+
   {:else if step === 'offer-game'}
     <div class="panel col center">
       <h3>{t('coach.assessmentDone')}</h3>
       <p class="muted">{t('coach.offerGameBody')}</p>
+      {#if skipNaDims.length}
+        <p class="feedback" style="font-size:0.85rem">{t('coach.skipCost', { dims: skipNaDims.join(', ') })}</p>
+      {/if}
       <ColorPicker bind:value={coachColorChoice} />
       <div class="row center">
         <button onclick={startGame}>{t('coach.playGame')}</button>
@@ -390,3 +618,18 @@
     </div>
   {/if}
 </section>
+
+<style>
+  .scope {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    margin: 0.5rem 0;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .scope legend { font-size: 0.82rem; color: var(--muted); padding: 0 0.4rem; }
+  .scope label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; }
+</style>

@@ -49,8 +49,12 @@ export function buildCoachProfile(args: {
   assessedAt: number;
   /** UI locale for the display labels in strengths/weaknesses/detail (V2-W18). */
   locale: Locale;
+  /** Optional timed-block read (C2/CO15). Fills `timeManagement` ONLY when the game didn't measure it
+   *  (sampleSize 0 from the game). The game's own time read takes precedence when present (AP-CPROBE-8:
+   *  additive optional arg, no output reshape; absent → byte-identical to today). */
+  timedDim?: DimensionScore;
 }): CoachProfile {
-  const { puzzleRating, probes, gameDimensions, assessedAt, locale } = args;
+  const { puzzleRating, probes, gameDimensions, assessedAt, locale, timedDim } = args;
 
   // n=0 guard: a theme with no in-band puzzle is dropped, never scored.
   const scored = probes.filter((p) => p.n > 0);
@@ -78,6 +82,14 @@ export function buildCoachProfile(args: {
     dimensions = gameDimensions.map((d) => (d.dimension === 'tactics' && motifs.length > 0 ? tacticsDim : d));
   } else {
     dimensions = ALL_DIMS.map((dim) => (dim === 'tactics' ? tacticsDim : placeholderDim(dim, locale)));
+  }
+
+  // C2/CO15: fill timeManagement from the timed block ONLY where it is still unmeasured (sampleSize 0).
+  // The game's own time read wins when present (it observed real blunders-under-pressure); the timed
+  // block is the puzzle-side fallback so the axis is no longer n/a from puzzles alone. Additive,
+  // precedence-documented (AP-CPROBE-8); absent timedDim leaves the output byte-identical to today.
+  if (timedDim && timedDim.sampleSize > 0) {
+    dimensions = dimensions.map((d) => (d.dimension === 'timeManagement' && d.sampleSize === 0 ? timedDim : d));
   }
 
   // Strengths / weaknesses. Per-motif covers the tactics granularity, so the dim

@@ -11,6 +11,25 @@ export const coach: Messages = {
   'coach.startAssessment': { fr: "Commencer l'évaluation →", en: 'Start the assessment →' },
   'coach.loadingPuzzles': { fr: 'Chargement des problèmes…', en: 'Loading puzzles…' },
 
+  // ── C2/CF7 à-la-carte scope picker (coach.*) ──────────────────────────────
+  'coach.scopeTitle': { fr: 'Que voulez-vous évaluer ?', en: 'What to assess?' },
+  'coach.scopeMotifs': { fr: 'Motifs tactiques', en: 'Tactical motifs' },
+  'coach.scopeEndgame': { fr: 'Finales (tours, pions, pièces mineures)', en: 'Endgames (rook, pawn, minor-piece)' },
+  'coach.scopeTimed': { fr: 'Bloc chronométré (gestion du temps)', en: 'Timed block (time management)' },
+  'coach.scopeEmptyAll': {
+    fr: 'Rien de sélectionné — tout sera évalué.',
+    en: 'Nothing selected — everything will be assessed.',
+  },
+
+  // ── C2/CO15 timed block (coach.*) ─────────────────────────────────────────
+  'coach.timedTitle': {
+    fr: 'Bloc chronométré : résolvez autant de problèmes que possible avant la fin du temps.',
+    en: 'Timed block: solve as many puzzles as you can before time runs out.',
+  },
+  'coach.timedRemaining': { fr: 'Temps restant : {sec} s — ', en: 'Time left: {sec}s — ' },
+  'coach.timedSolved': { fr: '{n} résolus', en: '{n} solved' },
+  'coach.timedDone': { fr: 'Terminer le bloc', en: 'End the block' },
+
   'coach.themeProgress': {
     fr: 'Motif {current}/{total} — ',
     en: 'Theme {current}/{total} — ',
@@ -29,6 +48,11 @@ export const coach: Messages = {
   },
   'coach.playGame': { fr: 'Jouer la partie →', en: 'Play the game →' },
   'coach.skip': { fr: 'Passer', en: 'Skip' },
+  // C2/CO7: name the radar dimensions that stay n/a if the game is skipped (informed choice, not forced).
+  'coach.skipCost': {
+    fr: 'Passer laisse non mesuré(e) : {dims} (affiché « n/a »).',
+    en: 'Skipping leaves unmeasured: {dims} (shown as “n/a”).',
+  },
 
   'coach.startingEngine': { fr: 'Démarrage du moteur…', en: 'Starting engine…' },
   'coach.yourMove': { fr: 'À vous de jouer — jouez naturellement.', en: 'Your move — play naturally.' },

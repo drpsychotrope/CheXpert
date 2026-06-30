@@ -104,6 +104,99 @@ describe('buildCoachProfile — with game dimensions', () => {
   });
 });
 
+describe('buildCoachProfile — timed dimension seam (C2/CO15)', () => {
+  const timed = (score: number, sampleSize: number): DimensionScore => ({
+    dimension: 'timeManagement',
+    score,
+    detail: 'timed',
+    sampleSize,
+  });
+
+  it('with timedDim and NO game: timeManagement fills from the timed read; other game-only dims stay placeholders', () => {
+    const p = buildCoachProfile({
+      puzzleRating: 1200,
+      probes: [probe('fork', 1200)],
+      gameDimensions: null,
+      assessedAt: 1,
+      locale: 'en',
+      timedDim: timed(72, 5),
+    });
+    const time = p.dimensions.find((d) => d.dimension === 'timeManagement')!;
+    expect(time.score).toBe(72);
+    expect(time.sampleSize).toBe(5);
+    // opening/endgame/resilience remain unmeasured placeholders (only the timed axis was filled).
+    expect(p.dimensions.find((d) => d.dimension === 'openingAccuracy')!.sampleSize).toBe(0);
+    expect(p.dimensions.find((d) => d.dimension === 'resilience')!.sampleSize).toBe(0);
+  });
+
+  it('a timedDim with sampleSize 0 does NOT fill the axis (stays n/a — AP-CPROBE-7)', () => {
+    const p = buildCoachProfile({
+      puzzleRating: 1200,
+      probes: [probe('fork', 1200)],
+      gameDimensions: null,
+      assessedAt: 1,
+      locale: 'en',
+      timedDim: timed(50, 0),
+    });
+    expect(p.dimensions.find((d) => d.dimension === 'timeManagement')!.sampleSize).toBe(0);
+  });
+
+  it('with BOTH a game and timedDim: the game time read wins (precedence)', () => {
+    const dims: DimensionScore[] = [
+      { dimension: 'tactics', score: 50, detail: 'x', sampleSize: 10 },
+      { dimension: 'openingAccuracy', score: 30, detail: 'x', sampleSize: 8 },
+      { dimension: 'endgameConversion', score: 70, detail: 'x', sampleSize: 6 },
+      { dimension: 'timeManagement', score: 20, detail: 'game', sampleSize: 5 },
+      { dimension: 'resilience', score: 80, detail: 'x', sampleSize: 4 },
+    ];
+    const p = buildCoachProfile({
+      puzzleRating: 1200,
+      probes: [probe('fork', 1200)],
+      gameDimensions: dims,
+      assessedAt: 1,
+      locale: 'en',
+      timedDim: timed(99, 8),
+    });
+    const time = p.dimensions.find((d) => d.dimension === 'timeManagement')!;
+    expect(time.score).toBe(20); // game wins
+    expect(time.detail).toBe('game');
+  });
+
+  it('NO-REGRESSION: output is byte-identical with vs without an undefined timedDim', () => {
+    const argsBase = {
+      puzzleRating: 1200,
+      probes: [probe('fork', 1100), probe('pin', 1400)],
+      gameDimensions: null,
+      assessedAt: 7,
+      locale: 'en' as const,
+    };
+    const without = buildCoachProfile(argsBase);
+    const withUndef = buildCoachProfile({ ...argsBase, timedDim: undefined });
+    expect(withUndef).toEqual(without);
+  });
+});
+
+describe('buildCoachProfile — endgame sub-buckets (C2/CF6)', () => {
+  it('scores each endgame bucket with n>0 as its own motif and drops n=0 buckets', () => {
+    const p = buildCoachProfile({
+      puzzleRating: 1200,
+      probes: [
+        probe('rookEndgame', 1000, 2),
+        probe('pawnEndgame', 1400, 2),
+        probe('minorPieceEndgame', 1200, 0), // empty bucket (seed set has none) → dropped
+      ],
+      gameDimensions: null,
+      assessedAt: 1,
+      locale: 'en',
+    });
+    const themes = p.motifs.map((m) => m.theme);
+    expect(themes).toContain('rookEndgame');
+    expect(themes).toContain('pawnEndgame');
+    expect(themes).not.toContain('minorPieceEndgame'); // n=0 never fabricated (AP-CPROBE-3)
+    expect(p.motifs.find((m) => m.theme === 'rookEndgame')!.delta).toBe(-200);
+  });
+});
+
 describe('motifAggregateScore', () => {
   it('maps mean delta 0 → 50 and is monotonic', () => {
     expect(motifAggregateScore([])).toBe(50);

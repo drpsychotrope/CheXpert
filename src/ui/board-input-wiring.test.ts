@@ -29,10 +29,10 @@ const stripComments = (s: string) =>
     .replace(/\/\/.*$/gm, '');
 const read = (rel: string) => stripComments(readFileSync(resolve(process.cwd(), rel), 'utf8'));
 
-// The 11 interactive Board instances across 9 files (spec §1 Gap 2). Each entry is a file
-// plus the number of <Board> instances it must wire with onMoveText.
+// The 12 interactive Board instances across 9 files (spec §1 Gap 2; +1 = C2's timed block).
+// Each entry is a file plus the number of <Board> instances it must wire with onMoveText.
 const INTERACTIVE: Array<{ file: string; boards: number }> = [
-  { file: 'src/ui/Coach.svelte', boards: 2 }, // ladders + calibration game
+  { file: 'src/ui/Coach.svelte', boards: 3 }, // ladders + timed block (C2/CO15) + calibration game
   { file: 'src/ui/Comeback.svelte', boards: 1 },
   { file: 'src/ui/Sparring.svelte', boards: 1 },
   { file: 'src/ui/Endgames.svelte', boards: 1 },
