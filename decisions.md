@@ -943,6 +943,47 @@ and the static `<title>` (set at load, not reactive). None block use; each is a 
 ADR-0052 (the FR decision this implements + supersedes Q3), ADR-0050/0051 (reactivity), ADR-0037 (additive
 field precedent).
 
+## Note — Coach designed-position probes (C3, no ADR)
+**Date:** 2026-06-30 · **Status:** accepted (additive; **no ADR number consumed** per `specs/coach-designed-probes-spec.md` §7)
+
+C3 lands without a new ADR because it is purely additive and reuses existing contracts (the F6
+`createGameSession({startFen})` controller, the `buildCoachProfile({gameDimensions})` merge, and the
+`buildWeaknessProfile` scoring engine unchanged). The ceiling stays **ADR-0053**; 0054–0058 remain
+reserved by unbuilt specs. Recorded here for traceability only.
+
+**What shipped.** The Coach assessment ends with one optional even game, which structurally cannot fairly
+measure **endgameConversion** (needs a *won* position to convert; `MIN_PHASE_PLIES=4` rarely reached) or
+**resilience** (needs a *worse* position to hold; `MIN_BEHIND_EPISODES=3` rarely reached). C3 adds two
+**opt-in designed-position probes** at the existing `offer-game` step:
+- A pure registry `COACH_PROBES` (`src/coach/probes.ts`): conversion → reuses the `rook-up` library FEN;
+  resilience → one new coach seed `coach:defend-worse` (`src/analysis/scenarios.ts`), a same-wing 4-vs-3
+  rook ending — a pawn down, player to move, a textbook holdable draw (the mirror of `rook-up`). Both
+  FENs are chess.js-validated legal in tests, side-to-move == side-to-train.
+- A pure `mirrorFen` / `seedForSide` (color symmetry — the seed is oriented to the player's color; tested
+  for round-trip + legality) and a pure `extractProbeDim` (single-dimension extraction with an honest,
+  *measured* `sampleSize`; a thin/failed probe stays "not measured", never a fabricated score).
+- Each probe seeds the SAME even-game board/loop in `Coach.svelte` (reused machinery — no new `Board`, so
+  the F2 `onMoveText` invariant + `board-input-wiring.test.ts` count stay at 3), plays out vs the bot at
+  a per-probe ply cap, then analyses via the existing `runAnalysis(source:'played')` and extracts ONLY
+  the targeted cell. Accumulated probe cells merge through `buildCoachProfile`'s additive `probeDims`
+  seam (mirroring the C2 `timedDim` seam — absent → output byte-identical), overriding the matching radar
+  cell and setting the additive `source.probes = true` (provenance). The cell `detail` names the designed
+  position.
+
+**Doctrine honoured.** No `DB_VERSION` bump (rides existing `coachProfile.dimensions`; `source.probes?` is
+an additive optional field). No diagnostic→rating-pool leak — a probe never calls
+`AdaptiveOpponent.finishGame`/`recordGame` nor mutates `puzzleRating` (AP-CDESIGN-1 / AP-COACH-8; like the
+even game, the probe game persists as a `GameAnalysis` via `runAnalysis(source:'played')` but folds into
+no rating). No pass/fail verdict — the directional `DimensionScore` is the outcome (no-grade honesty,
+REJECT E1). Insights byte-identical — the probe path feeds `coachProfile.dimensions` only and never
+touches `buildStudyPlan`. Pure cores (no `Date`/`Math.random` in `probes.ts`). Bilingual FR+EN for every
+new string. The even game is retained (probes are additive top-ups).
+
+Cross-links: `specs/coach-designed-probes-spec.md` (AP-CDESIGN-1…10), ADR-0045 (coach mode), ADR-0030
+(IMBALANCE_LIBRARY / `rook-up`), ADR-0057 (F6 `createGameSession({startFen})` enabler), ADR-0009/0027
+(directional, not-a-grade honesty), ADR-0053 (bilingual). Follow-up: C6 renders per-axis evidence type
+from `source.probes` + `detail`; C2 adds a timed designed probe. Append-only; supersedes nothing.
+
 ## Note — P1 play-loop closure (feature PR, no ADR)
 **Date:** 2026-06-30 · **Status:** shipped · **Spec:** `specs/play-loop-closure-spec.md`
 

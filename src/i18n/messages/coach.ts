@@ -48,6 +48,29 @@ export const coach: Messages = {
   },
   'coach.playGame': { fr: 'Jouer la partie →', en: 'Play the game →' },
   'coach.skip': { fr: 'Passer', en: 'Skip' },
+
+  // ── C3 designed-position probes (coach.*) — opt-in top-ups at the offer-game step for the two axes
+  // a short even game under-measures. Directional, no grade (AP-CDESIGN-5); each is one designed game. ──
+  'coach.probesTitle': {
+    fr: 'Optionnel : sondez deux axes difficiles à mesurer en une partie équilibrée — depuis des positions conçues.',
+    en: 'Optional: probe two axes a balanced game rarely measures — from designed positions.',
+  },
+  'coach.probeConversion': { fr: 'Tester la conversion (finale, un pion de plus) →', en: 'Test conversion (rook-up endgame) →' },
+  'coach.probeResilience': { fr: 'Tester la résilience (défendre une position inférieure) →', en: 'Test resilience (defend a worse position) →' },
+  'coach.probeDone': {
+    fr: 'Sondage enregistré : {dim}. Lancez l\'autre, jouez la partie, ou terminez.',
+    en: 'Probe recorded: {dim}. Run the other, play the game, or finish.',
+  },
+  'coach.probeUnmeasured': {
+    fr: 'Sondage trop court pour mesurer {dim} — cet axe reste « n/a ».',
+    en: 'Probe too short to measure {dim} — that axis stays “n/a”.',
+  },
+  'coach.probeAborted': {
+    fr: 'Sondage interrompu (erreur du moteur) — {dim} reste « n/a ».',
+    en: 'Probe interrupted (engine error) — {dim} stays “n/a”.',
+  },
+  'coach.finishAssessment': { fr: 'Terminer l\'évaluation', en: 'Finish assessment' },
+  'coach.probeRunning': { fr: 'Position conçue — jouez votre meilleur jeu.', en: 'Designed position — play your best.' },
   // C2/CO7: name the radar dimensions that stay n/a if the game is skipped (informed choice, not forced).
   'coach.skipCost': {
     fr: 'Passer laisse non mesuré(e) : {dims} (affiché « n/a »).',

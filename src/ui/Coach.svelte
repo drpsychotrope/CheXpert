@@ -13,6 +13,7 @@
   import { resultToGrade } from '../srs/fsrs';
   import { buildWeaknessProfile, type DimensionScore } from '../analysis/weakness';
   import { buildCoachProfile } from '../coach/diagnostic';
+  import { COACH_PROBES, seedForSide, extractProbeDim, type CoachProbe } from '../coach/probes';
   import {
     buildProbePlan,
     borderlineDepth,
@@ -31,7 +32,7 @@
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
   import { t, getLocale } from '../i18n';
-  import { labelOrRaw } from '../i18n/gen';
+  import { labelOrRaw, gt } from '../i18n/gen';
 
   type Step = 'intro' | 'ladders' | 'timed' | 'offer-game' | 'game' | 'analysing' | 'result';
   let step = $state<Step>('intro');
@@ -88,6 +89,24 @@
   let coachColorChoice = $state<ColorChoice>('random');
   let coachSide = $state<'w' | 'b'>('w');
 
+  // ── C3 designed-position probes ───────────────────────────────────────────
+  // Opt-in top-ups at the offer-game step for the two axes a short even game under-measures
+  // (conversion + resilience). A probe seeds the SAME even-game board/loop (reused machinery — no new
+  // Board, so the F2 onMoveText invariant + board-input-wiring count stay at 3) from a designed FEN,
+  // plays it out vs the bot, then extracts ONLY the targeted DimensionScore (single-dimension
+  // extraction) and returns to the offer so the user can run the other / play the even game / finish.
+  // The probe NEVER calls finishGame/recordGame on the opponent (AP-CDESIGN-1 / AP-COACH-8) and NEVER
+  // emits a pass/fail verdict (AP-CDESIGN-5). Accumulated probe cells are merged via buildCoachProfile's
+  // gameDimensions path (the diagnostic probeDims seam) at commit().
+  const PROBE_MOVE_LIMIT = 60; // a non-converting rook-up / endless shuffle can't run forever (FOLD E3)
+  let activeProbe = $state<CoachProbe | null>(null);
+  const probeDims: DimensionScore[] = [];
+  let probeFeedback = $state('');
+  // Reactive flags for the offer-game UI: which probes have already contributed a cell this assessment.
+  let probedDims = $state<Set<'endgameConversion' | 'resilience'>>(new Set());
+  const conversionProbe = COACH_PROBES.find((p) => p.dimension === 'endgameConversion')!;
+  const resilienceProbe = COACH_PROBES.find((p) => p.dimension === 'resilience')!;
+
   // Calibration-game board in-check highlight: `game` is mutated in place each move and Svelte 5
   // doesn't proxy the ChessGame instance, so a bare `game.inCheck()` binding never re-fires.
   // Depend on the reactive `gameFen` (reassigned every move) so it refreshes. (The ladder board
@@ -140,6 +159,11 @@
     timedSolvedCount = 0;
     endgameAnyScored = false; // reset CF6 fallback bookkeeping for a fresh (or repeat) assessment
     coarseAppended = false;
+    // C3: clear any designed-probe reads from a prior assessment.
+    probeDims.length = 0;
+    probedDims = new Set();
+    activeProbe = null;
+    probeFeedback = '';
     // Advance past the timed spec for the ladder phase; the timed block runs as its own step after.
     startNextLadder();
   }
@@ -399,20 +423,47 @@
 
   async function startGame() {
     coachSide = resolveColor(coachColorChoice) === 'white' ? 'w' : 'b';
+    activeProbe = null; // the even game (not a probe)
+    await beginGame(new ChessGame());
+  }
+
+  /** C3: start a designed probe — seed the SAME even-game board/loop from the probe FEN, oriented to
+   *  the player's color (seedForSide mirrors for Black). On an engine boot failure, abort gracefully:
+   *  the axis stays "not measured" and we return to the offer (AP-CDESIGN-3) — never commit, never a
+   *  fabricated cell. */
+  async function startProbe(probe: CoachProbe) {
+    coachSide = resolveColor(coachColorChoice) === 'white' ? 'w' : 'b';
+    activeProbe = probe;
+    probeFeedback = '';
+    await beginGame(new ChessGame(seedForSide(probe, coachSide)));
+  }
+
+  /** Shared game bootstrap for both the even game and a designed probe. On engine failure: the even
+   *  game commits without a game (today's behaviour); a probe aborts back to the offer (graceful skip). */
+  async function beginGame(seeded: ChessGame) {
     step = 'game';
-    game = new ChessGame();
+    game = seeded;
     gameFen = game.fen;
     opponent = new AdaptiveOpponent(app.engine, initOpponentState(baseline()));
     thinking = true;
     info = t('coach.startingEngine');
     try {
       await opponent.applyStrength();
-      info = t('coach.yourMove');
+      info = activeProbe ? t('coach.probeRunning') : t('coach.yourMove');
       thinking = false;
-      if (coachSide === 'b') await botReply(); // engine (White) opens
+      if (coachSide === 'b') await botReply(); // engine (the other side) opens
     } catch {
-      return finishWithoutGame();
+      return activeProbe ? abortProbe() : finishWithoutGame();
     }
+  }
+
+  /** Ply cap for the active game: the even game keeps GAME_MOVE_LIMIT; a probe gets its own bound so a
+   *  non-converting rook-up can't run forever (FOLD E3). */
+  const moveLimit = () => (activeProbe ? PROBE_MOVE_LIMIT : GAME_MOVE_LIMIT);
+
+  /** Route the game's end to the probe extractor or the even-game finisher. */
+  function endGame() {
+    return activeProbe ? finishProbe() : finishGame();
   }
 
   async function onGameMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
@@ -421,9 +472,9 @@
     const san = game.move(from, to, promo);
     if (!san) return;
     gameFen = game.fen;
-    if (game.terminal().over || game.history().length >= GAME_MOVE_LIMIT) return finishGame();
+    if (game.terminal().over || game.history().length >= moveLimit()) return endGame();
     await botReply();
-    if (game.terminal().over || game.history().length >= GAME_MOVE_LIMIT) finishGame();
+    if (game.terminal().over || game.history().length >= moveLimit()) endGame();
   }
 
   async function finishGame() {
@@ -448,8 +499,55 @@
     await commit(null);
   }
 
+  /** C3: analyse the finished probe game through the EXISTING pipeline, extract ONLY the targeted
+   *  DimensionScore (single-dimension extraction — AP-CDESIGN-2), accumulate it, then return to the
+   *  offer. The opponent's finishGame/recordGame is NEVER called (AP-CDESIGN-1 / AP-COACH-8). A thin
+   *  probe (sampleSize 0) stays "not measured" — no fabricated cell (AP-CDESIGN-3). */
+  async function finishProbe() {
+    const probe = activeProbe;
+    if (!probe) return finishGame(); // defensive — shouldn't happen
+    step = 'analysing';
+    info = t('coach.analysingGame');
+    const detailKey = probe.dimension === 'endgameConversion' ? 'diag.probeConversion' : 'diag.probeResilience';
+    let cell: DimensionScore | null = null;
+    try {
+      const { analysis } = await runAnalysis(app.engine, app.puzzles, {
+        gameId: `probe-${probe.dimension}-${Date.now()}`,
+        pgn: game.pgn(),
+        playerColor: coachSide,
+        source: 'played',
+        baseRating: baseline(),
+        now: Date.now(),
+      });
+      const dims = buildWeaknessProfile([analysis], baseline(), getLocale()).dimensions;
+      cell = extractProbeDim(probe.targetDimension, dims, gt(detailKey, getLocale()));
+    } catch {
+      cell = null; // analysis failed — leave the axis untouched (graceful skip)
+    }
+    const dimLabel = gt('dim.' + probe.targetDimension, getLocale());
+    if (cell && cell.sampleSize > 0) {
+      // Replace any prior reading for this dimension (re-run overrides), then record provenance.
+      const i = probeDims.findIndex((d) => d.dimension === cell!.dimension);
+      if (i >= 0) probeDims[i] = cell; else probeDims.push(cell);
+      probedDims = new Set([...probedDims, probe.dimension]);
+      probeFeedback = t('coach.probeDone', { dim: dimLabel });
+    } else {
+      probeFeedback = cell ? t('coach.probeUnmeasured', { dim: dimLabel }) : t('coach.probeAborted', { dim: dimLabel });
+    }
+    activeProbe = null;
+    step = 'offer-game';
+  }
+
+  /** Abort a probe whose engine failed to boot: leave the axis untouched, return to the offer. */
+  function abortProbe() {
+    const probe = activeProbe;
+    activeProbe = null;
+    probeFeedback = probe ? t('coach.probeAborted', { dim: gt('dim.' + probe.targetDimension, getLocale()) }) : '';
+    step = 'offer-game';
+  }
+
   async function commit(gameDimensions: DimensionScore[] | null) {
-    const p = buildCoachProfile({ puzzleRating: baseline(), probes, gameDimensions, assessedAt: Date.now(), locale: getLocale(), timedDim: timedDim ?? undefined });
+    const p = buildCoachProfile({ puzzleRating: baseline(), probes, gameDimensions, assessedAt: Date.now(), locale: getLocale(), timedDim: timedDim ?? undefined, probeDims: probeDims.length ? probeDims.slice() : undefined });
     profile = p;
     programPreview = buildCoachProgram(p, 30, getLocale());
     if (app.model) {
@@ -568,6 +666,21 @@
       <div class="row center">
         <button onclick={startGame}>{t('coach.playGame')}</button>
         <button style="background:transparent;border:1px solid var(--border)" onclick={finishWithoutGame}>{t('coach.skip')}</button>
+      </div>
+
+      <!-- C3 designed-position probes: opt-in top-ups for the two axes a balanced game under-measures.
+           Each runs a designed game then returns here. Directional, no grade (AP-CDESIGN-5). -->
+      <div class="probes col" style="width:100%;border-top:1px solid var(--border);margin-top:0.75rem;padding-top:0.75rem;gap:0.4rem">
+        <p class="muted" style="font-size:0.85rem">{t('coach.probesTitle')}</p>
+        <div class="row center">
+          <button style="background:transparent;border:1px solid var(--border)" onclick={() => startProbe(conversionProbe)}>
+            {probedDims.has('endgameConversion') ? '✔ ' : ''}{t('coach.probeConversion')}
+          </button>
+          <button style="background:transparent;border:1px solid var(--border)" onclick={() => startProbe(resilienceProbe)}>
+            {probedDims.has('resilience') ? '✔ ' : ''}{t('coach.probeResilience')}
+          </button>
+        </div>
+        {#if probeFeedback}<p class="feedback" style="font-size:0.85rem">{probeFeedback}</p>{/if}
       </div>
     </div>
 

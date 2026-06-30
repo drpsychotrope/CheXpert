@@ -154,6 +154,10 @@ export const generators: Messages = {
   // C2/CO15 timed-probe read (timedProbe.ts) — sample-size-labelled, directional, never a grade.
   'diag.timedRead': { fr: 'Bloc chronométré : {solved}/{attempted} résolus, ~{sec} s/problème', en: 'Timed block: {solved}/{attempted} solved, ~{sec}s/puzzle' },
   'diag.timedNone': { fr: 'Bloc chronométré ignoré ou aucun problème tenté', en: 'Timed block skipped or no puzzle attempted' },
+  // C3 designed-probe cell details (probes.ts extractProbeDim) — name the designed position so the radar
+  // reading is not a black box (FOLD E2). Directional, small sample — never a grade (AP-CDESIGN-4/5).
+  'diag.probeConversion': { fr: 'depuis une finale de tours conçue (un pion de plus)', en: 'from a designed rook-up endgame' },
+  'diag.probeResilience': { fr: 'depuis une position inférieure conçue à défendre', en: 'from a designed worse position to defend' },
 
   // ── program.ts coach-program reasons ─────────────────────────────────────
   'program.endgameDrill': {
