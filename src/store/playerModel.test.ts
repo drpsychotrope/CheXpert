@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { freshPlayerModel, loadPlayerModel, savePlayerModel } from './playerModel';
+import {
+  freshPlayerModel,
+  loadPlayerModel,
+  savePlayerModel,
+  migratePlayerModel,
+  CURRENT_PLAYER_SCHEMA_REV,
+  DEFAULT_DAILY_GOAL,
+} from './playerModel';
 import { DB_VERSION, openTrainerDB } from './db';
 import { resetDb } from '../test/resetDb';
 
@@ -31,5 +38,65 @@ describe('PlayerModel.conceptSeen (additive, no DB bump)', () => {
     await db.put('playerModel', legacy as never);
     const loaded = await loadPlayerModel(3000);
     expect(loaded.conceptSeen ?? []).toEqual([]);
+  });
+});
+
+describe('PlayerModel T3 retention (additive, schemaRev 1→2, no DB bump — AP-TINTEG-6)', () => {
+  beforeEach(resetDb);
+
+  it('DB_VERSION stays 4; CURRENT_PLAYER_SCHEMA_REV is 2', () => {
+    expect(DB_VERSION).toBe(4);
+    expect(CURRENT_PLAYER_SCHEMA_REV).toBe(2);
+  });
+
+  it('freshPlayerModel seeds dailyStreak 0 + the default goal, schemaRev 2, no lastTrainedAt', () => {
+    const m = freshPlayerModel(1000);
+    expect(m.dailyStreak).toBe(0);
+    expect(m.dailyGoal).toBe(DEFAULT_DAILY_GOAL);
+    expect(m.lastTrainedAt).toBeUndefined();
+    expect(m.schemaRev).toBe(2);
+  });
+
+  it('persists and reloads the retention fields', async () => {
+    const m = freshPlayerModel(1000);
+    m.dailyStreak = 5;
+    m.dailyGoal = 20;
+    m.lastTrainedAt = 123_456;
+    await savePlayerModel(m, 2000);
+    const loaded = await loadPlayerModel(3000);
+    expect(loaded.dailyStreak).toBe(5);
+    expect(loaded.dailyGoal).toBe(20);
+    expect(loaded.lastTrainedAt).toBe(123_456);
+    expect(loaded.schemaRev).toBe(2);
+  });
+
+  it('a rev-1 record (no retention fields) backfills defaults and bumps schemaRev to 2', () => {
+    // A record at the previous shape (per-pool maps present, schemaRev 1, no T3 fields).
+    const rev1 = freshPlayerModel(1000) as unknown as Record<string, unknown>;
+    rev1.schemaRev = 1;
+    delete rev1.dailyStreak;
+    delete rev1.dailyGoal;
+    delete rev1.lastTrainedAt;
+    const migrated = migratePlayerModel(rev1);
+    expect(migrated.dailyStreak).toBe(0);
+    expect(migrated.dailyGoal).toBe(DEFAULT_DAILY_GOAL);
+    expect(migrated.lastTrainedAt).toBeUndefined();
+    expect(migrated.schemaRev).toBe(2);
+  });
+
+  it('a legacy rev-0 record migrates to per-pool AND backfills the T3 retention defaults', () => {
+    const rev0 = {
+      id: 'singleton',
+      puzzleRating: { rating: 1200, rd: 200, vol: 0.06 },
+      gameRating: { rating: 1300, rd: 120, vol: 0.06 },
+      weaknessCounters: {},
+      onboarded: true,
+      createdAt: 1,
+      updatedAt: 1,
+    } as unknown as Record<string, unknown>;
+    const migrated = migratePlayerModel(rev0);
+    expect(migrated.dailyStreak).toBe(0);
+    expect(migrated.dailyGoal).toBe(DEFAULT_DAILY_GOAL);
+    expect(migrated.schemaRev).toBe(2);
   });
 });

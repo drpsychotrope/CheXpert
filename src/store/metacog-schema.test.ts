@@ -55,3 +55,49 @@ describe('metacognition schema (additive — no version bump)', () => {
     expect(freshSettings().metacogEnabled).toBe(false);
   });
 });
+
+describe('T3 usedHint schema (additive — no version bump, AP-TINTEG-6)', () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it('DB_VERSION stays 4 (usedHint is additive-optional)', () => {
+    expect(DB_VERSION).toBe(4);
+  });
+
+  it('a PuzzleAttemptRecord persists usedHint round-trip', async () => {
+    const db = await openTrainerDB();
+    const rec: PuzzleAttemptRecord = {
+      id: 'curated:9:3000',
+      puzzleId: 'curated:9',
+      solved: true,
+      ms: 4000,
+      themes: ['pin'],
+      ratingBefore: 1200,
+      ratingAfter: 1200,
+      playedAt: 3000,
+      source: 'curated',
+      usedHint: true,
+    };
+    await db.put('puzzleAttempts', rec);
+    const got = await db.get('puzzleAttempts', 'curated:9:3000');
+    expect(got?.usedHint).toBe(true);
+  });
+
+  it('a legacy attempt without usedHint reads falsy (undefined, no throw)', async () => {
+    const db = await openTrainerDB();
+    await db.put('puzzleAttempts', {
+      id: 'curated:10:4000',
+      puzzleId: 'curated:10',
+      solved: true,
+      ms: 3000,
+      themes: [],
+      ratingBefore: 1200,
+      ratingAfter: 1205,
+      playedAt: 4000,
+      source: 'curated',
+    });
+    const got = await db.get('puzzleAttempts', 'curated:10:4000');
+    expect(got?.usedHint).toBeFalsy();
+  });
+});

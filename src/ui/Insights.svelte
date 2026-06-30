@@ -11,7 +11,8 @@
   import { poolRating } from '../store/playerModel';
   import { allAttempts } from '../store/attemptsRepo';
   import { calibration, type MetacogAttempt } from '../metacog/metacog';
-  import { t, fmtPct, getLocale } from '../i18n';
+  import { impulsivity } from '../metacog/impulsivity';
+  import { t, fmtPct, fmtNum, getLocale } from '../i18n';
   import { motifLabelOrRaw, labelOrRaw } from '../i18n/gen';
 
   let loading = $state(true);
@@ -19,10 +20,14 @@
   let trend = $state<TrendPoint[]>([]);
   let weakest = $state<Dimension | null>(null);
   let minutes = $state(30);
-  let attempts = $state<MetacogAttempt[]>([]);
+  // Full attempt rows: they structurally satisfy MetacogAttempt (solved/confidence/selfTag) AND
+  // carry `ms` for the impulsivity readout — one load, two derived readouts (T3).
+  let attempts = $state<import('../store/db').PuzzleAttemptRecord[]>([]);
   let analysesAll = $state<import('../analysis/types').GameAnalysis[]>([]);
   // Derived so the calibration readout follows the language switch (recomputes on locale change).
-  const cal = $derived(calibration(attempts, { locale: getLocale() }));
+  const cal = $derived(calibration(attempts as MetacogAttempt[], { locale: getLocale() }));
+  // T3 impulsivity: descriptive move-time readout over {solved, ms}. Pure; null below the floor.
+  const imp = $derived(impulsivity(attempts));
 
   // Descriptive before/after miss-rate for the top ~3 leaks (Q-D windows + minMoves gate).
   const efficacy = $derived<EfficacyReadout[]>(
@@ -43,7 +48,7 @@
       trend = weaknessTrend(analyses, { window: 5, rating: model ? poolRating(model, 'classical').rating : 1200 });
       weakest = buildWeaknessProfile(analyses, model ? poolRating(model, 'classical').rating : 1200, getLocale()).weakest;
     }
-    attempts = (await allAttempts()) as MetacogAttempt[];
+    attempts = await allAttempts();
     loading = false;
   });
 
@@ -193,6 +198,28 @@
       {:else}
         <p class="muted">{t('insights.calibrationNeedsMore', { reported: cal.reportedAttempts })}</p>
       {/if}
+    {/if}
+
+    <!-- T3 impulsivity / move-time (Q-D, descriptive — never a grade; AP-TINTEG-7). A fact sentence
+         about the ATTEMPTS (not a trait of the player; no label noun — /enrich#8b) WITH denominators
+         (k/n, mirroring calibration; /enrich#3). Gated by metacog like calibration; the readout is
+         null below the sample-size floor, in which case nothing is asserted (no fabricated 0%). -->
+    {#if metacog && imp.readout}
+      <h3>{t('insights.impulsivity')}</h3>
+      <div class="panel col" style="gap:0.4rem">
+        <p>
+          {#if imp.readout.kind === 'impulsive'}
+            {t('insights.impulsivityImpulsive', { fastTotal: imp.fastTotal, pct: fmtPct(imp.readout.fastMissPct) })}
+          {:else if imp.readout.kind === 'deliberate'}
+            {t('insights.impulsivityDeliberate', { slowTotal: imp.slowTotal })}
+          {:else}
+            {t('insights.impulsivityMixed', { fastTotal: imp.fastTotal, pct: fmtPct(imp.readout.fastMissPct) })}
+          {/if}
+        </p>
+        <span class="muted" style="font-size:0.82rem">{t('insights.avgSolveTime', { sec: fmtNum(imp.readout.avgSec) })}</span>
+        <span class="muted" style="font-size:0.8rem">{t('insights.impulsivityDetail', { fastWrong: imp.fastWrong, fastTotal: imp.fastTotal, slowRight: imp.slowRight, slowTotal: imp.slowTotal })}</span>
+        <p class="muted" style="font-size:0.75rem">{t('insights.impulsivityDescriptive')}</p>
+      </div>
     {/if}
   {/if}
 </section>

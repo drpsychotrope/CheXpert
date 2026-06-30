@@ -14,6 +14,8 @@ export const play: Messages = {
     fr: 'Le classement aux problèmes mesure la reconnaissance de motifs, pas la force de jeu — les deux diffèrent.',
     en: 'Puzzle rating measures pattern recognition, not playing strength — they differ.',
   },
+  // T3/TR8: training-day streak shown beside the Review badge (re-engagement signal).
+  'home.streak': { fr: '🔥 Série de {n} jours', en: '🔥 {n}-day streak' },
   'home.playBot': { fr: "Jouer contre le bot adaptatif", en: 'Play the adaptive bot' },
   'home.todaysSession': { fr: "Session du jour", en: "Today's session" },
   'home.insights': { fr: 'Bilan', en: 'Insights' },

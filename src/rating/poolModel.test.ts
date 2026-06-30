@@ -78,12 +78,14 @@ describe('migratePlayerModel', () => {
     expect(freshPlayerModel(0).schemaRev).toBe(CURRENT_PLAYER_SCHEMA_REV);
   });
 
-  it('treats a schemaRev-stamped record as current (no legacy re-seed)', () => {
+  it('treats a per-pool record as current shape (no legacy re-seed), bumping schemaRev to current', () => {
     const fresh = freshPlayerModel(0);
     fresh.gameRatings.blitz = defaultRating(1888, 100, 0.06);
+    // A rev-1 record: per-pool maps already present → no rev-0 legacy re-seed; the additive T3
+    // backfill (rev 1→2) only stamps the current schemaRev and leaves the existing data intact.
     const m = migratePlayerModel({ ...(fresh as unknown as Record<string, unknown>), schemaRev: 1 });
-    expect(m.gameRatings.blitz!.rating).toBe(1888);
-    expect(m.schemaRev).toBe(1);
+    expect(m.gameRatings.blitz!.rating).toBe(1888); // data preserved (the "no re-seed" guarantee)
+    expect(m.schemaRev).toBe(CURRENT_PLAYER_SCHEMA_REV);
   });
 });
 

@@ -147,6 +147,31 @@ export const coach: Messages = {
     en: 'Calibration needs a few more reported attempts ({reported}/10 so far).',
   },
 
+  // ── T3 impulsivity / move-time readout (descriptive — AP-TINTEG-7). Sentences describe the
+  // ATTEMPTS (no label noun for the player — /enrich#8b) and carry denominators (/enrich#3). ──
+  'insights.impulsivity': { fr: 'Vitesse & précipitation', en: 'Speed & impulsivity' },
+  'insights.impulsivityImpulsive': {
+    fr: 'Vos tentatives rapides ratent souvent : {pct} de vos {fastTotal} tentatives rapides sont fausses.',
+    en: 'Your quick attempts miss often: {pct} of your {fastTotal} quick attempts are wrong.',
+  },
+  'insights.impulsivityDeliberate': {
+    fr: 'Quand vous prenez votre temps, vous trouvez : la plupart de vos {slowTotal} tentatives réfléchies sont justes.',
+    en: 'When you take your time, you solve: most of your {slowTotal} slower attempts are right.',
+  },
+  'insights.impulsivityMixed': {
+    fr: 'Résultats partagés selon la vitesse : {pct} de vos {fastTotal} tentatives rapides sont fausses.',
+    en: 'Mixed results by speed: {pct} of your {fastTotal} quick attempts are wrong.',
+  },
+  'insights.avgSolveTime': { fr: 'Temps de résolution moyen : {sec} s.', en: 'Average solve time: {sec}s.' },
+  'insights.impulsivityDetail': {
+    fr: 'Rapides : {fastWrong}/{fastTotal} ratées · Lentes : {slowRight}/{slowTotal} réussies.',
+    en: 'Fast: {fastWrong}/{fastTotal} missed · Slow: {slowRight}/{slowTotal} solved.',
+  },
+  'insights.impulsivityDescriptive': {
+    fr: 'Descriptif, pas une note — ceci décrit vos tentatives, pas vous.',
+    en: 'Descriptive, not a grade — this describes your attempts, not you.',
+  },
+
   // ── EvalGraph.svelte (evalGraph.*) ────────────────────────────────────────
   'evalGraph.ariaLabel': {
     fr: 'Vos chances de gain au fil de la partie',

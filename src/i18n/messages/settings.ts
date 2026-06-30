@@ -30,6 +30,14 @@ export const settings: Messages = {
     en: 'When on, Tactics and Calculation show optional chips: how sure you were (before the reveal) and, after a miss, why you think you missed. Insights then shows a descriptive calibration readout — how your confidence lines up with your results. Off by default; the chips are always skippable and never block solving.',
   },
 
+  // T3/TR8 daily training goal (Q-E, default 10 puzzles, configurable).
+  'settings.training': { fr: 'Entraînement', en: 'Training' },
+  'settings.dailyGoalLabel': { fr: 'Objectif quotidien (problèmes)', en: 'Daily goal (puzzles)' },
+  'settings.dailyGoalHint': {
+    fr: 'Nombre de problèmes à résoudre par jour. Votre série progresse à chaque nouveau jour d\'entraînement. Par défaut : 10.',
+    en: 'How many puzzles to solve each day. Your streak advances on each new training day. Default: 10.',
+  },
+
   'settings.privacy': { fr: 'Confidentialité', en: 'Privacy' },
   'settings.privacyBody': {
     fr: "Tout reste sur cet appareil. Vos parties, votre historique de problèmes et votre modèle de joueur vivent dans l'IndexedDB de votre navigateur. Rien n'est envoyé où que ce soit par défaut.",

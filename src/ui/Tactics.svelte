@@ -8,8 +8,10 @@
   import { TacticalTrainer, gradeAttempt } from '../trainer/TacticalTrainer';
   import { acceptAltMove, type LineEval } from '../trainer/altMove';
   import type { Puzzle } from '../trainer/puzzle';
-  import { putAttempt, getAttempt, attemptsByPuzzle, recordTacticsAttempt } from '../store/attemptsRepo';
-  import { resultToGrade, clampForConfidence } from '../srs/fsrs';
+  import { putAttempt, getAttempt, attemptsByPuzzle, recordTacticsAttempt, solvedTodayCount } from '../store/attemptsRepo';
+  import { resultToGrade, clampForConfidence, DEFAULT_GRADE_THRESHOLDS } from '../srs/fsrs';
+  import { clampGradeForHint, applyGlickoGain } from '../trainer/hintGrade';
+  import { rollStreak, goalProgress, DEFAULT_DAILY_GOAL } from '../trainer/retention';
   import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
   import { cardForThemes, loadConcepts, missWhy, type ConceptCard as ConceptCardData } from '../concepts/concepts';
   import { failCountByPuzzle, isLeech } from '../srs/schedule';
@@ -115,6 +117,20 @@
   // it never auto-spoils a Retry; toggled on only when the user taps the button.
   let showSolution = $state(false);
 
+  // T3 hint integrity (TR5, Q-A/Q-B). `hintTier` advances 1→2→3 per Hint press (progressive
+  // reveal); `usedHint` latches true on ANY tier and drives the grade clamp in finish()
+  // (FSRS ≤ Hard + skip the Glicko gain). Both reset in loadNext()/retry() (AP-TINTEG-1).
+  let usedHint = $state(false);
+  let hintTier = $state(0);
+
+  // T3 retention (TR8). The day-streak + today's goal progress, recomputed after each solve
+  // and on load. Descriptive only — the line never gates the loop (AP-TINTEG-10).
+  let streakCount = $state(0);
+  let goalDone = $state(0);
+  let goalTotal = $state(DEFAULT_DAILY_GOAL);
+  // T3 impulsivity (Q-D): a gentle, self-dismissing nudge after a FAST miss. Never blocking.
+  let fastMissMsg = $state('');
+
   async function openLearn(): Promise<void> {
     showCard = true;
     await markConceptOffered(); // records first-exposure the moment the card is opened
@@ -163,6 +179,9 @@
     exhaustedTheme = null;
     exhaustedWidened = false;
     solvedSan = null;
+    usedHint = false; // T3: a fresh puzzle starts unaided (AP-TINTEG-1)
+    hintTier = 0;
+    fastMissMsg = '';
 
     // The coarse difficulty band (T2/TR9) → (rating, window) for the curated/mixed paths. on-level
     // is byte-identical to baseline (window 250). Personal stays wide (TR4 — show your puzzles).
@@ -308,6 +327,23 @@
     void refreshLeech(p.id);
   }
 
+  /** T3/TR8: recompute today's solved-count → daily-goal progress via the bounded playedAt index
+   *  (AP-TINTEG-11). Local start-of-day computed here (the call site), passed to the repo. Never
+   *  blocks the loop — a count failure just leaves the line at its last value. */
+  async function refreshGoal(now: number): Promise<void> {
+    if (!model) return;
+    const d = new Date(now);
+    const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    try {
+      const solved = await solvedTodayCount(startOfDay, now);
+      const g = goalProgress(solved, model.dailyGoal ?? DEFAULT_DAILY_GOAL);
+      goalDone = g.done;
+      goalTotal = g.goal;
+    } catch {
+      /* storage hiccup — keep the previous readout */
+    }
+  }
+
   /** Recompute the leech flag for `puzzleId` from stored attempts (prior failures only). */
   async function refreshLeech(puzzleId: string): Promise<void> {
     leech = false;
@@ -450,8 +486,14 @@
       solvedSan = first ? new ChessGame(puzzle.fen).moveUci(first) : null;
     }
 
+    // T3 hint integrity (TR5, Q-B / AP-TINTEG-1/2): a hinted SOLVE withholds the Glicko gain —
+    // the player's rating AND the puzzle's own rating both stay flat (neither raised nor dropped).
+    // A miss is unaffected (the normal loss path applies — the hint didn't save it). The before
+    // rating is captured first so it can stand in as the after rating on the flat path.
+    const ratingBefore = model.puzzleRating.rating;
+    const applyGain = applyGlickoGain(solved, usedHint);
     const graded = gradeAttempt(model.puzzleRating, puzzle, solved);
-    model.puzzleRating = graded.player;
+    if (applyGain) model.puzzleRating = graded.player;
 
     // Track a nascent weakness counter when failing (Phase 2 builds on this).
     if (!solved) {
@@ -462,6 +504,16 @@
 
     const now = Date.now();
     const ms = trainer.elapsedMs(now);
+
+    // T3 retention (TR8, Q-C/Q-E): on a SOLVE, fold today into the day-streak (once per new
+    // calendar day; multi-session same day does not increment; a >1-day gap resets — AP-TINTEG-5)
+    // and persist dailyStreak/lastTrainedAt INTO the same model snapshot the atomic write commits
+    // (mirrors the weaknessCounters fold). Pure rollStreak; no Date in the core (AP-TINTEG-9).
+    if (solved) {
+      const rolled = rollStreak({ dailyStreak: model.dailyStreak ?? 0, lastTrainedAt: model.lastTrainedAt ?? 0 }, now);
+      model.dailyStreak = rolled.dailyStreak;
+      model.lastTrainedAt = rolled.lastTrainedAt;
+    }
     // IndexedDB cannot structured-clone a Svelte 5 $state proxy ("could not be cloned"),
     // and `puzzle` is $state — its proxied arrays (themes/moves/meta) make these db.put()s
     // throw, silently aborting finish() so NOTHING persists (no attempt, no SRS card → empty
@@ -470,7 +522,11 @@
     const attemptId = `${p.id}:${now}`;
     // Remember the row id so self-tag clicks can UPDATE the same row (not insert a new one).
     if (!solved) lastAttemptId = attemptId;
-    const updatedPuzzle = { ...p, rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) };
+    // T3 (AP-TINTEG-1): on a hinted solve the gain is withheld, so the puzzle's own rating is
+    // left UNMOVED too (mirrors F3's AP-COACH-8 "pass unchanged"); else it drifts as before.
+    const updatedPuzzle = applyGain
+      ? { ...p, rating: Math.round(graded.puzzle.rating), ratingDeviation: Math.round(graded.puzzle.rd) }
+      : p;
     // One atomic transaction (audit W11): attempt log + puzzle rating + FSRS card + player model —
     // a mid-write failure can no longer leave an attempt with no SRS card (a puzzle missing from Review).
     await recordTacticsAttempt({
@@ -480,22 +536,36 @@
         solved,
         ms,
         themes: p.themes,
-        ratingBefore: graded.player.rating,
+        // On the flat (no-gain) path the rating did not move, so before === after.
+        ratingBefore: applyGain ? graded.player.rating : ratingBefore,
         ratingAfter: model.puzzleRating.rating,
         playedAt: now,
         source: p.source,
         // metacognition: whichever were set (undefined drops cleanly on structured clone).
         confidence,
         selfTag: !solved ? selfTag : undefined,
+        // T3: provenance tag — undefined drops cleanly on structured clone when no hint was used.
+        usedHint: usedHint || undefined,
       },
       puzzle: updatedPuzzle,
       model: $state.snapshot(model),
-      // T1/TR3 (Q-E): a low-confidence (guess/unsure) SOLVE is clamped to ≤ Good so a self-flagged
-      // lucky solve doesn't earn a long interval. No-op on a miss (Again floor) / high confidence.
-      srs: { kind: 'puzzle', refId: puzzle.id, grade: clampForConfidence(resultToGrade(solved, ms), confidence) },
+      // FSRS grade composes two downgrade-only clamps as a net min() (AP-TINTEG-3): the T1/TR3
+      // low-confidence clamp (a self-flagged lucky SOLVE ≤ Good) and the T3 hint clamp (a hinted
+      // solve ≤ Hard). gradeCard then applies the first-exposure clamp on top — all monotone down.
+      srs: { kind: 'puzzle', refId: puzzle.id, grade: clampGradeForHint(clampForConfidence(resultToGrade(solved, ms), confidence), usedHint) },
       now,
     });
     app.puzzles.updateCached(updatedPuzzle);
+
+    // T3 impulsivity nudge (Q-D / AP-TINTEG-10): a gentle, self-dismissing line after a FAST miss
+    // ("missed in {n}s — slow down?"). Uses the grader's own fast boundary. Never blocks the loop.
+    if (!solved && ms <= DEFAULT_GRADE_THRESHOLDS.fastMs) {
+      fastMissMsg = t('tactics.fastMiss', { n: Math.max(1, Math.round(ms / 1000)) });
+    }
+
+    // T3 retention readout (TR8): recompute the streak + today's goal progress for the header.
+    streakCount = model.dailyStreak ?? 0;
+    await refreshGoal(now);
   }
 
   /** UPDATE the existing attempt row's selfTag after the chips render post-miss.
@@ -536,19 +606,43 @@
     void loadNext();
   }
 
+  // T3/TR8: seed the streak + today's goal readout once the model is ready (before any solve),
+  // so the header line is correct on mount. Runs when `model` becomes available.
+  $effect(() => {
+    if (model) {
+      streakCount = model.dailyStreak ?? 0;
+      void refreshGoal(Date.now());
+    }
+  });
+
   // Load the first puzzle once the model is ready.
   $effect(() => {
     if (model && !trainer && app.puzzles.size > 0) loadNext();
   });
 
+  /**
+   * T3 progressive hint (TR5, Q-A): three escalating tiers — tier 1 names the motif (least
+   * reveal), tier 2 the target (to-)square, tier 3 the full move. Each press advances the tier
+   * (capped at 3) and latches `usedHint = true`, which clamps the grade in finish() regardless
+   * of tier (the integrity rule is tier-independent; only the teaching value escalates).
+   * AP-TINTEG-1/10: marks the attempt and never blocks the loop.
+   */
   function hint() {
-    if (trainer) {
-      const m = trainer.expectedMove();
-      if (m) {
-        feedback = t('tactics.hint', { sq: m.slice(0, 2) });
-        feedbackKind = '';
-      }
+    if (!trainer) return;
+    const m = trainer.expectedMove();
+    if (!m) return;
+    usedHint = true;
+    hintTier = Math.min(hintTier + 1, 3);
+    // Tier 1 names the motif; if this puzzle has no theme to name, fall straight to the target
+    // square so the first press is never empty.
+    if (hintTier === 1 && puzzle && puzzle.themes.length) {
+      feedback = t('tactics.hintMotif', { motif: motifLabelOrRaw(puzzle.themes[0], getLocale()) });
+    } else if (hintTier <= 2) {
+      feedback = t('tactics.hintTarget', { sq: m.slice(2, 4) });
+    } else {
+      feedback = t('tactics.hintMove', { move: m.slice(0, 4) });
     }
+    feedbackKind = '';
   }
 
   /** Re-attempt the SAME puzzle from the start (after a miss). Already graded, so
@@ -567,6 +661,9 @@
     showSolution = false; // AP-TEACH-4: a fresh Retry must not show the answer
     showTimedOffer = false;
     checkingAlt = false;
+    usedHint = false; // T3: clear the hint state for the fresh attempt (retry is unscored practice)
+    hintTier = 0;
+    fastMissMsg = '';
     startTimer();
   }
 </script>
@@ -576,6 +673,11 @@
   {#if model}
     <p class="muted">
       {t('tactics.ratingLine', { rating: Math.round(model.puzzleRating.rating), rd: Math.round(model.puzzleRating.rd), solved: solvedThisSession, attempted: attemptedThisSession })}
+    </p>
+    <!-- T3/TR8 retention: day-streak + today's goal progress. Descriptive only; never gates the
+         loop (AP-TINTEG-10). The streak segment shows only once there is a streak to report. -->
+    <p class="muted" style="font-size:0.82rem">
+      {#if streakCount > 0}<span>{t('tactics.streakLine', { n: streakCount })}</span> · {/if}<span>{t('tactics.goalLine', { done: goalDone, goal: goalTotal })}</span>
     </p>
   {/if}
   {#if drillThemes && drillThemes.length}
@@ -680,7 +782,12 @@
     />
   </div>
 
-  <p class="feedback {feedbackKind}">{feedback}</p>
+  <p class="feedback {feedbackKind}">{feedback}{#if usedHint && trainer?.state.status === 'solved'} <span class="muted" style="font-size:0.82rem">{t('tactics.hintedTag')}</span>{/if}</p>
+
+  <!-- T3 impulsivity nudge (Q-D): a gentle, self-dismissing line after a fast miss. Passive. -->
+  {#if fastMissMsg}
+    <p class="feedback muted" style="font-size:0.85rem">{fastMissMsg}</p>
+  {/if}
 
   <!-- T2/TR4 after-solve provenance (Q-A=b): once a personal puzzle is solved, name what you left.
        SAN computed at the call site (finish, via ChessGame.moveUci); on null it's omitted (E1/AP-TPERS-6).

@@ -22,7 +22,18 @@ export const tactics: Messages = {
   'tactics.wrong': { fr: 'Pas le bon coup — réessayez la position, ou passez.', en: 'Not the move — Retry the position, or move on.' },
   'tactics.solved': { fr: 'Résolu ! ✔', en: 'Solved! ✔' },
   'tactics.keepGoing': { fr: 'Correct — continuez.', en: 'Correct — keep going.' },
-  'tactics.hint': { fr: 'Indice : une pièce forte part de {sq}.', en: 'Hint: a strong piece moves from {sq}.' },
+  // ── T3 progressive hints (TR5, Q-A) — 3 escalating tiers; ANY tier clamps the grade ──
+  // Tier 1 names the motif (least reveal), tier 2 the target square, tier 3 the full move.
+  'tactics.hintMotif': { fr: 'Indice : pensez au motif — {motif}.', en: 'Hint: think about the motif — {motif}.' },
+  'tactics.hintTarget': { fr: 'Indice : une pièce arrive en {sq}.', en: 'Hint: a piece lands on {sq}.' },
+  'tactics.hintMove': { fr: 'Indice : le coup est {move}.', en: 'Hint: the move is {move}.' },
+  // Transparency marker on a hinted solve (the clamp is visible to the player). AP-TINTEG-1.
+  'tactics.hintedTag': { fr: '(indice utilisé)', en: '(hint used)' },
+  // T3/TR8 retention header: day-streak + today's goal progress (descriptive).
+  'tactics.streakLine': { fr: 'Série de {n} jours', en: '{n}-day streak' },
+  'tactics.goalLine': { fr: 'Objectif du jour : {done}/{goal}', en: 'Today: {done}/{goal}' },
+  // T3 impulsivity inline nudge (Q-D): gentle, self-dismissing, after a fast miss. Never blocks.
+  'tactics.fastMiss': { fr: 'Raté en {n} s — ralentissez ?', en: 'Missed in {n}s — slow down?' },
   'tactics.retryFind': { fr: 'Réessayez — trouvez le coup.', en: 'Retry — find the move.' },
   'tactics.leech': { fr: 'Celui-ci vous résiste sans arrêt.', en: 'This one keeps beating you.' },
   'tactics.learnPattern': { fr: 'Apprendre le motif →', en: 'Learn the pattern →' },

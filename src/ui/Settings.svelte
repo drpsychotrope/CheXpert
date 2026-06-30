@@ -1,13 +1,23 @@
 <script lang="ts">
   import { app } from '../state/app.svelte';
-  import { clearAllData } from '../store/playerModel';
+  import { clearAllData, DEFAULT_DAILY_GOAL } from '../store/playerModel';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import { t, getLocale, type Locale } from '../i18n';
 
   const settings = $derived(app.settings);
+  const model = $derived(app.model);
 
   async function changeLocale(e: Event) {
     await app.setLocale((e.currentTarget as HTMLSelectElement).value as Locale);
+  }
+
+  // T3/TR8: the daily puzzle goal (Q-E, default 10). Persisted on the player model via the
+  // existing atomic write; clamped to a sane floor so the progress readout never divides oddly.
+  async function changeDailyGoal(e: Event) {
+    if (!model) return;
+    const n = Math.round(Number((e.currentTarget as HTMLInputElement).value));
+    model.dailyGoal = Number.isFinite(n) && n >= 1 ? n : DEFAULT_DAILY_GOAL;
+    await app.persistModel(Date.now());
   }
   // Themed, non-blocking confirmations instead of native confirm() (audit v2 W14/H39).
   let confirmKind = $state<null | 'network' | 'wipe'>(null);
@@ -85,6 +95,22 @@
       {t('settings.metacogLabel')}
     </label>
     <p class="muted" style="font-size:0.85rem">{t('settings.metacogHint')}</p>
+  </div>
+
+  <div class="panel col">
+    <h3>{t('settings.training')}</h3>
+    <label class="row" style="flex-direction:row;align-items:center;gap:0.6rem">
+      {t('settings.dailyGoalLabel')}
+      <input
+        type="number"
+        min="1"
+        max="200"
+        value={model?.dailyGoal ?? DEFAULT_DAILY_GOAL}
+        onchange={changeDailyGoal}
+        style="width:5rem"
+      />
+    </label>
+    <p class="muted" style="font-size:0.85rem">{t('settings.dailyGoalHint')}</p>
   </div>
 
   <div class="panel col">

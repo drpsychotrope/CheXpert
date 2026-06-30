@@ -1332,3 +1332,55 @@ zero regressions), svelte-check **0/0** (400 files), build green. **Rollback:** 
 no migration to unwind. Cross-links: ADR-0037/0040/0043/0053/0055, F1 (`motifLabelOrRaw`), F3
 (`steerFromWeakness`), `ChessGame.moveUci`. Follow-ups (§11): T1 miss-path (shipped), T3 (`usedHint`/clamp,
 progressive hints, streak), provenance in Review (DEFER), "open the source game" deep-link after F5 (DEFER).
+
+## T3 — trainer-integrity-retention: hint integrity (usedHint clamp) + day-streak/daily-goal + impulsivity signal (no new ADR)
+
+**Spec** `specs/trainer-integrity-retention-spec.md` (V1). One coherent move on the trainer solve→`finish()`
+seam closing three honest-measurement gaps that all hang off the same `PuzzleAttemptRecord`. **No new ADR**
+(feature PR; the grade-clamp policy was not deemed architectural — the Q-A..Q-E decisions are recorded here
+inline, per §7 default).
+
+**Hint integrity (TR5, Q-A/Q-B).** `hint()` is now **3 progressive tiers** (motif → target square → full
+move) off `trainer.expectedMove()` (NOT a `revealSolution`); **any** tier latches `usedHint`. A hinted
+**solve** is clamped two ways: FSRS grade ≤ `Hard` via the new pure `clampGradeForHint` AND the player's
+Glicko **gain is skipped** via `applyGlickoGain` — the player rating AND the puzzle's own rating stay
+**flat** (neither raised nor dropped), mirroring F3's AP-COACH-8 "pass unchanged". A hinted **miss** is
+unaffected (the normal loss path is honest). The clamp composes with the FSRS first-exposure clamp
+(`fsrs.ts` `Easy→Good` on `State.New`) and the T1 low-confidence clamp as a net `min()` — three
+downgrade-only clamps, a hint can only ever LOWER the effective grade (AP-TINTEG-1/2/3). `usedHint?` is
+additive-optional on `PuzzleAttemptRecord` (after `coachProbe?`), recorded `usedHint || undefined` so it
+drops on structured clone; a "(hint used)" marker on the solved feedback keeps the clamp transparent.
+
+**Retention (TR8, Q-C/Q-E).** Three additive-optional fields on `PlayerModel`: **`dailyStreak`** (NOT bare
+`streak` — Vision owns that in-drill counter, AP-TINTEG-4), `dailyGoal` (default **10**, Settings number
+input), `lastTrainedAt`. Pure `retention.ts` `rollStreak` folds one training event per **calendar day** via
+an **injected `dayKey`** (default local YYYY-MM-DD): same day → unchanged; adjacency decided by re-keying
+`now − 24h` (no key-string parsing, DST/format-robust) → +1; >1-day gap → reset to 1 (AP-TINTEG-5).
+`goalProgress` is pure; today's solved-count uses a **bounded `playedAt` index range** (`solvedTodayCount`,
+O(today) not O(all), AP-TINTEG-11). Streak+goal line in the trainer header; **streak on Home** beside the
+Review badge. **`schemaRev` 1→2 with a load-path backfill, NO `DB_VERSION` bump** (additive precedent
+ADR-0037/0040/0043/0053; mirrors `conceptSeen?`); a rev-0/rev-1 record backfills defaults on load.
+
+**Impulsivity (Q-D).** Pure `metacog/impulsivity.ts` — DESCRIPTIVE, never a grade (AP-META-1/AP-TINTEG-7):
+splits attempts by the grader's **own** `DEFAULT_GRADE_THRESHOLDS.fastMs` (imported, not re-declared), reports
+avg solve time + the fast-wrong vs slow-right split **with denominators** (k/n like calibration), and a
+`kind` sentence (impulsive/deliberate/mixed) that is `null` below the sample-size floor (default 10 —
+anti-fabrication). Rendered in Insights' existing **metacog-gated** section (a NEW section, never a study-plan
+input — **AP-COACH-1 preserved**, `studyPlan.ts`/`session.ts` untouched, determinism test green). Sentences
+describe the *attempts*, not the player (no label noun, /enrich#8b). A gentle, self-dismissing inline
+"missed in {n}s — slow down?" nudge fires in Tactics on a fast miss; never blocks the loop (AP-TINTEG-10).
+
+**Doctrine.** Additive-only; **no `DB_VERSION` bump** (`schemaRev` 1→2 + backfill only); bilingual FR+EN for
+every new string (catalogue parity gate is automatic via `translate.test.ts`); pure cores with injected
+`now`/`dayKey` (no `Date.now`/`Math.random`, AP-TINTEG-9); single concern. **Tests:** `hintGrade.test.ts`,
+`retention.test.ts`, `impulsivity.test.ts` (clamp composition, streak/dayKey rollover incl. midnight
+boundary, impulsivity buckets + denominators + floor) + schema round-trips in `metacog-schema.test.ts`/
+`playerModel.test.ts`. **692 Vitest green** (655 baseline + 37 new, zero regressions), svelte-check **0/0**
+(406 files), build green. One pre-existing test (`poolModel.test.ts` "no re-seed") updated to assert the
+current `schemaRev` after the 1→2 bump — data-preservation assertion intact. **Rollback:** fully additive
+and per-fold separable — revert single-tier `hint()` + the `usedHint` thread (A3), the `rollStreak`/goal
+calls + header/Home/Settings (A4), or the impulsivity section + nudge (A5) independently; the `schemaRev`
+backfill is idempotent; no migration to unwind. Cross-links: ADR-0033 (first-exposure clamp), ADR-0037/0040/
+0043/0053 (additive precedent), ADR-0055 (F3 AP-COACH-8 pass-unchanged), `fsrs.ts` `DEFAULT_GRADE_THRESHOLDS`.
+Follow-ups (§11): record `hintTier?` if a "how much did the hint help" consumer appears (DEFER — no consumer
+now); FSRS `stability` as a mastery readout (DEFER); streak decay-weighting + calendar/notifications (DEFER).

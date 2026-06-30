@@ -6,8 +6,11 @@ import { STANDARD_POOLS, type RatingPool } from '../rating/pools';
 import type { GameOutcome } from '../engine/AdaptiveOpponent';
 
 /** Current data-shape revision of the PlayerModel singleton (audit W13). Bump when adding a
- *  field the load-path migration must backfill; rev 0 = legacy single gameRating, rev 1 = per-pool. */
-export const CURRENT_PLAYER_SCHEMA_REV = 1;
+ *  field the load-path migration must backfill; rev 0 = legacy single gameRating, rev 1 = per-pool,
+ *  rev 2 = T3 retention fields (dailyStreak/dailyGoal/lastTrainedAt — additive, NO DB_VERSION bump). */
+export const CURRENT_PLAYER_SCHEMA_REV = 2;
+/** Default daily puzzle goal seeded on a fresh model (Q-E = 10). */
+export const DEFAULT_DAILY_GOAL = 10;
 /** Current data-shape revision of the Settings singleton (audit W13). */
 export const CURRENT_SETTINGS_SCHEMA_REV = 1;
 
@@ -25,6 +28,10 @@ export function freshPlayerModel(now: number): PlayerModel {
     opponentByPool,
     weaknessCounters: {},
     conceptSeen: [],
+    // T3 retention (Q-C/Q-E): a fresh model starts with no streak and the default daily goal.
+    // lastTrainedAt stays absent until the first training day rolls it (retention.ts:rollStreak).
+    dailyStreak: 0,
+    dailyGoal: DEFAULT_DAILY_GOAL,
     schemaRev: CURRENT_PLAYER_SCHEMA_REV,
     onboarded: false,
     createdAt: now,
@@ -81,6 +88,11 @@ export function migratePlayerModel(raw: Record<string, unknown>): PlayerModel {
       updatedAt: r.updatedAt ?? Date.now(),
     };
   }
+  // rev 1 → 2 (T3): backfill the day-based retention fields. Preserve any already-stored value
+  // (so a rev-2 record round-trips unchanged); default a missing streak/goal. lastTrainedAt stays
+  // undefined until the first training day rolls it. Additive — NO DB_VERSION bump (AP-TINTEG-6).
+  model.dailyStreak = model.dailyStreak ?? 0;
+  model.dailyGoal = model.dailyGoal ?? DEFAULT_DAILY_GOAL;
   model.schemaRev = CURRENT_PLAYER_SCHEMA_REV;
   return model;
 }

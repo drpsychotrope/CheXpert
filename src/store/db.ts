@@ -55,6 +55,11 @@ export interface PuzzleAttemptRecord {
    *  (AP-COACH-8). Additive optional; absent on legacy/normal attempts reads falsy. No `source`
    *  union change (AP-ATTEMPT-5), NO DB_VERSION bump. */
   coachProbe?: boolean;
+  /** True when the player took a hint (any tier) on this attempt (T3/TR5, Q-B). A hinted SOLVE
+   *  is graded FSRS ≤ Hard and skips the Glicko gain (rating flat) so a hint can't inflate the
+   *  measurement (AP-TINTEG-1). Provenance tag ONLY. Additive optional; absent on legacy/unaided
+   *  attempts reads falsy. Mirrors `coachProbe?` — NO `source` union change, NO DB_VERSION bump. */
+  usedHint?: boolean;
 }
 
 export interface PlayerModel {
@@ -75,6 +80,15 @@ export interface PlayerModel {
    *  old records lack it and read `undefined`. NO DB_VERSION bump. */
   coachProfile?: import('../coach/types').CoachProfile;
   coachProfilePrev?: import('../coach/types').CoachProfile;
+  /** Day-based training retention (T3/TR8, Q-C/Q-E). Additive optional, backfilled in the load
+   *  path (playerModel.ts) with schemaRev 1→2 — old records read the defaults; NO DB_VERSION bump
+   *  (mirrors `conceptSeen?`). Named `dailyStreak` (NOT bare `streak`, which is Vision's in-drill
+   *  counter — AP-TINTEG-4). `dailyStreak`: consecutive training days; `dailyGoal`: puzzles/day
+   *  target (absent reads as the default 10); `lastTrainedAt`: epoch ms of the last training day
+   *  used to roll the streak. */
+  dailyStreak?: number;
+  dailyGoal?: number;
+  lastTrainedAt?: number;
   onboarded: boolean;
   createdAt: number;
   updatedAt: number;

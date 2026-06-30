@@ -5,6 +5,8 @@
 
   const model = $derived(app.model);
   const classical = $derived(model ? poolRating(model, 'classical') : null);
+  // T3/TR8: the training-day streak, normalised to a number for the badge below.
+  const dailyStreak = $derived(model?.dailyStreak ?? 0);
 </script>
 
 <section class="home">
@@ -25,6 +27,11 @@
       </div>
     </div>
     <p class="note">{t('home.puzzleNote')}</p>
+    <!-- T3/TR8: surface the training-day streak where re-engagement happens, beside the Review
+         badge below. One render site, no new logic — reads model.dailyStreak (/enrich#2). -->
+    {#if dailyStreak > 0}
+      <p class="note">{t('home.streak', { n: dailyStreak })}</p>
+    {/if}
   {/if}
 
   <div class="actions">

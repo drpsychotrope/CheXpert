@@ -28,6 +28,19 @@ export async function allAttempts(): Promise<PuzzleAttemptRecord[]> {
 }
 
 /**
+ * Count SOLVED attempts whose playedAt falls in [`startOfDay`, `now`] (T3/TR8 daily-goal
+ * progress). Uses a BOUNDED `playedAt` index range so the read is O(today), not a full
+ * allAttempts() scan that grows with the whole log (AP-TINTEG-11). The caller supplies the
+ * local start-of-day so the boundary stays deterministic and DST-correct at the call site.
+ */
+export async function solvedTodayCount(startOfDay: number, now: number): Promise<number> {
+  const db = await openTrainerDB();
+  const range = IDBKeyRange.bound(startOfDay, now);
+  const todays = await db.getAllFromIndex('puzzleAttempts', 'playedAt', range);
+  return todays.reduce((n, a) => n + (a.solved ? 1 : 0), 0);
+}
+
+/**
  * Record a completed tactics attempt ATOMICALLY (audit W11): the attempt log, the puzzle's drifting
  * rating, the FSRS card, and the player model all commit in ONE IndexedDB transaction. A mid-write
  * failure aborts the whole tx, so we can never end up with e.g. an attempt logged but no SRS card
