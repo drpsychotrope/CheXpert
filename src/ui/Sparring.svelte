@@ -152,6 +152,13 @@
         {lastMove}
         check={inCheck}
         {onMove}
+        onMoveText={(text) => {
+          if (status !== 'playing' || turnColor() !== orientation) return false;
+          const r = game.resolveMove(text);
+          if (!r) return false;
+          void onMove(r.from, r.to, r.promo ?? 'q');
+          return true;
+        }}
       />
     </div>
     <p class="feedback {resultKind}">{status === 'thinking' ? t('sparring.opponentThinking') : result}</p>

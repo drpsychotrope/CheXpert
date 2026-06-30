@@ -268,7 +268,14 @@
       <Board {fen} {orientation}
         turnColor={display.turn === 'w' ? 'white' : 'black'}
         movableColor={display.turn === 'w' ? 'white' : 'black'}
-        dests={display.dests()} check={display.inCheck()} onMove={onLadderMove} />
+        dests={display.dests()} check={display.inCheck()} onMove={onLadderMove}
+        onMoveText={(text) => {
+          if (!trainer || !ladder) return false;
+          const r = display.resolveMove(text);
+          if (!r) return false;
+          onLadderMove(r.from, r.to, r.promo ?? 'q');
+          return true;
+        }} />
     </div>
     <p class="feedback">{feedback}</p>
 
@@ -291,7 +298,14 @@
         turnColor={game.turn === 'w' ? 'white' : 'black'}
         movableColor={!thinking && game.turn === coachSide ? (coachSide === 'w' ? 'white' : 'black') : undefined}
         dests={!thinking && game.turn === coachSide ? game.dests() : new Map()}
-        check={gameInCheck} onMove={onGameMove} />
+        check={gameInCheck} onMove={onGameMove}
+        onMoveText={(text) => {
+          if (!opponent || game.turn !== coachSide || thinking) return false;
+          const r = game.resolveMove(text);
+          if (!r) return false;
+          void onGameMove(r.from, r.to, r.promo ?? 'q');
+          return true;
+        }} />
     </div>
     {#if thinking}<p class="feedback">{t('coach.botThinking')}</p>{/if}
 

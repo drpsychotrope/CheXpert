@@ -83,7 +83,14 @@
   );
 
   let el: HTMLDivElement;
+  // `bind:this` ref we also read imperatively (focus-return, FOLD A1). Svelte 5 flags a
+  // plain `let` that is both bound and read as non-reactive, so declare it as $state.
+  let kbInput = $state<HTMLInputElement | null>(null);
   let cg: Api | null = null;
+  // The board is keyboard/text-playable only when a text resolver is wired AND it isn't view-only —
+  // the same condition that renders the move form below. Label the region accordingly so AT users are
+  // told the typed-move path exists, without over-promising on view-only/drag-only boards (WCAG 1.3.1).
+  const interactive = $derived(!viewOnly && !!onMoveText);
   // Honor the OS reduced-motion preference: no piece-slide animation (audit v2 W13 / WCAG 2.3.3).
   const reduceMotion =
     typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -111,6 +118,9 @@
   // giving a no-mouse path to play on every board. The error is an aria-live region for AT users.
   let kbMove = $state('');
   let kbError = $state('');
+  // Polite success counterpart to the assertive error region (FOLD A3): a single bounded status
+  // string announced when a typed move applies, cleared on the next attempt so it never lingers.
+  let kbStatus = $state('');
   function submitKbMove(e: Event) {
     e.preventDefault();
     const text = kbMove.trim();
@@ -118,8 +128,11 @@
     if (onMoveText(text)) {
       kbMove = '';
       kbError = '';
+      kbStatus = t('board.movePlayed'); // polite announcement (FOLD A3)
+      kbInput?.focus(); // keep focus in the field so a second move needs no re-tab (FOLD A1)
     } else {
       kbError = t('board.notLegal', { move: text });
+      kbStatus = ''; // clear any prior success so AT doesn't re-announce a stale "move played"
     }
   }
 
@@ -195,7 +208,15 @@
       {#each ranks as r}<span>{r}</span>{/each}
     </div>
   {/if}
-  <div class="cg-board-host" bind:this={el}></div>
+  <!-- Region aria (single source): interactive boards expose a group whose label states the typed-move
+       path exists; view-only / drag-only boards get a positional img label only. role="grid" per-square
+       navigation is deferred (spec §11 D1) — announcing a grid with no arrow model would mislead AT. -->
+  <div
+    class="cg-board-host"
+    bind:this={el}
+    role={interactive ? 'group' : 'img'}
+    aria-label={interactive ? t('board.label') : t('board.labelView')}
+  ></div>
   <!-- file labels (bottom gutter), one flex cell per column -->
   {#if coords}
     <div class="files">
@@ -209,6 +230,7 @@
       <input
         id="kbmove-input"
         class="kbmove-input"
+        bind:this={kbInput}
         bind:value={kbMove}
         placeholder={t('board.kbPlaceholder')}
         autocomplete="off"
@@ -218,6 +240,8 @@
       />
       <button type="submit">{t('board.kbPlay')}</button>
       <span id="kbmove-err" class="kbmove-err" role="alert" aria-live="assertive">{kbError}</span>
+      <!-- Polite success status (FOLD A3): visually hidden; announced after a typed move applies. -->
+      <span class="sr-only" role="status" aria-live="polite">{kbStatus}</span>
     </form>
   {/if}
   {#if pendingPromo}
@@ -323,4 +347,16 @@
   .kbmove-label { font-size: 0.8rem; color: var(--muted); }
   .kbmove-input { flex: 0 1 9rem; min-width: 7rem; }
   .kbmove-err { font-size: 0.8rem; color: var(--bad, #e06c6c); min-height: 1em; }
+  /* Visually hidden but exposed to assistive tech (FOLD A3 polite status). */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
 </style>

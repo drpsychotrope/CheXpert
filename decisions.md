@@ -1162,3 +1162,53 @@ consume it with observable behaviour unchanged. svelte-check **0/0**, **577 Vite
 audit-v2 W12 (`playSession` pure home), `enhancements-architecture-spec.md` F6. Follow-ups: migrate
 Sparring + Comeback onto the controller (inheriting human-move + retry); **P3** (opponent agency) and
 **C3** (designed probes) consume this controller.
+
+## F2 — board-input-a11y: keyboard/text move entry + aria across board consumers (no new ADR)
+
+**Extends ADR-0052's a11y line (P0-04 / W4) + ADR-0053 (bilingual).** No new ADR (Q-D — display/markup
+follow-up; mirrors F1's precedent and reserves the portfolio's ADR-0054; a future board-aria ADR takes
+the first free number *after* 0054, never 0054 itself). **Spec:** `specs/board-input-a11y-spec.md` (V1).
+
+**Premise correction (the key scan output).** The audit's CF9 "boards are mouse-only, no aria" was
+**false** at the component + 3-consumer level: `Board.svelte` already shipped `onMoveText` + the keyboard
+form + an assertive `role=alert` error region (P0-04), and Tactics/Review/Play already wired it. F2 was
+therefore *finish the rollout + label the region*, not *build keyboard entry* — shrinking the PR to wiring
+9 files + one aria attribute.
+
+**Decisions (RESOLVED defaults).** (Q-A) text move entry + a basic region `aria-label` **now**;
+`role="grid"` per-square navigation **DEFER** (announcing a grid with no arrow model is worse than a group
+— AP-A11Y-4 / §11 D1). (Q-B) ←/→ ply MOVE NAVIGATION **DEFER** (needs a ply cursor that exists nowhere).
+(Q-C) region aria lives in the **single source** `Board.svelte` so every consumer inherits it; only the
+`onMoveText` *callback* is per-consumer (it needs that consumer's game + turn guard). (Q-D) no new ADR.
+(Q-E) whitelist the **11 interactive** instances; `onSelect` calc/vision drills + view-only boards are
+excluded — the `{#if onMoveText && !viewOnly}` guard makes wiring them a no-op or wrong (AP-A11Y-3).
+
+**Delivered.** `Board.svelte`: a derived `interactive = !viewOnly && !!onMoveText` drives a split region
+label — `role="group"` + `t('board.label')` when interactive, else `role="img"` + `t('board.labelView')`
+(positional, no "type below" claim). FOLD A1: focus returns to the move input after a successful typed
+move (consecutive keyboard moves need no re-tab). FOLD A3: a visually-hidden polite `aria-live="status"`
+node announces `t('board.movePlayed')` on success — the polite counterpart to the kept assertive error.
+Three new bilingual keys (`board.label`, `board.labelView`, `board.movePlayed`). The 11 interactive
+boards (Coach×2, Comeback, Sparring, Endgames, GuessMove, AnalysisBoard, Repertoire [scratch
+`new ChessGame(drill.fen())` — no persistent game], Woodpecker, Onboarding×2) now pass `onMoveText` via
+the canonical Tactics pattern, each gated by that consumer's existing turn/play condition so a typed move
+can never apply when a dragged one couldn't (AP-A11Y-2). Promo-less last-rank pushes auto-queen (`?? 'q'`)
+for parity with Tactics/Play/Review (§11 D6).
+
+**Tests.** Reused `resolveMove` core (already covers SAN/UCI/coord/castle/promo, standard + 960). New
+static wiring guard `src/ui/board-input-wiring.test.ts` (Node `fs`, no DOM): asserts each of the 11
+consumers passes `onMoveText` + resolves via `resolveMove`, that the excluded boards do **not**, and that
+`Board.svelte` carries the region-aria branch + the focus/announce loop. **Honest limit (FOLD A8):** this
+guards the *presence* of the wiring, not the correctness of each turn/play guard — behavioural correctness
+(typed move rejected off-turn) is manual (spec §6 C2/C3). i18n parity is covered by the existing catalogue
+integrity test (iterates `ALL_MESSAGES`).
+
+**Doctrine.** Additive UI only; **no `DB_VERSION` bump** (nothing persisted — AP-A11Y-6); single concern
+(no `resolveMove`/move-API/selection/persistence change); Insights study-plan byte-identical. svelte-check
+**0/0**, **613 Vitest green** (577 baseline + 36 wiring), build green. **Rollback:** revert the commit —
+the `onMoveText` props vanish (those 9 files fall back to mouse-only), the 3 keys + the region role/label
+are removed; no data/schema/migration to unwind; per-file safe. Cross-links: ADR-0052 (a11y line / P0-04),
+ADR-0053 (bilingual), ADR-0043 (coords/onSelect drills, excluded), `enhancements-architecture-spec.md` F2.
+Follow-ups (§11): full ARIA-grid navigation (D1), ←/→ ply nav (D2), a Svelte component-test harness (D3),
+square-tap a11y for the onSelect drills (D4), an optional board-aria ADR (D5), typed under-promotion via
+the keyboard field (D6).

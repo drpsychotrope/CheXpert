@@ -278,6 +278,13 @@
         dests={display.dests()}
         check={display.inCheck()}
         onMove={onLadderMove}
+        onMoveText={(text) => {
+          if (!trainer || !ladder) return false;
+          const r = display.resolveMove(text);
+          if (!r) return false;
+          onLadderMove(r.from, r.to, r.promo ?? 'q');
+          return true;
+        }}
       />
     </div>
     <p class="feedback">{ladderFeedback}</p>
@@ -308,6 +315,13 @@
         dests={!gameThinking && game.turn === gameSide ? game.dests() : new Map()}
         check={gameInCheck}
         onMove={onGameMove}
+        onMoveText={(text) => {
+          if (gameThinking || game.turn !== gameSide) return false;
+          const r = game.resolveMove(text);
+          if (!r) return false;
+          void onGameMove(r.from, r.to, r.promo ?? 'q');
+          return true;
+        }}
       />
     </div>
     {#if gameThinking}<p class="feedback">{t('onboarding.thinking')}</p>{/if}

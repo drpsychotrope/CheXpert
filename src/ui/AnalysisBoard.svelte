@@ -109,6 +109,12 @@
         dests={game.dests()}
         check={game.inCheck()}
         {onMove}
+        onMoveText={(text) => {
+          const r = game.resolveMove(text);
+          if (!r) return false;
+          onMove(r.from, r.to, r.promo ?? 'q');
+          return true;
+        }}
       />
     </div>
   </div>
