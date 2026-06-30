@@ -13,6 +13,11 @@ export interface PlanItem {
   focus: string;
   minutes: number;
   reason: string;
+  /** Additive provenance tag (C5): a step added because the user has a clear STRENGTH (`'leverage'`)
+   *  or because their intake GOAL asked for it (`'goal'`). Absent on every weakness/maintenance step
+   *  AND on every `buildStudyPlan` item — so Insights output stays byte-identical (AP-CINTAKE-8). The
+   *  UI uses it only to render a small tag; routing (`activity`/`focus`) is untouched. */
+  kind?: 'leverage' | 'goal';
 }
 
 function activityForLeak(leak: Leak): { activity: PlanItem['activity']; focus: string } {

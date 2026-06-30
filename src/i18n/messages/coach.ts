@@ -11,6 +11,30 @@ export const coach: Messages = {
   'coach.startAssessment': { fr: "Commencer l'évaluation →", en: 'Start the assessment →' },
   'coach.loadingPuzzles': { fr: 'Chargement des problèmes…', en: 'Loading puzzles…' },
 
+  // ── C5/CO3 intake goal picker (coach.*) — one short, SKIPPABLE goal before the assessment. The
+  // goal softly weights the program (re-order + ≤1 step); it never replaces the weakness-first plan
+  // (AP-CINTAKE-1). Skipping behaves exactly like today's coach. ──
+  'coach.goalsTitle': { fr: 'Quel est votre objectif ?', en: 'What is your goal?' },
+  'coach.goalsIntro': {
+    fr: 'Optionnel — cela oriente légèrement votre programme. Vos points faibles restent la priorité ; vous pouvez passer.',
+    en: 'Optional — this gently steers your program. Your weak spots still lead; you can skip.',
+  },
+  'coach.goalTargetRating': { fr: 'Monter en classement', en: 'Raise my rating' },
+  'coach.goalFixBlunders': { fr: 'Arrêter de gaffer', en: 'Stop blundering' },
+  'coach.goalOpeningPrep': { fr: 'Travailler mes ouvertures', en: 'Prepare my openings' },
+  'coach.goalTimeTrouble': { fr: 'Gérer le temps (zeitnot)', en: 'Fix time trouble' },
+  'coach.goalSkip': { fr: 'Passer — évaluez-moi simplement', en: 'Skip — just assess me' },
+
+  // C5: small inline tags on program steps the goal/strength added (the row stays a normal step).
+  'coach.tagLeverage': { fr: 'point fort', en: 'strength' },
+  'coach.tagGoal': { fr: 'objectif', en: 'goal' },
+  // C5: descriptive metacog coach line header + the off-state gentle hint for the fix-blunders goal.
+  'coach.metacogTitle': { fr: 'Votre confiance', en: 'Your confidence' },
+  'coach.metacogOffHint': {
+    fr: 'Pour coacher vos gaffes, activez les check-ins de confiance (Réglages) — vous verrez alors où votre assurance vous trompe.',
+    en: 'To coach your blunders, enable confidence check-ins (Settings) — you’ll then see where your certainty misleads you.',
+  },
+
   // ── C2/CF7 à-la-carte scope picker (coach.*) ──────────────────────────────
   'coach.scopeTitle': { fr: 'Que voulez-vous évaluer ?', en: 'What to assess?' },
   'coach.scopeMotifs': { fr: 'Motifs tactiques', en: 'Tactical motifs' },

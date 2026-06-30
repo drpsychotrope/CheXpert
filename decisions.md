@@ -1703,3 +1703,59 @@ surface), `specs/coach-real-data-assessment-spec.md` §2/§4/§6/§9, `enhanceme
 Folds CO11 (assess from imported PGN) + CO6 (blend played history). Follow-ups (§11): user-tunable N /
 per-source filters (C5), opening→repertoire from blended history (C7), game-review surfacing for the games
 that fed the profile (C6), bulk multi-game `.pgn` upload (F5 §11).
+
+## C5 — coach-intake-metacognition (no new ADR; extends ADR-0045 + ADR-0037)
+
+The shipped coach **inferred everything from ~14 puzzles and never asked the user what they want**;
+`CoachProfile.strengths` was a **display-only checkmark list** (computed, never acted on); and the
+metacognition feature (ADR-0037) already collected confidence-calibration + self-diagnosed miss-causes
+that the coach **ignored** (surfaced only in Insights). C5 **coaches the player, not just the board**:
+three additive, optional capabilities. Arbitrages **RESOLVED Q-A..Q-D = a**: (Q-A) a **closed 4-goal
+picker + Skip** stored as `CoachProfile.goal?` — not infer-only (defeats the feature) nor free-text
+(unparseable); (Q-B) **soft** goal weighting (re-order + ≤1 step) layered AFTER the weakness-first
+builder — **never a hard override** (AP-CINTAKE-1: dishonest + collides with C7); (Q-C) **one**
+descriptive calibration sentence from the **existing** readout, gated by `metacogEnabled` + the sample
+floor — not the full Insights table (DEFER) nor always-on; (Q-D) **one** strength-leverage step when a
+clear strength exists + budget remains — not a full strengths program (dilutes).
+
+**`CoachGoal`** is a closed union (`target-rating · fix-blunders · opening-prep · time-trouble`, mirrors
+`SELF_TAGS`); **all goal behaviour lives in the single `GOAL_PLAN` table** (program.ts — E6/AP-CINTAKE-2),
+so a 5th goal is one new row. New pure helpers in `program.ts`: `applyGoalWeighting(plan, goal, profile,
+minutes, locale)` is **total + idempotent** — `goal === undefined`/unknown ⇒ the SAME plan unchanged
+(legacy 3-arg byte-identical, E4/AP-CINTAKE-5), else a **stable** float of the goal's affinity step(s)
+to the front + an `ensure` append (only when absent AND budget remains), invariant `out.length >=
+in.length` with the weakness-step **set** preserved; `leverageStepFor(profile, minutes, used, locale)`
+returns ≤1 step (null when no strength/no budget), reusing `scenarioForFocus` (E5) and tagged
+`kind:'leverage'`. `buildCoachProgram` gains an **optional 4th arg** `goal?` — after the weakness-first
+plan + maintenance fallback it appends the leverage step (if any) then returns `applyGoalWeighting(...)`.
+New pure core `src/coach/coaching.ts`: `metacogCoachLine(cal, locale)` re-phrases the **existing**
+`CalibrationReadout` into ONE coach-voiced sentence (verdict word + top self-tag cause) or **null** below
+the floor / no data (anti-fabrication, AP-CINTAKE-4) — **no new math, never a digit/grade** (AP-CINTAKE-3,
+cross-link AP-META-1). `PlanItem` gains an additive `kind?: 'leverage' | 'goal'` tag (UI labels it; routing
+untouched). `Coach.svelte`: a new `goals` step before the ladders (4 options + Skip, **pre-selected from
+`coachProfilePrev.goal`** on re-run — E1), the goal **persisted** on the profile in `commit()`, the metacog
+line rendered only when `metacogEnabled` + non-null (else, for `fix-blunders`, a gentle enable-hint — E2),
+and the leverage/goal steps shown with a small tag.
+
+**Additive, no new store**: `goal?` is optional on the existing `coachProfile` (legacy/skipped runs read
+`undefined` ⇒ today's plan), the coaching line is **derived** (not stored), and it reads the existing
+`puzzleAttempts` — **no `DB_VERSION` bump** (still 4; mirrors `conceptSeen?`/`coachProfile?` — AP-CINTAKE-7).
+`buildStudyPlan` + the Insights calibration block are **untouched** — Insights output byte-identical
+(AP-CINTAKE-8 / AP-COACH-1; `studyPlan.ts` diff is the lone additive `kind?` field, never emitted by
+`buildStudyPlan`). C5's weighting is a **thin re-ordering precursor C7 supersedes** without a rewrite
+(AP-CINTAKE-6: C5 adds NO time-budget/mastery/efficacy/repertoire routing; goal-tuned puzzle *difficulty*
+stays REJECTED — it would bias the diagnostic measurement). Pure cores keep no `Date`/`Math.random`
+(AP-CINTAKE-9; the UI owns `Date.now`/locale). Every new `coach.*`/`program.*`/`coaching.*` key is FR+EN
+(parity by construction). **Tests:** `coaching.test.ts` (5 — null below floor / verdict-only / with-cause
+self-tag label / **no-digit** regex / FR≠EN) + `program.test.ts` extended (+12 — undefined & unknown goal
+unchanged, `time-trouble` float, `opening-prep` ensure-no-dup, idempotence, `out.length>=in.length` + set
+preserved, budget cap, `leverageStepFor` null/≤1/valid-scenario, and a `buildCoachProgram`+`buildSession`
+end-to-end proving the `kind` tags survive). **894 tests green** (876 + 18), svelte-check **0/0** (429
+files), build green. **Rollback** (§10): revert the commit — `coaching.ts`/its test/the `goals` step/the
+goal-weighting helpers/`GOAL_PLAN`/the `goal?` & `kind?` fields/the new i18n keys vanish; the 3-arg
+`buildCoachProgram`, `buildStudyPlan`, `calibration`, and the DB are untouched, no migration ran. Records
+**Q-A..Q-D = a**. ADR-0059 reserved (flag only if review elevates goal-weighting to architectural;
+0054-0058 in use). Cross-links: ADR-0045 (coach mode), ADR-0037 (metacognition), AP-META-1 (descriptive,
+not a grade), `specs/coach-intake-metacognition-spec.md` §4/§5/§6/§9, `enhancements-architecture-spec.md`
+§3 (folds CO3 + CO14 + CO18). Follow-ups (§11): C7 refines goal weighting into mastery/efficacy/time-budget
+routing; a metacog one-liner after a coached session (E7 DEFER); a 5th goal = one `GOAL_PLAN` row.

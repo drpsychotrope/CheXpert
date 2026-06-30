@@ -20,6 +20,14 @@ export interface ThemeProbeResult {
   n: number;
 }
 
+/**
+ * Closed coaching-goal taxonomy (C5/CO3 — mirrors metacog's `SELF_TAGS` discipline; a 5th goal is
+ * a one-line `GOAL_PLAN` row). Chosen at the optional intake step. `'target-rating'` means "no
+ * reweight" — the weakness-first plan is already the right answer. Goal BEHAVIOUR lives in the single
+ * `GOAL_PLAN` table (program.ts), never scattered as `if goal==='…'` across the UI (AP-CINTAKE-2).
+ */
+export type CoachGoal = 'target-rating' | 'fix-blunders' | 'opening-prep' | 'time-trouble';
+
 /** Persisted coaching assessment (PlayerModel.coachProfile). Directional, not a grade. */
 export interface CoachProfile {
   assessedAt: number;            // UI-stamped (Date.now boundary)
@@ -34,4 +42,9 @@ export interface CoachProfile {
   // one cell, fed through buildCoachProfile's gameDimensions path with an honest small sampleSize.
   source: { ladders: boolean; game: boolean; probes?: boolean };
   gameAnalyzed: boolean;
+  // `goal?` (C5/CO3): the optional intake goal that softly weighted this program. Additive optional —
+  // legacy records & skipped runs lack it (read `goal === undefined` ⇒ today's weakness-first plan,
+  // byte-identical). Persisted so a re-run can pre-select it. Mirrors `conceptSeen?`/`coachProfile?` —
+  // NO `DB_VERSION` bump (AP-CINTAKE-7).
+  goal?: CoachGoal;
 }

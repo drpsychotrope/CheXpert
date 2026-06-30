@@ -193,6 +193,44 @@ export const generators: Messages = {
     en: 'No clear weakness surfaced — keep your pattern recognition sharp.',
   },
 
+  // ── C5 strength-leverage reasons (program.ts leverageStepFor) — play TO a clear strength.
+  // Directional, never a grade; {strength} is the already-localized strength label. ──
+  'program.leverageTactics': {
+    fr: 'Point fort : {strength} — jouez une partie attaquante pour le faire valoir.',
+    en: 'Strength: {strength} — play an attacking game to press it.',
+  },
+  'program.leverageEndgame': {
+    fr: 'Point fort : {strength} — entretenez-le par des finales.',
+    en: 'Strength: {strength} — keep it sharp with endgames.',
+  },
+  'program.leverageResilience': {
+    fr: 'Point fort : {strength} — mettez-le à profit dans des positions disputées.',
+    en: 'Strength: {strength} — put it to work in tough positions.',
+  },
+
+  // ── C5 goal-ensured step reasons (program.ts GOAL_PLAN.ensure) — added because the intake goal
+  // asked for it (e.g. opening-prep). Routing keys (activity/focus) stay English. ──
+  'program.goalOpening': {
+    fr: 'Objectif ouverture — solidifiez votre répertoire.',
+    en: 'Opening goal — shore up your repertoire.',
+  },
+  'program.goalOpeningSteer': {
+    fr: 'Objectif ouverture — jouez une partie orientée vers vos lignes.',
+    en: 'Opening goal — play a game steered into your lines.',
+  },
+
+  // ── C5 metacognition coach line (coaching.ts metacogCoachLine) — ONE descriptive sentence built
+  // from the EXISTING calibration readout. {verdict} = metacog.verdict* word; {cause} = selfTag.*
+  // label. NEVER a number/grade (AP-CINTAKE-3 — tests assert no digit). ──
+  'coaching.line': {
+    fr: 'Côté confiance, vous êtes plutôt {verdict} — gardez-le en tête en partie.',
+    en: 'On confidence, you read as {verdict} — keep that in mind over the board.',
+  },
+  'coaching.lineWithCause': {
+    fr: 'Côté confiance, vous êtes plutôt {verdict} ; vos erreurs tiennent surtout à : {cause}. Ralentissez sur celles-là.',
+    en: 'On confidence, you read as {verdict}; your misses cluster on: {cause}. Slow down on those.',
+  },
+
   // ── studyPlan.ts plan-item reasons (focus/activity stay English routing keys) ──
   'studyPlan.warmupTargeted': { fr: '{n} cases à réviser — rappel ciblé.', en: '{n} squares due — targeted recall.' },
   'studyPlan.warmupVision': {

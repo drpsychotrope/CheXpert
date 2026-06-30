@@ -27,17 +27,34 @@
   import { initTimedProbe, recordTimed, timedDimension, type TimedProbeState } from '../coach/timedProbe';
   import { initClock, startClock, stopClock, tick, flagged, type ClockState } from '../clock/Clock';
   import { buildCoachProgram } from '../coach/program';
+  import { metacogCoachLine } from '../coach/coaching';
+  import { calibration, type MetacogAttempt } from '../metacog/metacog';
+  import { allAttempts } from '../store/attemptsRepo';
   import { buildCoachTrend, isStale, profileAgeDays, COACH_STALE_DAYS } from '../coach/coachTrend';
   import { buildSession } from '../analysis/session';
-  import type { CoachProfile, ThemeProbeResult } from '../coach/types';
+  import type { CoachProfile, ThemeProbeResult, CoachGoal } from '../coach/types';
   import type { TacticalTrainer } from '../trainer/TacticalTrainer';
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
   import { t, getLocale } from '../i18n';
   import { labelOrRaw, gt } from '../i18n/gen';
 
-  type Step = 'intro' | 'ladders' | 'timed' | 'offer-game' | 'game' | 'analysing' | 'result';
+  type Step = 'intro' | 'goals' | 'ladders' | 'timed' | 'offer-game' | 'game' | 'analysing' | 'result';
   let step = $state<Step>('intro');
+
+  // ── C5/CO3 intake goal ─────────────────────────────────────────────────────
+  // The optional, skippable coaching goal. Pre-selected from the LAST run's goal (coachProfilePrev.goal)
+  // so a re-run defaults the picker (E1; the user can change or skip). `undefined` = skipped / legacy ⇒
+  // today's weakness-first program (byte-identical). Soft weighting only (AP-CINTAKE-1).
+  let goal = $state<CoachGoal | undefined>(app.model?.coachProfilePrev?.goal ?? app.model?.coachProfile?.goal);
+  // The descriptive metacog coach line for the result (null below the sample floor / metacog off).
+  let coachLine = $state<string | null>(null);
+  const GOAL_OPTIONS: Array<{ id: CoachGoal; key: string }> = [
+    { id: 'target-rating', key: 'coach.goalTargetRating' },
+    { id: 'fix-blunders', key: 'coach.goalFixBlunders' },
+    { id: 'opening-prep', key: 'coach.goalOpeningPrep' },
+    { id: 'time-trouble', key: 'coach.goalTimeTrouble' },
+  ];
 
   // C2 (CF7): the probe plan is built from the user's à-la-carte scope at startLadders() time.
   // `plan` replaces the old hard-coded THEMES array (motifs + endgame sub-buckets + optional timed).
@@ -172,9 +189,17 @@
    *  persisted profile, not from the in-memory programPreview. No new persisted state (AP-CPROF-5). */
   function resumeProgram() {
     if (!saved) return;
-    const plan = buildCoachProgram(saved, 30, getLocale());
+    // Resume re-weights from the goal the saved profile was built with (C5 — persisted on the profile).
+    const plan = buildCoachProgram(saved, 30, getLocale(), saved.goal);
     app.activeSession = { plan: buildSession(plan), current: 0, startedAt: Date.now(), reflection: '' };
     app.go('session');
+  }
+
+  /** C5: the optional goal picker precedes the ladders. Pre-select the last run's goal (E1), then show
+   *  the step; both "pick a goal" and "skip" lead to startLadders(). */
+  function startGoals() {
+    goal = app.model?.coachProfilePrev?.goal ?? app.model?.coachProfile?.goal;
+    step = 'goals';
   }
 
   function startLadders() {
@@ -605,8 +630,21 @@
 
   async function commit(gameDimensions: DimensionScore[] | null) {
     const p = buildCoachProfile({ puzzleRating: baseline(), probes, gameDimensions, assessedAt: Date.now(), locale: getLocale(), timedDim: timedDim ?? undefined, probeDims: probeDims.length ? probeDims.slice() : undefined });
+    // C5: persist the chosen intake goal on the profile (additive; `undefined` when skipped). It both
+    // softly weights the program AND lets a re-run pre-select the picker.
+    p.goal = goal;
     profile = p;
-    programPreview = buildCoachProgram(p, 30, getLocale());
+    programPreview = buildCoachProgram(p, 30, getLocale(), goal);
+    // C5/CO14: ONE descriptive calibration sentence — ONLY when metacog is enabled (opt-in gate) AND
+    // there is enough reported data (the readout's own sample floor). Below either ⇒ null = no line
+    // (anti-fabrication, AP-CINTAKE-4). Reads the EXISTING attempts/calibration — Insights untouched.
+    coachLine = null;
+    if (app.settings?.metacogEnabled) {
+      try {
+        const attempts = (await allAttempts()) as MetacogAttempt[];
+        coachLine = metacogCoachLine(calibration(attempts, { locale: getLocale() }), getLocale());
+      } catch { /* storage unavailable — simply no coaching line */ }
+    }
     if (app.model) {
       // Reload from DB so any weaknessCounters fold written by runAnalysis(source:'played')
       // in finishGame() is preserved — persisting the stale boot snapshot would discard it (I-1).
@@ -664,16 +702,37 @@
         {@render scopePicker()}
         <div class="row center">
           <button onclick={resumeProgram}>{t('coach.startProgram')}</button>
-          <button style="background:transparent;border:1px solid var(--border)" onclick={startLadders} disabled={app.puzzles.size === 0}>{t('coach.reassess')}</button>
+          <button style="background:transparent;border:1px solid var(--border)" onclick={startGoals} disabled={app.puzzles.size === 0}>{t('coach.reassess')}</button>
         </div>
         {#if app.puzzles.size === 0}<p class="muted">{t('coach.loadingPuzzles')}</p>{/if}
       </div>
     {:else}
       <p class="muted">{t('coach.intro')}</p>
       {@render scopePicker()}
-      <button onclick={startLadders} disabled={app.puzzles.size === 0}>{t('coach.startAssessment')}</button>
+      <button onclick={startGoals} disabled={app.puzzles.size === 0}>{t('coach.startAssessment')}</button>
       {#if app.puzzles.size === 0}<p class="muted">{t('coach.loadingPuzzles')}</p>{/if}
     {/if}
+
+  {:else if step === 'goals'}
+    <!-- C5/CO3 intake: one short, skippable goal that SOFTLY weights the program. Skipping (or picking)
+         both proceed to the ladders; the weakness-first plan always leads (AP-CINTAKE-1). -->
+    <div class="panel col center" style="gap:0.6rem;width:100%">
+      <h3>{t('coach.goalsTitle')}</h3>
+      <p class="muted" style="font-size:0.85rem">{t('coach.goalsIntro')}</p>
+      <div class="goals col" style="width:100%;gap:0.4rem">
+        {#each GOAL_OPTIONS as opt}
+          <label class="goal-opt" class:sel={goal === opt.id}>
+            <input type="radio" name="coach-goal" value={opt.id} checked={goal === opt.id} onchange={() => (goal = opt.id)} />
+            {t(opt.key)}
+          </label>
+        {/each}
+      </div>
+      <div class="row center">
+        <button onclick={startLadders} disabled={app.puzzles.size === 0}>{t('coach.startAssessment')}</button>
+        <button style="background:transparent;border:1px solid var(--border)" onclick={() => { goal = undefined; startLadders(); }} disabled={app.puzzles.size === 0}>{t('coach.goalSkip')}</button>
+      </div>
+      {#if app.puzzles.size === 0}<p class="muted">{t('coach.loadingPuzzles')}</p>{/if}
+    </div>
 
   {:else if step === 'ladders'}
     <p class="muted">{t('coach.themeProgress', { current: themeIdx + 1, total: ladderCount })}<b>{labelOrRaw('motif', plan[themeIdx]?.key ?? '', getLocale())}</b>{t('coach.themeProgressSuffix')}</p>
@@ -782,10 +841,22 @@
         <div class="col"><b>{t('coach.strengths')}</b>{#each profile.strengths as s}<span>✔ {s}</span>{:else}<span class="muted">—</span>{/each}</div>
         <div class="col"><b>{t('coach.focusOn')}</b>{#each profile.weaknesses as w}<span>△ {w}</span>{:else}<span class="muted">—</span>{/each}</div>
       </div>
+      <!-- C5/CO14: ONE descriptive calibration sentence, gated by metacogEnabled + the readout's sample
+           floor. If the user's goal is fix-blunders but metacog is OFF, show a gentle enable-hint instead
+           of silently dropping the goal's main lever (E2) — never a fabricated line (AP-CINTAKE-4). -->
+      {#if coachLine}
+        <p class="feedback" style="font-size:0.88rem"><b>{t('coach.metacogTitle')} : </b>{coachLine}</p>
+      {:else if goal === 'fix-blunders' && !app.settings?.metacogEnabled}
+        <p class="muted" style="font-size:0.82rem">{t('coach.metacogOffHint')}</p>
+      {/if}
       <h4>{t('coach.yourProgram')}</h4>
       <ol style="text-align:left">
         {#each programPreview as item}
-          <li><b>{labelOrRaw('activity', item.activity, getLocale())}</b> <span class="muted">{t('coach.programItemMeta', { minutes: item.minutes, reason: item.reason })}</span></li>
+          <li>
+            <b>{labelOrRaw('activity', item.activity, getLocale())}</b>
+            {#if item.kind === 'leverage'}<span class="tag tag-leverage">{t('coach.tagLeverage')}</span>{:else if item.kind === 'goal'}<span class="tag tag-goal">{t('coach.tagGoal')}</span>{/if}
+            <span class="muted">{t('coach.programItemMeta', { minutes: item.minutes, reason: item.reason })}</span>
+          </li>
         {/each}
       </ol>
       {#if resultTrend && resultTrend.motifs.length}
@@ -812,4 +883,30 @@
   }
   .scope legend { font-size: 0.82rem; color: var(--muted); padding: 0 0.4rem; }
   .scope label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; }
+
+  /* C5 intake goal options */
+  .goal-opt {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.92rem;
+    cursor: pointer;
+  }
+  .goal-opt.sel { border-color: var(--accent, #6aa); background: color-mix(in srgb, var(--accent, #6aa) 12%, transparent); }
+
+  /* C5 program-step provenance tags (strength leverage / goal-added) */
+  .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    line-height: 1;
+    padding: 0.15rem 0.4rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    vertical-align: middle;
+  }
+  .tag-leverage { border-color: var(--accent, #6aa); color: var(--accent, #6aa); }
 </style>
