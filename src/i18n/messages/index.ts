@@ -5,6 +5,7 @@ import type { Messages } from '../translate';
 import { common } from './common';
 import { play } from './play';
 import { tactics } from './tactics';
+import { severity } from './severity';
 import { coach } from './coach';
 import { analysis } from './analysis';
 import { journey } from './journey';
@@ -16,6 +17,7 @@ export const DOMAINS: Record<string, Messages> = {
   common,
   play,
   tactics,
+  severity,
   coach,
   analysis,
   journey,

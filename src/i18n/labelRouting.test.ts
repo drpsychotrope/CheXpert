@@ -6,8 +6,10 @@
 import { describe, it, expect } from 'vitest';
 import { labelOrRaw, motifLabelOrRaw } from './gen';
 import { generators } from './messages/generators';
+import { severity as severityMessages } from './messages/severity';
 import { buildStudyPlan, type PlanItem } from '../analysis/studyPlan';
 import type { Leak } from '../analysis/fingerprint';
+import type { Severity } from '../trainer/provenance';
 
 // FOLD I3: the REAL PlanItem.activity union, surfaced for runtime iteration. The
 // `Record<PlanItem['activity'], true>` type forces TS to list EVERY union member —
@@ -98,6 +100,36 @@ describe('F1 regression — routed displays (spec §5)', () => {
     const themes = ['fork', 'someTailTheme'];
     const line = themes.map((th) => motifLabelOrRaw(th, 'fr')).join(', ');
     expect(line).toBe('Fourchettes, someTailTheme');
+  });
+});
+
+describe('sev.* severity bilingual parity — union-exhaustive (T2/TR4, AP-TPERS-9)', () => {
+  // Mirror the activity.* gate: Record<Severity, true> forces TS to list EVERY union member, so a
+  // future severity added to the union without a label here fails svelte-check (compile-time
+  // exhaustiveness). The test then asserts each listed value has a non-empty FR AND EN label.
+  // (Closed BARE-WORD severity set under `sev.*`, distinct from the article-prefixed `severity.*`
+  // explanation phrases in generators.ts — see i18n/messages/severity.ts for why.)
+  const SEVERITY_VALUES: Record<Severity, true> = {
+    mistake: true,
+    blunder: true,
+    inaccuracy: true,
+    'missed-win': true,
+  };
+  const SEVERITIES = Object.keys(SEVERITY_VALUES) as Severity[];
+
+  it('every severity value has a non-empty FR AND EN sev.* label (closed union, no raw)', () => {
+    for (const s of SEVERITIES) {
+      const entry = severityMessages['sev.' + s];
+      expect(entry, `missing sev.* catalogue entry for "${s}"`).toBeTruthy();
+      expect(entry.fr.trim().length, `empty FR for sev.${s}`).toBeGreaterThan(0);
+      expect(entry.en.trim().length, `empty EN for sev.${s}`).toBeGreaterThan(0);
+    }
+  });
+
+  it('renders the FR chess-register word, not the raw English enum (e.g. blunder → "gaffe")', () => {
+    expect(severityMessages['sev.blunder'].fr).toBe('gaffe');
+    expect(severityMessages['sev.inaccuracy'].fr).toBe('imprécision');
+    expect(severityMessages['sev.missed-win'].fr).toBe('gain manqué');
   });
 });
 

@@ -36,6 +36,37 @@ export const tactics: Messages = {
   'tactics.themesEmpty': { fr: '—', en: '—' },
   'tactics.fromYourGameTag': { fr: ' · ★ issu de votre partie', en: ' · ★ from your game' },
 
+  // ── T2 personal-puzzle provenance (TR4, Q-A=b) ───────────────────────────
+  // Pre-solve: which move you played + how bad (severity rendered via severity.*). After-solve: the
+  // win/move you left, SAN computed at the call site from moves[0] (AP-TPERS-1/6).
+  'tactics.provenancePre': {
+    fr: 'Coup {move} de votre partie — vous avez joué {played} ({severity}). Trouvez ce que vous avez manqué.',
+    en: 'Move {move} of your game — you played {played} ({severity}). Find what you missed.',
+  },
+  'tactics.provenancePostWin': { fr: 'Le gain que vous avez laissé : {san}.', en: 'The win you left: {san}.' },
+  'tactics.provenancePostMove': { fr: 'Le coup que vous avez manqué : {san}.', en: 'The move you missed: {san}.' },
+
+  // ── T2 source toggle + theme/difficulty picker (TR9, Q-B/Q-C) ────────────
+  'tactics.sourceLabel': { fr: 'Source :', en: 'Source:' },
+  'tactics.sourceMixed': { fr: 'Mixte', en: 'Mixed' },
+  'tactics.sourcePersonal': { fr: 'Mes parties', en: 'From my games' },
+  'tactics.sourceCurated': { fr: 'Sélection', en: 'Curated' },
+  'tactics.themePickerLabel': { fr: 'Thème :', en: 'Theme:' },
+  'tactics.themeAll': { fr: 'Tous', en: 'All' },
+  'tactics.diffLabel': { fr: 'Difficulté :', en: 'Difficulty:' },
+  'tactics.diffEasier': { fr: 'Plus facile', en: 'Easier' },
+  'tactics.diffOnLevel': { fr: 'À mon niveau', en: 'On level' },
+  'tactics.diffHarder': { fr: 'Plus difficile', en: 'Harder' },
+
+  // ── T2 honest theme-exhaustion (TR10, Q-D=c) ─────────────────────────────
+  'tactics.themeExhausted': { fr: 'Plus aucun problème {theme} dans votre fourchette.', en: 'No more {theme} puzzles in your range.' },
+  'tactics.themeExhaustedWidened': {
+    fr: 'Même en élargissant, plus aucun {theme} — passer en mixte ?',
+    en: 'Even widened, no more {theme} — switch to mixed?',
+  },
+  'tactics.widenRange': { fr: 'Élargir la fourchette', en: 'Widen range' },
+  'tactics.switchToMixed': { fr: 'Passer en mixte', en: 'Switch to mixed' },
+
   // ── SolutionReveal toggle (reveal.*) — Trainer-miss "Show solution" (F4, Q-F) ──
   // Opt-in (Q-D / AP-TEACH-4): never auto-spoils a Retry. reveal.themeWhy lives in
   // generators.ts (resolved by the pure missWhy core via gt); calc.solution is reused

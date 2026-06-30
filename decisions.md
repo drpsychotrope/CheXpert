@@ -1282,3 +1282,53 @@ data/migration to unwind. Cross-links: ADR-0037/0010/0033/0040/0052/0053, F3, F4
 `enhancements-architecture-spec.md` Trainer T1. Follow-ups (§11): T2 (mode/theme/provenance, Review
 metacog), T3 (`usedHint` clamp, progressive hints, impulsivity signal, alt-accept telemetry → revisit an
 `altAccepted?` flag), C6 (coach reuses `SolutionReveal` with an `explainPly`-derived why).
+
+## T2 — trainer-personalization: personal-puzzle provenance + source/theme/difficulty picker + honest exhaustion (no new ADR)
+
+**Spec:** `specs/trainer-personalization-spec.md` (V1, 4 draft + 3 enrich cycles). **Parent:**
+`specs/enhancements-architecture-spec.md` §3 (T2; folds TR4/TR9/TR10). **No new ADR** (feature; additive-
+optional, no `DB_VERSION`/`schemaRev` bump — precedent ADR-0037/0040/0043/0053; reserved 0054-0057
+untouched). Display + selection only.
+
+**Premise correction.** F3 (ADR-0055) had **already** shipped the weakness-steered "Mixed" branch in
+`loadNext` + the pure `weaknessSelect.ts`, so T2 did **not** re-implement selection bias (AP-TPERS-5) —
+its real remaining work was TR4 provenance, TR9 the explicit toggle + theme/difficulty picker, and TR10
+the exhaustion message (the dashboard display + richer selection F3 deferred to T2). Verified before edit.
+
+**What shipped.** `src/trainer/provenance.ts` (new, PURE — no Date/Math.random/Svelte): `provenanceOf(meta)`
+turns a personal puzzle's `meta` (consumed nowhere before) into a displayable pre-solve object, returning
+`null` for curated / partial / legacy meta and **never throwing** (AP-TPERS-10); `bandToQuery(band, base)`
+maps a coarse 3-band difficulty to `(rating, window)` (on-level == today's `{base, 250}`, no-regression;
+AP-TPERS-7); `sourceToQuery(source)` maps the toggle 1:1 onto `PuzzleQuery.source` (`mixed`→undefined).
+`Tactics.svelte`: a **pre-solve** provenance line ("Move N of your game — you played X (severity). Find
+what you missed.") replacing the generic star while solving, and an **after-solve** line ("The win you
+left: SAN" / "The move you missed: SAN") whose SAN is rendered from `moves[0]` (a UCI) via the **existing**
+`new ChessGame(puzzle.fen).moveUci(...)` at the call site — `null`→omit, no new parser (enrich E1,
+AP-TPERS-6); the generic `fromYourGameTag` is kept ONLY for the `null`-provenance case (AP-TPERS-1). A
+3-way **source toggle** (Mixed / From my games / Curated) persisted via additive-optional
+`SettingsRecord.trainerSource?` read `?? 'mixed'` (default never buries personal puzzles — AP-TPERS-12), an
+in-trainer **theme picker** writing the SAME `app.tacticsFilterThemes` the dashboard drill uses with
+`motifLabelOrRaw` labels (single source of truth — AP-TPERS-11), and a session-only coarse **difficulty
+band** (not persisted). **Honest exhaustion** (TR10/AP-TPERS-2): a themed query that yields `null` in-zone
+sets an explicit state + **Widen range** (re-query at window 800; escalates if still empty) / **Switch to
+mixed** (clear theme + set source mixed) instead of the silent fall-through; never a blank board
+(AP-TPERS-3). New **closed `sev.*` severity namespace** (FR+EN, parity-gated) — `severity.*` was taken on
+the live baseline by `generators.ts`' article-prefixed explain phrases ("une gaffe"), which read wrong in
+the parenthetical and feed Insights (must stay byte-identical), so the bare-word set lives under `sev.*`.
+
+**Tests.** `provenance.test.ts` (new): `provenanceOf` full/curated/missing/partial-legacy(→null, no
+throw)/extra-keys/kind-normalisation/determinism; the call-site SAN contract (`moveUci` known + null);
+`bandToQuery` per band incl. on-level==baseline; `sourceToQuery` mapping. `labelRouting.test.ts`: a
+union-exhaustive `sev.*` parity gate (`Record<Severity, true>` — compile-time exhaustiveness mirroring the
+activity.* gate). `tactics-personalization-wiring.test.ts` (new): static wiring-presence (no Svelte
+harness — portfolio fact) for provenance / toggle / picker / band / exhaustion / F3-steer consumption.
+
+**Doctrine.** Additive-only; **no `DB_VERSION`/`schemaRev` bump** (only optional `trainerSource?`, mirrors
+`locale?`); bilingual FR+EN for every new string; pure cores (no Date/Math.random/Svelte); single concern
+(provenance display + selection routing). **AP-COACH-1 preserved** — `studyPlan.ts`/`session.ts` and the
+generators' `severity.*` untouched; Insights byte-identical. **655 Vitest green** (630 baseline + 25 new,
+zero regressions), svelte-check **0/0** (400 files), build green. **Rollback:** revert per sub-feature
+(provenance markup / toggle + drop `trainerSource?` (legacy rows read `?? 'mixed'`) / picker / exhaustion);
+no migration to unwind. Cross-links: ADR-0037/0040/0043/0053/0055, F1 (`motifLabelOrRaw`), F3
+(`steerFromWeakness`), `ChessGame.moveUci`. Follow-ups (§11): T1 miss-path (shipped), T3 (`usedHint`/clamp,
+progressive hints, streak), provenance in Review (DEFER), "open the source game" deep-link after F5 (DEFER).

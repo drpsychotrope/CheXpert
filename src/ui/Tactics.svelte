@@ -14,8 +14,13 @@
   import { cardForThemes, loadConcepts, missWhy, type ConceptCard as ConceptCardData } from '../concepts/concepts';
   import { failCountByPuzzle, isLeech } from '../srs/schedule';
   import { steerFromWeakness } from '../trainer/weaknessSelect';
+  import { provenanceOf, bandToQuery, sourceToQuery, type DifficultyBand, type TrainerSource, type PuzzleProvenance } from '../trainer/provenance';
   import { t, getLocale } from '../i18n';
   import { motifLabelOrRaw } from '../i18n/gen';
+
+  // T2 in-trainer theme picker: the common motif themes, written into the SAME app.tacticsFilterThemes
+  // the dashboard drill uses (single source of truth, AP-TPERS-11) and labelled via motifLabelOrRaw.
+  const PICKER_THEMES = ['fork', 'pin', 'skewer', 'hangingPiece', 'discoveredAttack', 'backRankMate', 'mateIn1', 'mateIn2'];
 
   let trainer = $state<TacticalTrainer | null>(null);
   let puzzle = $state<Puzzle | null>(null);
@@ -32,6 +37,20 @@
   let attemptedThisSession = $state(0);
   let mode = $state<'mixed' | 'personal' | 'themed'>('mixed');
   const seen = new Set<string>();
+
+  // T2/TR9: explicit source toggle (persisted as SettingsRecord.trainerSource?, read `?? 'mixed'`)
+  // + a session-only coarse difficulty band (NOT persisted — ephemeral by design, AP-TPERS-7).
+  const source = $derived<TrainerSource>(app.settings?.trainerSource ?? 'mixed');
+  let band = $state<DifficultyBand>('on-level');
+  // T2/TR10: explicit theme-exhaustion state (replaces the silent fall-through). When set, the
+  // puzzle area shows the message + Widen / Switch-to-mixed instead of a blank board (AP-TPERS-2/3).
+  let exhaustedTheme = $state<string | null>(null);
+  let exhaustedWidened = $state(false);
+  // T2/TR4: after-solve "missed win" SAN, computed at the call site (ChessGame, not the pure core).
+  // Set when a personal puzzle is solved; null → the after-solve line is omitted (AP-TPERS-6).
+  let solvedSan = $state<string | null>(null);
+  // Pre-solve provenance, derived from the current puzzle's meta (null for curated/legacy → generic tag).
+  const prov = $derived<PuzzleProvenance | null>(puzzle ? provenanceOf(puzzle) : null);
 
   // Concept cards (teach-before-test, ADR-0040). Loaded once; [] if the asset is missing
   // (graceful — the link just won't appear). Non-blocking: never gates the next puzzle.
@@ -141,35 +160,59 @@
     showSolution = false;
     showTimedOffer = false;
     checkingAlt = false;
+    exhaustedTheme = null;
+    exhaustedWidened = false;
+    solvedSan = null;
 
-    // Selection priority closes the loop: a dashboard drill filter wins; else
-    // prefer the player's own personal puzzles (from their real mistakes); else
-    // (F3 / TR2, ADR-0055) softly bias the curated zone toward the player's top
-    // weakness theme; else fall back to the plain curated set in the rating zone.
-    let p =
-      drillThemes && drillThemes.length
-        ? await app.puzzles.next({ rating: model.puzzleRating.rating, window: 400, exclude: seen, themes: drillThemes })
-        : null;
-    if (p) mode = 'themed';
+    // The coarse difficulty band (T2/TR9) → (rating, window) for the curated/mixed paths. on-level
+    // is byte-identical to baseline (window 250). Personal stays wide (TR4 — show your puzzles).
+    const bq = bandToQuery(band, model.puzzleRating.rating);
 
-    if (!p) {
+    // Selection priority closes the loop: an active theme (dashboard drill OR the in-trainer theme
+    // picker — both write app.tacticsFilterThemes, AP-TPERS-11) wins; else honor the explicit source
+    // toggle (T2/TR9); else (no toggle / mixed) prefer personal, then F3-steered curated, then plain
+    // curated. A themed query that yields null in-zone is NOT a silent fall-through — it sets the
+    // explicit exhaustion state (TR10 / AP-TPERS-2).
+    let p: Awaited<ReturnType<typeof app.puzzles.next>> = null;
+    if (drillThemes && drillThemes.length) {
+      const theme = drillThemes[0];
+      p = await app.puzzles.next({ rating: model.puzzleRating.rating, window: 400, exclude: seen, themes: drillThemes });
+      if (p) {
+        mode = 'themed';
+      } else {
+        // Honest exhaustion (Q-D=c): explicit message + widen/switch, never a silent mode flip.
+        exhaustedTheme = theme;
+        return;
+      }
+    } else if (source === 'curated') {
+      // Map the toggle to PuzzleQuery.source through the tested pure helper (single source of truth).
+      p = await app.puzzles.next({ ...bq, exclude: seen, source: sourceToQuery(source) });
+      if (p) mode = 'mixed';
+    } else if (source === 'personal') {
+      // Keep the personal window wide (TR4) so the player's own puzzles surface regardless of band.
+      p = await app.puzzles.next({ rating: model.puzzleRating.rating, window: 600, exclude: seen, source: sourceToQuery(source) });
+      if (p) mode = 'personal';
+    } else {
+      // Mixed (today's default behaviour): prefer the player's own personal puzzles; else
+      // (F3 / TR2, ADR-0055) softly bias the curated zone toward the top weakness theme; else
+      // fall back to the plain curated set in the rating zone.
       p = await app.puzzles.next({ rating: model.puzzleRating.rating, window: 600, exclude: seen, source: 'personal' });
       if (p) mode = 'personal';
-    }
-    // Weakness-steered curated (soft bias, Q-B/Q-D): only when no explicit drill filter is active.
-    // steerFromWeakness returns undefined themes when there's no signal → we skip straight to plain
-    // curated, so behaviour is byte-identical to baseline for a fresh/empty model. A biased next()
-    // returning null also falls through (AP-ATTEMPT-2/3 — never dead-end the loop).
-    if (!p) {
-      const steer = steerFromWeakness(model.weaknessCounters);
-      if (steer.themes) {
-        p = await app.puzzles.next({ rating: model.puzzleRating.rating, window: 250, exclude: seen, themes: steer.themes });
+      // Weakness-steered curated (soft bias, Q-B/Q-D): only when no explicit drill filter is active.
+      // steerFromWeakness returns undefined themes when there's no signal → we skip straight to plain
+      // curated, so behaviour is byte-identical to baseline for a fresh/empty model. A biased next()
+      // returning null also falls through (AP-ATTEMPT-2/3 — never dead-end the loop).
+      if (!p) {
+        const steer = steerFromWeakness(model.weaknessCounters);
+        if (steer.themes) {
+          p = await app.puzzles.next({ ...bq, exclude: seen, themes: steer.themes });
+          if (p) mode = 'mixed';
+        }
+      }
+      if (!p) {
+        p = await app.puzzles.next({ ...bq, exclude: seen });
         if (p) mode = 'mixed';
       }
-    }
-    if (!p) {
-      p = await app.puzzles.next({ rating: model.puzzleRating.rating, window: 250, exclude: seen });
-      if (p) mode = 'mixed';
     }
 
     if (!p) {
@@ -177,18 +220,8 @@
       return;
     }
     seen.add(p.id);
-    puzzle = p;
-    trainer = new TacticalTrainer(p, Date.now());
-    display = new ChessGame(p.fen);
-    fen = display.fen;
-    lastMove = null;
-    // Orient the board to the solver's side, fixed for the whole puzzle.
-    orientation = display.turn === 'w' ? 'white' : 'black';
-    startTimer();
-    // Resolve the teaching card for this puzzle's motif (null → no link shown).
-    card = cardForThemes(p.themes, cards);
-    // Leech = this puzzle has already been failed >= N times (PRIOR attempts only).
-    void refreshLeech(p.id);
+    // Adopt the puzzle (board/trainer/orientation/timer/card/leech) — shared with widenTheme.
+    adoptPuzzle(p);
   }
 
   function clearDrill() {
@@ -198,6 +231,81 @@
     seen.clear();
     trainer = null;
     loadNext();
+  }
+
+  /** T2/TR9: change the persisted source toggle, then reload so it takes effect immediately. The
+   *  default is always 'mixed' — we never seed a value that buries personal puzzles (AP-TPERS-12). */
+  async function setSource(s: TrainerSource) {
+    if (!app.settings) return;
+    app.settings.trainerSource = s;
+    await app.persistSettings();
+    seen.clear();
+    void loadNext();
+  }
+
+  /** T2/TR9: change the session-only coarse difficulty band (not persisted), then reload. */
+  function setBand(b: DifficultyBand) {
+    band = b;
+    seen.clear();
+    void loadNext();
+  }
+
+  /** T2/TR9 theme picker: write the SAME app.tacticsFilterThemes the dashboard drill uses (single
+   *  source of truth, AP-TPERS-11). null/'all' clears the theme back to the toggle's source. */
+  function pickTheme(theme: string | null) {
+    app.tacticsFilterThemes = theme ? [theme] : null;
+    stopTimer();
+    seen.clear();
+    trainer = null;
+    void loadNext();
+  }
+
+  /** T2/TR10 exhaustion action — Widen range: re-query the SAME theme at a larger window (400→800).
+   *  If that still yields null, escalate to the "even widened, none left — switch?" message instead
+   *  of silently dead-ending (AP-TPERS-3). */
+  async function widenTheme() {
+    if (!model || !exhaustedTheme) return;
+    const theme = exhaustedTheme;
+    const p = await app.puzzles.next({ rating: model.puzzleRating.rating, window: 800, exclude: seen, themes: [theme] });
+    if (p) {
+      exhaustedTheme = null;
+      exhaustedWidened = false;
+      mode = 'themed';
+      seen.add(p.id);
+      adoptPuzzle(p);
+    } else {
+      exhaustedWidened = true; // escalate the message; offer Switch-to-mixed
+    }
+  }
+
+  /** T2/TR10 exhaustion action — Switch to mixed: clear the theme AND set the source to mixed, then
+   *  reload. The honest non-dead-end exit from a drained theme (Q-D=c). */
+  async function switchToMixed() {
+    app.tacticsFilterThemes = null;
+    app.tacticsTimed = false;
+    exhaustedTheme = null;
+    exhaustedWidened = false;
+    if (app.settings && app.settings.trainerSource !== 'mixed') {
+      app.settings.trainerSource = 'mixed';
+      await app.persistSettings();
+    }
+    stopTimer();
+    seen.clear();
+    trainer = null;
+    void loadNext();
+  }
+
+  /** Adopt a freshly-selected puzzle into the board/trainer (shared by loadNext + widenTheme). */
+  function adoptPuzzle(p: Puzzle) {
+    puzzle = p;
+    trainer = new TacticalTrainer(p, Date.now());
+    display = new ChessGame(p.fen);
+    fen = display.fen;
+    lastMove = null;
+    orientation = display.turn === 'w' ? 'white' : 'black';
+    startTimer();
+    card = cardForThemes(p.themes, cards);
+    void refreshLeech(p.id);
   }
 
   /** Recompute the leech flag for `puzzleId` from stored attempts (prior failures only). */
@@ -333,6 +441,15 @@
     attemptedThisSession += 1;
     if (solved) solvedThisSession += 1;
 
+    // T2/TR4 after-solve "the win you left": render the puzzle's solution move (moves[0], a UCI) as
+    // SAN via the EXISTING ChessGame.moveUci on a fresh board from the puzzle's start FEN (enrich E1).
+    // Personal puzzles with provenance only; on null (illegal/unparseable) the line is omitted, not
+    // crashed (AP-TPERS-6). The pure formatter never parses FEN/UCI — we compute SAN here, at the call site.
+    if (solved && prov && puzzle.source === 'personal') {
+      const first = puzzle.moves[0];
+      solvedSan = first ? new ChessGame(puzzle.fen).moveUci(first) : null;
+    }
+
     const graded = gradeAttempt(model.puzzleRating, puzzle, solved);
     model.puzzleRating = graded.player;
 
@@ -463,16 +580,73 @@
   {/if}
   {#if drillThemes && drillThemes.length}
     <p class="feedback">
-      {t('tactics.drilling', { themes: drillThemes.slice(0, 3).join(', ') })}
+      {t('tactics.drilling', { themes: drillThemes.map((th) => motifLabelOrRaw(th, getLocale())).slice(0, 3).join(', ') })}
       <button class="link" onclick={clearDrill}>{t('tactics.clear')}</button>
     </p>
-  {:else if mode === 'personal'}
-    <p class="muted" style="font-size:0.85rem">{t('tactics.fromYourGames')}</p>
+  {:else}
+    <!-- T2/TR9: source toggle + theme + difficulty in ONE compact control row. Shown only in the
+         no-drill state (E9) — a dashboard drill already fixes the theme, so we don't crowd the board.
+         Theme writes the SAME app.tacticsFilterThemes the drill uses (AP-TPERS-11). -->
+    <div class="row center controls" style="gap:0.6rem;flex-wrap:wrap">
+      <span class="muted ctl-label">{t('tactics.sourceLabel')}</span>
+      <div class="seg" role="group" aria-label={t('tactics.sourceLabel')}>
+        <button type="button" class="chip {source === 'mixed' ? 'on' : ''}" onclick={() => setSource('mixed')}>{t('tactics.sourceMixed')}</button>
+        <button type="button" class="chip {source === 'personal' ? 'on' : ''}" onclick={() => setSource('personal')}>{t('tactics.sourcePersonal')}</button>
+        <button type="button" class="chip {source === 'curated' ? 'on' : ''}" onclick={() => setSource('curated')}>{t('tactics.sourceCurated')}</button>
+      </div>
+
+      <label class="muted ctl-label">
+        {t('tactics.themePickerLabel')}
+        <select value="" onchange={(e) => pickTheme(e.currentTarget.value || null)}>
+          <option value="">{t('tactics.themeAll')}</option>
+          {#each PICKER_THEMES as th (th)}
+            <option value={th}>{motifLabelOrRaw(th, getLocale())}</option>
+          {/each}
+        </select>
+      </label>
+
+      <span class="muted ctl-label">{t('tactics.diffLabel')}</span>
+      <div class="seg" role="group" aria-label={t('tactics.diffLabel')}>
+        <button type="button" class="chip {band === 'easier' ? 'on' : ''}" onclick={() => setBand('easier')}>{t('tactics.diffEasier')}</button>
+        <button type="button" class="chip {band === 'on-level' ? 'on' : ''}" onclick={() => setBand('on-level')}>{t('tactics.diffOnLevel')}</button>
+        <button type="button" class="chip {band === 'harder' ? 'on' : ''}" onclick={() => setBand('harder')}>{t('tactics.diffHarder')}</button>
+      </div>
+    </div>
+    {#if mode === 'personal' && !prov}
+      <p class="muted" style="font-size:0.85rem">{t('tactics.fromYourGames')}</p>
+    {/if}
   {/if}
   {#if timed}
     <p class="feedback {timeLeft <= 5 ? 'bad' : ''}">{t('tactics.beatClock', { n: timeLeft })}
       <button class="link" onclick={clearDrill}>{t('tactics.clear')}</button>
     </p>
+  {/if}
+
+  <!-- T2/TR4 pre-solve provenance (Q-A=b): for a personal puzzle while solving, tell the player which
+       move they played + how bad (severity via the closed sev.* namespace), replacing the generic
+       star. AP-TPERS-1. (sev.* not severity.* — see i18n/messages/severity.ts for the prefix note.) -->
+  {#if prov && trainer?.state.status === 'solving'}
+    <p class="feedback">
+      {t('tactics.provenancePre', { move: prov.moveNumber, played: prov.playedMove, severity: t('sev.' + prov.severity) })}
+    </p>
+  {/if}
+
+  <!-- T2/TR10 honest theme exhaustion (Q-D=c): explicit message + Widen / Switch-to-mixed instead of
+       a silent fall-through to personal/curated. Never a blank board (AP-TPERS-2/3). -->
+  {#if exhaustedTheme}
+    <div class="col center" style="gap:0.4rem">
+      <p class="feedback bad">
+        {exhaustedWidened
+          ? t('tactics.themeExhaustedWidened', { theme: motifLabelOrRaw(exhaustedTheme, getLocale()) })
+          : t('tactics.themeExhausted', { theme: motifLabelOrRaw(exhaustedTheme, getLocale()) })}
+      </p>
+      <div class="row center">
+        {#if !exhaustedWidened}
+          <button onclick={widenTheme}>{t('tactics.widenRange')}</button>
+        {/if}
+        <button onclick={switchToMixed}>{t('tactics.switchToMixed')}</button>
+      </div>
+    </div>
   {/if}
 
   {#if metacog && trainer?.state.status === 'solving'}
@@ -507,6 +681,17 @@
   </div>
 
   <p class="feedback {feedbackKind}">{feedback}</p>
+
+  <!-- T2/TR4 after-solve provenance (Q-A=b): once a personal puzzle is solved, name what you left.
+       SAN computed at the call site (finish, via ChessGame.moveUci); on null it's omitted (E1/AP-TPERS-6).
+       'missed-win' → "the win you left"; 'mistake' → "the move you missed" (branch on prov.kind). -->
+  {#if prov && solvedSan && trainer?.state.status === 'solved'}
+    <p class="feedback good">
+      {prov.kind === 'missed-win'
+        ? t('tactics.provenancePostWin', { san: solvedSan })
+        : t('tactics.provenancePostMove', { san: solvedSan })}
+    </p>
+  {/if}
 
   {#if trainer?.state.status === 'failed' && puzzle}
     <!-- F4: opt-in "Show solution" on a miss (Q-D). Non-blocking & Retry-safe (AP-TEACH-4):
@@ -566,7 +751,9 @@
   {#if puzzle}
     <p class="muted" style="font-size:0.8rem">
       {t('tactics.themes', { themes: puzzle.themes.map((th) => motifLabelOrRaw(th, getLocale())).join(', ') || t('tactics.themesEmpty') })}
-      {#if puzzle.source === 'personal'}{t('tactics.fromYourGameTag')}{/if}
+      <!-- AP-TPERS-1: the generic tag is ONLY for the null-provenance case (curated, or a legacy
+           personal puzzle without full meta). When prov is present, the pre/post lines carry it. -->
+      {#if puzzle.source === 'personal' && !prov}{t('tactics.fromYourGameTag')}{/if}
     </p>
   {/if}
 </section>
@@ -577,4 +764,8 @@
   .metacog-label { font-size: 0.82rem; align-self: center; }
   .chip { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 0.15rem 0.7rem; font-size: 0.82rem; cursor: pointer; }
   .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  /* T2 control row: source toggle + theme + difficulty in one compact line (E9). */
+  .controls { margin: 0.3rem 0; }
+  .ctl-label { font-size: 0.82rem; align-self: center; }
+  .seg { display: inline-flex; gap: 0.25rem; }
 </style>

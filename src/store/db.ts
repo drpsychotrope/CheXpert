@@ -99,6 +99,12 @@ export interface SettingsRecord {
   /** UI language (V2-W18, ADR-0053 — supersedes ADR-0052 Q3 mono-locale). Additive; a
    *  legacy/absent value reads as the default 'fr'. No DB_VERSION bump (read-site `?? 'fr'`). */
   locale?: 'fr' | 'en';
+  /** Trainer source preference (T2/TR9): which puzzle source the trainer draws from when no
+   *  dashboard drill is active. Maps 1:1 onto PuzzleQuery.source ('mixed' -> undefined). Additive
+   *  optional; a legacy/absent value reads as the default 'mixed' (read-site `?? 'mixed'`) so a
+   *  fresh/legacy profile still sees its personal puzzles (AP-TPERS-12). NO DB_VERSION bump,
+   *  mirrors `locale?` (precedent ADR-0037/0040/0043/0053). */
+  trainerSource?: 'mixed' | 'personal' | 'curated';
   /** Data-shape revision (audit W13). See PlayerModel.schemaRev. */
   schemaRev?: number;
 }
