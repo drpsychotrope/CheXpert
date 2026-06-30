@@ -235,6 +235,8 @@ export const journey: Messages = {
   'review.completeMany': { fr: 'Révision terminée — {n} cartes faites.', en: 'Review complete — {n} cards done.' },
   'review.cardProgress': { fr: 'Carte {index} sur {total} · {reviewed} révisées', en: 'Card {index} of {total} · {reviewed} reviewed' },
   'review.missed': { fr: 'Raté — reprogrammé bientôt.', en: 'Missed — scheduled again soon.' },
+  // T1/TR6: one on-board second try before the miss locks (the miss is still recorded).
+  'review.secondTry': { fr: 'Pas ça — encore un essai.', en: 'Not that — one more try.' },
   'review.solved': { fr: 'Résolu ✔', en: 'Solved ✔' },
   'review.keepGoing': { fr: 'Correct — continuez.', en: 'Correct — keep going.' },
   'review.noFailedPuzzles': {

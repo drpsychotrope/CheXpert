@@ -1212,3 +1212,73 @@ ADR-0053 (bilingual), ADR-0043 (coords/onSelect drills, excluded), `enhancements
 Follow-ups (§11): full ARIA-grid navigation (D1), ←/→ ply nav (D2), a Svelte component-test harness (D3),
 square-tap a11y for the onSelect drills (D4), an optional board-aria ADR (D5), typed under-promotion via
 the keyboard field (D6).
+
+---
+
+## T1 — trainer-feedback-core: solution+why on miss, self-tag actions, alt-move accept, second-try (no new ADR)
+
+**Reuses ADR-0037 (metacog) / 0010+0033 (FSRS clamp lineage) / 0040 (concept cards) / 0052+0053 (i18n);
+builds on F4 (`SolutionReveal` + `missWhy`) and F3 (attempt recording / `selfTag`+`confidence` capture).**
+No new ADR (Q-F): the alt-move "what counts as solving" change is gated behind a code-level flag, not
+ratified architectural — reserved ADR numbers (0054-0057) untouched, ADR-0058 NOT spent. **Spec:**
+`specs/trainer-feedback-core-spec.md` (V1, 4 refiner + 3 enrich cycles).
+
+**Premise correction at build time.** The spec's §1 baseline (504 tests, pre-F4) was stale: at HEAD all
+of F1-F6 are committed (**613 tests**), so **TR1 was already shipped** — both `Tactics.svelte` and
+`Review.svelte` already mount F4's `<SolutionReveal>` with `why={missWhy(puzzle.themes, getLocale())}` on
+a miss. T1's remaining work was therefore TR6 (second-try), accept-alternate-winning, and TR3 (self-tag
+reactions + confidence clamp), built on the committed foundations rather than re-implementing TR1.
+
+**Decisions (RESOLVED defaults).** (Q-A) accept an off-line move iff it is mate FOR the solver, OR within
+`withinCp` (50) of the mainline best AND clearly winning beyond `winningFloorCp` (200) — the dual gate is
+the honesty guard (relative-only would accept "less bad" losing moves; absolute-only would reject a thin
+quiet-tactic). Behind a flag `acceptAltWinning` (default ON, code-level const — **no persisted setting**,
+no schema churn). (Q-B) one on-board second try before the fail locks; the wrong move stays visible; the
+attempt **still records the miss** (`mistakes >= 1`). (Q-C) exactly 3 reactions, Tactics-only:
+`unfamiliar-pattern`→open the motif's concept card (reuse `cardForThemes`/`openLearn`); `rushed`→one-tap
+"Try this timed" (reuse `app.tacticsTimed`); `confidence ∈ {guess,unsure}` on a SOLVE → clamp FSRS grade
+≤ Good. (Q-D) reveal stays opt-in (inherits F4). (Q-E) the clamp is a tiny pure helper
+`clampForConfidence(grade, confidence)` wrapping the grade before `recordTacticsAttempt`. (Q-H) an
+accepted alt records `solved:true` like any solve — no new provenance field.
+
+**Delivered.** `src/srs/fsrs.ts`: pure `clampForConfidence` (downgrades Easy/Good→Good for guess/unsure;
+never upgrades; no-op on miss/sure/undefined; inline `'sure'|'unsure'|'guess'` union so `srs/` stays a
+dependency leaf). `src/trainer/altMove.ts` (new): pure `acceptAltMove(solver, bestLine, playedLine,
+policy?)` — White-POV sign discipline (flips for a Black solver), mate-for-solver short-circuit, dual
+relative+absolute gate; `AltMovePolicy`/`LineEval`/`DEFAULT_ALT_MOVE_POLICY` exported. `TacticalTrainer`:
+additive `retriesLeft` in `SolveState` (constructor `retries=1`, `DEFAULT_RETRIES`); `playUserMove` returns
+a new `'retry'` (records the miss, stays solving, board not advanced) before locking `'wrong'`; new
+`acceptUserMove(uci)` applies the off-line move + scripted opponent reply exactly like the matched path
+(engine-free — the decision is made outside). `Tactics.svelte`: handles `'retry'` (leaves the wrong move
+on the board), runs an async `tryAcceptAlt` on a would-be miss (two back-to-back `fullStrength` evals —
+mainline best via `analyzeLines` + the after-position via `evaluate`; honest fall-through to a miss on
+reject/illegal/error/timeout, never hangs — a `checkingAlt` guard blocks a racing second move), applies
+`clampForConfidence` on solve, and reacts to the self-tag chips (`unfamiliar-pattern`→card, `rushed`→timed
+offer). `Review.svelte`: TR6 + symmetric alt-accept (no TR3 — Review has no metacog capture, PC-3). Seven
+new bilingual keys (`tactics.secondTry/checkingAlt/altAccepted/tryTimed/offerTimed/reactUnfamiliar`,
+`review.secondTry`); reuses F4's `reveal.*` and `tactics.learnPattern`/`openInLibrary`.
+
+**Tests.** Pure cores unit-tested (no harness): `altMove.test.ts` (mate accept, within-cp clearly-winning
+accept, rejects the relative-only "less bad" trap, rejects equal-but-below-floor, rejects gap>withinCp,
+Black-solver sign correctness, custom thresholds); `fsrs.test.ts` extended (clamp downgrades/no-ops/never
+upgrades/Again untouched/composes with the first-exposure clamp); `TacticalTrainer.test.ts` extended
+(first wrong → `'retry'` with `mistakes===1, retriesLeft===0, status solving`; second wrong → `'wrong'`
++ failed; `retries:0` reproduces instant-fail; correct-after-retry still solves; `acceptUserMove` advances
+the line + opponent reply; illegal `acceptUserMove`→`'wrong'` no state change). **Honest limit:** the
+async alt-accept *wiring* + the TR3 reaction UI are behavioural (no `*.svelte` test harness exists —
+portfolio fact); covered by spec §6 manual. **Cores stay pure** (no Date/Math.random/engine);
+`TacticalTrainer` stays engine-free (AP-TFEED-6).
+
+**Doctrine.** Additive only; **no `DB_VERSION`/`schemaRev` bump, no new persisted field** (selfTag/
+confidence already on `PuzzleAttemptRecord`; the clamp is computed; an alt-accept records `solved:true`).
+Honesty: pattern hint not a verdict, a retried/alt-accepted miss is still a miss (AP-TFEED-2/3); bilingual
+FR+EN for every new key. Single concern (miss-feedback react + self-tag react + alt-move + second-try); the
+recording/selection path (F3) and the reveal component (F4) untouched. **630 Vitest green** (613 baseline
++ 17 new, zero regressions), svelte-check **0/0** (396 files), build green; `metacog.calibration()` /
+study-plan / `explainPly` / EvalGraph byte-identical. **Rollback:** revert the commit — per-fold safe and
+independent (drop the clamp → grades return to `resultToGrade`; drop the alt seam → `sameMove`-only
+acceptance; `retries:0` reproduces instant-fail without code removal; TR1 stays for F4 consumers). No
+data/migration to unwind. Cross-links: ADR-0037/0010/0033/0040/0052/0053, F3, F4,
+`enhancements-architecture-spec.md` Trainer T1. Follow-ups (§11): T2 (mode/theme/provenance, Review
+metacog), T3 (`usedHint` clamp, progressive hints, impulsivity signal, alt-accept telemetry → revisit an
+`altAccepted?` flag), C6 (coach reuses `SolutionReveal` with an `explainPly`-derived why).

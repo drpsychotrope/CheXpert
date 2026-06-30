@@ -6,9 +6,10 @@
   import SolutionReveal from './SolutionReveal.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { TacticalTrainer, gradeAttempt } from '../trainer/TacticalTrainer';
+  import { acceptAltMove, type LineEval } from '../trainer/altMove';
   import type { Puzzle } from '../trainer/puzzle';
   import { putAttempt, getAttempt, attemptsByPuzzle, recordTacticsAttempt } from '../store/attemptsRepo';
-  import { resultToGrade } from '../srs/fsrs';
+  import { resultToGrade, clampForConfidence } from '../srs/fsrs';
   import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
   import { cardForThemes, loadConcepts, missWhy, type ConceptCard as ConceptCardData } from '../concepts/concepts';
   import { failCountByPuzzle, isLeech } from '../srs/schedule';
@@ -38,6 +39,14 @@
   let card = $state<ConceptCardData | null>(null);
   let leech = $state(false);
   const LEECH_THRESHOLD = 3; // Q-B
+
+  // T1 accept-alternate-winning (Q-A). A code-level flag (default ON) — no persisted setting,
+  // no schema churn (§2 OUT). Off-line moves the engine confirms are also clearly winning are
+  // accepted as a solve; on engine error/timeout we fall through to a miss (AP-TFEED-3).
+  const acceptAltWinning = true;
+  const ALT_EVAL_MOVETIME_MS = 300; // per-eval budget for the two serialized full-strength evals
+  // True while the async alt-check runs, so a second move can't race onto the board.
+  let checkingAlt = $state(false);
 
   // Load (and re-load on language switch): reading getLocale() inside the effect
   // tracks the reactive locale, so flipping FR/EN refetches the matching seed and
@@ -112,7 +121,8 @@
     }, 1000);
   }
   async function onTimeout() {
-    if (!trainer || trainer.state.status !== 'solving') return;
+    // Don't race a confirmed-miss into an in-flight alt-accept eval (which may resolve to a solve).
+    if (!trainer || trainer.state.status !== 'solving' || checkingAlt) return;
     locked = true;
     feedback = t('tactics.timeMiss');
     feedbackKind = 'bad';
@@ -129,6 +139,8 @@
     lastAttemptId = undefined;
     showCard = false;
     showSolution = false;
+    showTimedOffer = false;
+    checkingAlt = false;
 
     // Selection priority closes the loop: a dashboard drill filter wins; else
     // prefer the player's own personal puzzles (from their real mistakes); else
@@ -205,19 +217,30 @@
   }
 
   async function onMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
-    if (!trainer || !puzzle || trainer.state.status !== 'solving' || locked) return;
+    if (!trainer || !puzzle || trainer.state.status !== 'solving' || locked || checkingAlt) return;
+    const fenBefore = display.fen; // position BEFORE the move, for the alt-move engine check
     const uci = from + to + (display.isPromotion(from, to) ? promo : '');
     const result = trainer.playUserMove(uci);
 
-    if (result === 'wrong') {
-      stopTimer();
-      feedback = t('tactics.wrong');
-      feedbackKind = 'bad';
-      await finish(false);
-      // Reset the board to the puzzle's start so Retry is one click away.
-      display = new ChessGame(puzzle.fen);
+    if (result === 'retry') {
+      // T1/TR6: one on-board second try. Leave the wrong move visible (do NOT reset to puzzle.fen)
+      // and stay solving; the miss is already recorded in the trainer (AP-TFEED-2). The next move
+      // resumes the normal flow. Timed mode keeps running — the clock is the drill.
+      display = new ChessGame(fenBefore);
+      display.moveUci(uci);
       fen = display.fen;
-      lastMove = null;
+      lastMove = [from, to];
+      feedback = t('tactics.secondTry');
+      feedbackKind = 'bad';
+      return;
+    }
+
+    if (result === 'wrong') {
+      // T1 accept-alternate-winning (Q-A): before committing the miss, ask the engine whether the
+      // off-line move is itself a clear win. Honest fall-through: reject / illegal / error / timeout
+      // → the normal miss path (never hang — AP-TFEED-3).
+      if (acceptAltWinning && (await tryAcceptAlt(fenBefore, uci, from, to))) return;
+      await commitMiss();
       return;
     }
 
@@ -235,6 +258,73 @@
     } else {
       feedback = t('tactics.keepGoing');
       feedbackKind = 'good';
+    }
+  }
+
+  /** Commit a confirmed miss: feedback, grade as a fail, reset the board for a one-click Retry. */
+  async function commitMiss() {
+    if (!trainer || !puzzle) return;
+    stopTimer();
+    feedback = t('tactics.wrong');
+    feedbackKind = 'bad';
+    await finish(false);
+    // Reset the board to the puzzle's start so Retry is one click away.
+    display = new ChessGame(puzzle.fen);
+    fen = display.fen;
+    lastMove = null;
+  }
+
+  /**
+   * Accept-alternate-winning engine check (Q-A). Returns true iff the off-line `uci` was
+   * accepted as a solve (and drove the trainer forward); false to fall through to the miss path.
+   * Two FULL-STRENGTH evals run back-to-back (the engine is serialized): the mainline best for the
+   * position before the move, and the eval of the position after the move. Any null move / engine
+   * error → false (honest default = miss; AP-TFEED-3/6).
+   */
+  async function tryAcceptAlt(fenBefore: string, uci: string, from: string, to: string): Promise<boolean> {
+    if (!trainer || !puzzle) return false;
+    const solver = orientation; // the solver's side, fixed for the puzzle
+    checkingAlt = true;
+    const prevFeedback = feedback;
+    feedback = t('tactics.checkingAlt');
+    feedbackKind = '';
+    try {
+      // The resulting position after the played move (opponent to move). Clone first.
+      const after = new ChessGame(fenBefore);
+      if (after.moveUci(uci) == null) return false;
+
+      // best line for the position BEFORE the move (multipv 1, White-POV), then the played-move eval.
+      const best = (await app.engine.analyzeLines(fenBefore, { multipv: 1, movetime: ALT_EVAL_MOVETIME_MS, fullStrength: true }))[0];
+      if (!best) return false;
+      const played = await app.engine.evaluate(after.fen, { movetime: ALT_EVAL_MOVETIME_MS, fullStrength: true });
+
+      const bestLine: LineEval = { uci: best.uci, whiteCp: best.whiteCp, mate: best.mate };
+      // EvalResult exposes the raw mover-POV score; its `.score.mate` is the after-position mate.
+      const playedLine: LineEval = { uci, whiteCp: played.whiteCp, mate: played.score.mate };
+
+      if (!acceptAltMove(solver, bestLine, playedLine)) return false;
+
+      const r = trainer.acceptUserMove(uci);
+      if (r === 'wrong') return false; // defensive: illegal in current position → miss path
+
+      stopTimer();
+      display = new ChessGame(trainer.getFen());
+      fen = display.fen;
+      lastMove = [from, to];
+      if (r === 'solved') {
+        feedback = t('tactics.altAccepted');
+        feedbackKind = 'good';
+        await finish(true); // records a genuine solve (Q-H)
+      } else {
+        feedback = t('tactics.altAccepted');
+        feedbackKind = 'good';
+      }
+      return true;
+    } catch {
+      feedback = prevFeedback; // engine failure: restore and let the caller commit the miss
+      return false;
+    } finally {
+      checkingAlt = false;
     }
   }
 
@@ -283,7 +373,9 @@
       },
       puzzle: updatedPuzzle,
       model: $state.snapshot(model),
-      srs: { kind: 'puzzle', refId: puzzle.id, grade: resultToGrade(solved, ms) },
+      // T1/TR3 (Q-E): a low-confidence (guess/unsure) SOLVE is clamped to ≤ Good so a self-flagged
+      // lucky solve doesn't earn a long interval. No-op on a miss (Again floor) / high confidence.
+      srs: { kind: 'puzzle', refId: puzzle.id, grade: clampForConfidence(resultToGrade(solved, ms), confidence) },
       now,
     });
     app.puzzles.updateCached(updatedPuzzle);
@@ -293,10 +385,38 @@
    * This is NOT a new insert — it re-puts the same id so AP-META-5 is preserved. */
   async function updateSelfTag(tag: SelfTag) {
     selfTag = selfTag === tag ? undefined : tag;
+    reactToSelfTag(); // T1/TR3 (Q-C): react to the just-set tag (Tactics-only; metacog-gated)
     if (!lastAttemptId) return;
     const row = await getAttempt(lastAttemptId);
     if (!row) return;
     await putAttempt({ ...row, selfTag });
+  }
+
+  // T1/TR3 reactions (Q-C). One-tap offers/hints, never verdicts (AP-TFEED-3/7). They attach
+  // ONLY to Tactics' existing chips and only when metacog is on; no reaction is invented for tags
+  // without a clean single action (miscalculated / wrong-plan / missed-opponent-resource / other).
+  let showTimedOffer = $state(false);
+
+  /** Surface the matching reaction for the current self-tag (re-evaluated on each toggle). */
+  function reactToSelfTag() {
+    showTimedOffer = false;
+    if (!metacog) return;
+    if (selfTag === 'unfamiliar-pattern') {
+      // Surface the motif's concept card prominently (reuse openLearn → ConceptCard; AP-TFEED-1/5).
+      // showLearn already drives the "Learn the pattern" link; openLearn also marks first-exposure.
+      if (card) void openLearn();
+    } else if (selfTag === 'rushed') {
+      // Offer timed mode (reuse the existing app.tacticsTimed mechanism; FOLD-5).
+      showTimedOffer = true;
+    }
+  }
+
+  /** TR3 `rushed` reaction: switch to the existing timed drill and load a fresh puzzle. */
+  function tryTimed() {
+    app.tacticsTimed = true;
+    showTimedOffer = false;
+    seen.clear();
+    void loadNext();
   }
 
   // Load the first puzzle once the model is ready.
@@ -328,6 +448,8 @@
     selfTag = undefined;
     lastAttemptId = undefined;
     showSolution = false; // AP-TEACH-4: a fresh Retry must not show the answer
+    showTimedOffer = false;
+    checkingAlt = false;
     startTimer();
   }
 </script>
@@ -424,6 +546,15 @@
           <button type="button" class="chip {selfTag === tag ? 'on' : ''}" onclick={() => updateSelfTag(tag)}>{SELF_TAG_LABELS[tag]}</button>
         {/each}
       </div>
+      <!-- TR3 (Q-C): `rushed` → one-tap offer of timed mode (reuses app.tacticsTimed; FOLD-5).
+           An offer, not a verdict (AP-TFEED-3/7). `unfamiliar-pattern` opens the concept card
+           via reactToSelfTag()/openLearn; the "Learn the pattern" affordance below also covers it. -->
+      {#if showTimedOffer && !timed}
+        <p class="feedback">
+          {t('tactics.offerTimed')}
+          <button class="link" onclick={tryTimed}>{t('tactics.tryTimed')}</button>
+        </p>
+      {/if}
     </div>
   {/if}
 

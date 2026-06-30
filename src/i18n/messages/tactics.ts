@@ -43,6 +43,18 @@ export const tactics: Messages = {
   'reveal.showSolution': { fr: 'Voir la solution', en: 'Show solution' },
   'reveal.hideSolution': { fr: 'Masquer la solution', en: 'Hide solution' },
 
+  // ── T1 trainer-feedback (second try, alt-accept, self-tag reactions) — Q-G ──
+  // Complete per-locale templates (AP-TFEED-5); offers/hints framed honestly, never verdicts.
+  'tactics.secondTry': {
+    fr: 'Pas ça — il vous reste un essai sur l’échiquier.',
+    en: 'Not that — you have one more try on the board.',
+  },
+  'tactics.checkingAlt': { fr: 'Vérification du coup…', en: 'Checking your move…' },
+  'tactics.altAccepted': { fr: 'Coup différent, mais tout aussi gagnant. ✔', en: 'Different move, but equally winning. ✔' },
+  'tactics.tryTimed': { fr: 'Essayer en mode chrono', en: 'Try this timed' },
+  'tactics.offerTimed': { fr: 'Pressé ? Entraînez-vous contre la montre.', en: 'Rushed? Train against the clock.' },
+  'tactics.reactUnfamiliar': { fr: 'Motif peu familier — voici la fiche.', en: "Unfamiliar pattern — here's the card." },
+
   // ── Calculate.svelte (calc.*) ────────────────────────────────────────────
   'calc.title': { fr: 'Calcul', en: 'Calculation' },
   // Intro split to preserve the three inline <b> emphases from the original markup.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resultToGrade, newCard, gradeCard, isDue, intervalLabel, Grade } from './fsrs';
+import { resultToGrade, clampForConfidence, newCard, gradeCard, isDue, intervalLabel, Grade } from './fsrs';
 
 const T0 = Date.UTC(2026, 4, 31, 0, 0, 0);
 
@@ -16,6 +16,35 @@ describe('resultToGrade (Q-I mapping)', () => {
   });
   it('slow pass → Hard', () => {
     expect(resultToGrade(true, 30000)).toBe(Grade.Hard);
+  });
+});
+
+describe('clampForConfidence (T1, Q-E / TR3)', () => {
+  it('downgrades Easy and Good to Good for guess/unsure (a self-flagged lucky solve)', () => {
+    expect(clampForConfidence(Grade.Easy, 'guess')).toBe(Grade.Good);
+    expect(clampForConfidence(Grade.Good, 'guess')).toBe(Grade.Good);
+    expect(clampForConfidence(Grade.Easy, 'unsure')).toBe(Grade.Good);
+    expect(clampForConfidence(Grade.Good, 'unsure')).toBe(Grade.Good);
+  });
+  it('is a no-op for high confidence (sure) and for an undefined/absent confidence', () => {
+    expect(clampForConfidence(Grade.Easy, 'sure')).toBe(Grade.Easy);
+    expect(clampForConfidence(Grade.Good, 'sure')).toBe(Grade.Good);
+    expect(clampForConfidence(Grade.Easy)).toBe(Grade.Easy);
+    expect(clampForConfidence(Grade.Good, undefined)).toBe(Grade.Good);
+  });
+  it('never upgrades and leaves Again (a miss) untouched', () => {
+    // Again is the miss floor; low confidence must not lift it, nor raise Hard.
+    expect(clampForConfidence(Grade.Again, 'guess')).toBe(Grade.Again);
+    expect(clampForConfidence(Grade.Again, 'unsure')).toBe(Grade.Again);
+    expect(clampForConfidence(Grade.Hard, 'guess')).toBe(Grade.Hard); // already ≤ Good, unchanged
+  });
+  it('composes with gradeCard first-exposure clamp: a guess first solve still resurfaces < 1 day', () => {
+    // resultToGrade(fast solve) = Easy; clampForConfidence(guess) → Good; gradeCard New also caps.
+    const grade = clampForConfidence(resultToGrade(true, 4000), 'guess');
+    expect(grade).toBe(Grade.Good);
+    const c = newCard('puzzle', 'pg', T0);
+    const next = gradeCard(c, grade, T0);
+    expect((next.due - T0) / 86_400_000).toBeLessThan(1);
   });
 });
 
