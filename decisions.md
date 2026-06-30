@@ -1429,3 +1429,51 @@ backfill is idempotent; no migration to unwind. Cross-links: ADR-0033 (first-exp
 0043/0053 (additive precedent), ADR-0055 (F3 AP-COACH-8 pass-unchanged), `fsrs.ts` `DEFAULT_GRADE_THRESHOLDS`.
 Follow-ups (§11): record `hintTier?` if a "how much did the hint help" consumer appears (DEFER — no consumer
 now); FSRS `stability` as a mastery readout (DEFER); streak decay-weighting + calendar/notifications (DEFER).
+
+---
+
+## ADR-0058 — Takeback during a rated Play game marks that game un-counted (P2)
+
+**Context.** Before P2, `Play.svelte`'s `finishGame` **always** rated + persisted a finished game, and a
+takeback only existed inside the automatic coached-blunder flow (which interposes *before* the clock press
+and lets the game continue, so it never touched the rating). P2 adds an **on-demand** takeback in normal
+play (a player can undo their last move + the bot's reply on their own turn). An un-gated on-demand takeback
+in a rated game is a clear **abuse vector**: undo every bad move, keep only the rating gains. The honest fix
+must let a slow, learning-oriented player take a move back **without** letting that inflate a measured
+rating — and the cost must be visible to the player at the moment they take the move back, not hidden.
+
+**Decision (Q-B = a).** The on-demand takeback is **opt-in** via a new `SettingsRecord.takebackInPlay?`
+(default **OFF** → today's behaviour is byte-identical for everyone who doesn't enable it). When ON, and the
+player takes a move back during a game, that game becomes **un-counted**: the in-progress game is flagged
+`unrated` in component state (surfaced immediately by a muted "this game won't count" note), `finishGame`
+**skips the entire rating-write block** (no `updateRating`, no `opponentByPool`/`gameRatings` assignment, no
+`applyStrength` nudge) and persists the saved `GameRecord` with an honest `unrated: true`. The game is still
+recorded (`putGame`) and other model state still persists (`persistModel`) — only the *rating* is left
+unchanged. The skip decision is a single pure authority, `playSession.ts:shouldRate(unrated)` (`!unrated`),
+unit-tested. The coached takeback is **unchanged** (it already interposes pre-clock-press and the game
+continues — it never rated anything to forfeit). The takeback also carries degenerate guards (FOLD A4 /
+AP-PLAYUX-10): it requires the **player** to have actually moved — pure `canTakeBackInPlay(historyLength,
+playerColor)` (White ≥ 2 plies, Black ≥ 3) so a Black player at ply 1 can **not** undo the bot's opening
+move (which would empty the board with the bot to move); it undoes the bot reply **and** the player move
+together (back to the player's turn) via the controller's `takeBackPlayerMove()`; it **never** auto-fires
+the engine (the loop resumes on the player's next move); and it is disabled while an analysis is in flight
+(a generation token discards any stale `runAnalysis` result so it can't land on a fresh game / post-undo
+position).
+
+**Consequences.** Honesty preserved — a rating can never be inflated by taking moves back; the forfeit is
+visible before the game ends. Default OFF keeps the rating math byte-identical to pre-P2 for the existing
+user base (and the existing `finishGame`/rating tests stay green). Additive-optional fields only —
+`GameRecord.unrated?` (after `coached`) and `SettingsRecord.takebackInPlay?` — both read-site defaulted
+(`?? false`), mirroring the `coached?`/`variant?`/`metacogEnabled?`/`autoAnalyzeOnFinish?` precedent, so
+**no `DB_VERSION` bump** (AP-PLAYUX-6). **Tests:** `playSession.test.ts` covers `shouldRate` (counted vs
+un-counted) + `canTakeBackInPlay` (White/Black degenerate cases incl. the Black-at-ply-1 guard);
+`gameSession.test.ts` covers `takeBackPlayerMove` (undoes both plies, lands on the player's turn, recomputes
+the highlight, never consults the engine); the static wiring guard `play-in-game-ux-wiring.test.ts` locks
+the `shouldRate(unrated)` gate + the `unrated: true` record write. **737 Vitest green** (712 baseline + 25),
+svelte-check **0/0** (413 files), build green. **Rollback:** revert the P2 commit — the rating-skip + the
+`unrated` field + the `takebackInPlay` toggle go together (avoid a half-state where a record is marked
+`unrated` but still rated); records that carry `unrated`/settings that carry `takebackInPlay` read fine
+elsewhere (both optional), no migration to unwind. Cross-links: ADR-0057 (F6 controller — the takeback is a
+new controller hook, not an inline loop), ADR-0037/0040/0043/0053/0056 (additive-optional precedent),
+`specs/play-in-game-ux-spec.md` §0.5 Q-B / §4 A2-A4 / §9 AP-PLAYUX-3/10. Follow-ups (§11): a takeback
+budget / per-game cap with a difficulty/penalty model (D5 — would re-open this policy; out of P2).

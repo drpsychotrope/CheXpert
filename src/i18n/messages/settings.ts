@@ -30,6 +30,17 @@ export const settings: Messages = {
     en: 'When on, Tactics and Calculation show optional chips: how sure you were (before the reveal) and, after a miss, why you think you missed. Insights then shows a descriptive calibration readout — how your confidence lines up with your results. Off by default; the chips are always skippable and never block solving.',
   },
 
+  // P2 (play-in-game-ux): opt-in on-demand takeback during a normal game (ADR-0058).
+  'settings.play': { fr: 'Partie', en: 'Play' },
+  'settings.takebackInPlay': {
+    fr: 'Autoriser les reprises en partie',
+    en: 'Allow takebacks during a game',
+  },
+  'settings.takebackInPlayHelp': {
+    fr: 'Reprendre un coup dans une partie classée la rend non comptabilisée (le classement ne change pas pour cette partie). Désactivé par défaut.',
+    en: "Taking a move back in a rated game makes it not count (your rating won't change for that game). Off by default.",
+  },
+
   // T3/TR8 daily training goal (Q-E, default 10 puzzles, configurable).
   'settings.training': { fr: 'Entraînement', en: 'Training' },
   'settings.dailyGoalLabel': { fr: 'Objectif quotidien (problèmes)', en: 'Daily goal (puzzles)' },

@@ -120,7 +120,7 @@ export function poolOpponent(m: PlayerModel, pool: RatingPool): { targetElo: num
 }
 
 export function freshSettings(): SettingsRecord {
-  return { id: 'singleton', coachedMode: false, allowNetwork: false, boardOrientation: 'white', opponentStyle: 'human', metacogEnabled: false, schemaRev: CURRENT_SETTINGS_SCHEMA_REV };
+  return { id: 'singleton', coachedMode: false, allowNetwork: false, boardOrientation: 'white', opponentStyle: 'human', metacogEnabled: false, takebackInPlay: false, schemaRev: CURRENT_SETTINGS_SCHEMA_REV };
 }
 
 export async function loadPlayerModel(now: number): Promise<PlayerModel> {

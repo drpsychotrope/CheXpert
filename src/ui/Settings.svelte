@@ -41,6 +41,14 @@
     await app.persistSettings();
   }
 
+  // P2 (play-in-game-ux): opt-in on-demand takeback during a normal game (ADR-0058). A takeback in a
+  // rated game forfeits the rating for that game (the help text states this).
+  async function toggleTakeback() {
+    if (!settings) return;
+    settings.takebackInPlay = !(settings.takebackInPlay ?? false);
+    await app.persistSettings();
+  }
+
   async function toggleNetwork(e: Event) {
     if (!settings) return;
     const wantOn = (e.currentTarget as HTMLInputElement).checked;
@@ -111,6 +119,15 @@
       {t('play.loop.autoAnalyzeLabel')}
     </label>
     <p class="muted" style="font-size:0.85rem">{t('play.loop.autoAnalyzeHelp')}</p>
+  </div>
+
+  <div class="panel col">
+    <h3>{t('settings.play')}</h3>
+    <label class="row" style="flex-direction:row;align-items:center;gap:0.6rem">
+      <input type="checkbox" checked={settings?.takebackInPlay ?? false} onchange={toggleTakeback} />
+      {t('settings.takebackInPlay')}
+    </label>
+    <p class="muted" style="font-size:0.85rem">{t('settings.takebackInPlayHelp')}</p>
   </div>
 
   <div class="panel col">

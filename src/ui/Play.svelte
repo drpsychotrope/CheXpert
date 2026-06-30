@@ -26,7 +26,8 @@
   import { chess960Position, chess960PositionById } from '../variant/chess960';
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
-  import { applyGameResult, botMovetime, flagOutcome } from '../game/playSession';
+  import { applyGameResult, botMovetime, flagOutcome, shouldRate, canTakeBackInPlay } from '../game/playSession';
+  import { toMovePairs } from '../game/moveList';
   import { createGameSession, type GameSession } from '../game/gameSession';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import { downloadPgn, pgnFilename } from './pgnDownload';
@@ -50,6 +51,16 @@
   // Non-blocking coached take-back prompt (audit v2 W12/F5). While it's open the player's own clock
   // keeps running — fair, it's their decision time — and the opponent isn't charged (F6).
   let coachOpen = $state(false);
+  // P2 (play-in-game-ux): confirm-before-resign gate, on-demand blunder-check verdict, and the
+  // un-rated marker set when the player uses an in-play takeback (ADR-0058). All additive UI state.
+  let resignOpen = $state(false);
+  let unrated = $state(false);
+  let checkVerdict = $state<'risky' | 'fine' | null>(null);
+  // The FEN a check verdict was computed for, so a verdict maps to the current position only and a
+  // second click on the same position is a no-op (one check per position — AP-PLAYUX-5).
+  let checkedFen = $state<string | null>(null);
+  // The move-list scroll container, so a tiny $effect can auto-follow the latest ply into view.
+  let moveListEl = $state<HTMLDivElement | undefined>(undefined);
   let steerNote = $state('');
   let opponent: AdaptiveOpponent | null = null;
   let colorChoice = $state<ColorChoice>('white');
@@ -99,6 +110,10 @@
   let aTotal = $state(0);
   // Quiet "analysed ✓" shown when the opt-in auto-run succeeds (no toast clutter; F-P1-2).
   let autoAnalyzed = $state(false);
+  // P2 (FOLD A4): a generation token bumped on every newGame()/rematch(). An in-flight analysis
+  // promise reads its token at start and discards its result if a new game began meanwhile, so a
+  // stale `runAnalysis` can't write `aResult` over a fresh game started via Rematch (AP-PLAYUX-10).
+  let analyzeGen = 0;
 
   // Loop closure (P1): the unanalysed-backlog count, derived from the persisted stores (F5 reads)
   // so it survives navigation — NOT a transient field (AP-PLAYLOOP-1). Exactly
@@ -119,6 +134,8 @@
   const coached = $derived(app.settings?.coachedMode ?? false);
   const opponentStyle = $derived(app.settings?.opponentStyle ?? 'human');
   const autoAnalyzeOnFinish = $derived(app.settings?.autoAnalyzeOnFinish ?? false);
+  // P2: opt-in on-demand takeback during a normal game (default OFF → today's behaviour unchanged).
+  const takebackEnabled = $derived(app.settings?.takebackInPlay ?? false);
   const live = $derived(status === 'playing' || status === 'thinking');
 
   // Recompute the unanalysed-backlog count from the persisted stores (F5 reads). Pure selector on
@@ -172,12 +189,20 @@
     aResult = null;
     aStatus = 'idle';
     aPuzzles = 0;
+    // Invalidate any in-flight analysis so its late result can't write over this fresh game (P2).
+    analyzeGen++;
     startFen960 = null;
     castle960 = null;
     lastMove = null;
     gameFinished = false;
     coachOpen = false;
     engineError = false;
+    // P2 resets: a fresh game is rated again, the resign dialog is closed, and any prior move-check
+    // verdict is cleared (the rematch path call-throughs here, so this resets the rematch too).
+    unrated = false;
+    resignOpen = false;
+    checkVerdict = null;
+    checkedFen = null;
 
     if (variant === 'chess960') {
       // Distinguish an invalid entry from a deliberate 0: NaN → random, not silently SP 0 (audit W6).
@@ -338,8 +363,52 @@
   // `inCheckFor(fen)`; the $derived stays here, anchored on the reactive `fen`.
   const inCheck = $derived(fen && session ? session.inCheckFor(fen) : false);
 
+  // ── P2 move list (PL3, Q-A=a) ──
+  // SAN history, re-derived on every move via the reactive `fen` (same ADR-0051 dependency `inCheck`
+  // uses; `game` is mutated in place and is not deep-proxied). Play stores UCI in the controller, so
+  // the list reads SAN from `game.history()` — the single numbering authority is `toMovePairs`, never
+  // a parallel list from playedUci (AP-PLAYUX-1).
+  const moveSan = $derived(fen && session ? game.history() : []);
+  // Start side / move number for correct numbering of a Black-first or loaded mid-game start. Play's
+  // standard + 960 starts are both White-to-move at move 1, but derive from the start FEN so the
+  // formatter stays honest (mirrors ChessGame.pgn()'s body builder).
+  const startFenForList = $derived(variant === 'chess960' ? (startFen960 ?? START_FEN) : START_FEN);
+  const startSide = $derived<'w' | 'b'>(startFenForList.split(' ')[1] === 'b' ? 'b' : 'w');
+  const startMoveNo = $derived(Number(startFenForList.split(' ')[5] || '1'));
+  const movePairs = $derived(toMovePairs(moveSan, startSide, startMoveNo));
+  // The latest played ply index (for the highlight); -1 before the first move.
+  const latestPly = $derived(moveSan.length - 1);
+
+  // ── P2 takeback gating (PL7, Q-B=a) ──
+  // The pure half (`canTakeBackInPlay`: the player has actually moved) ANDed with the live/turn gates
+  // and the in-flight-analysis guard. Disabled during analysis so a stale result can't land on a
+  // post-undo position; never available on the bot's turn / while thinking / coached dialog open.
+  const canTakeBack = $derived(
+    takebackEnabled &&
+      status === 'playing' &&
+      turnColor() === playerColor &&
+      !coachOpen &&
+      !thinking &&
+      aStatus !== 'analyzing' &&
+      !!session &&
+      canTakeBackInPlay(moveSan.length, playerColor),
+  );
+  // The on-demand blunder check is offered on the player's turn while the game is live.
+  const canCheckMove = $derived(status === 'playing' && turnColor() === playerColor && !coachOpen && !thinking);
+
+  // Auto-follow the latest ply: keyed on the move count so it scrolls the newest row into view as the
+  // game progresses (and when reading back after it ends). `block:'nearest'` avoids jumping the page.
+  $effect(() => {
+    void moveSan.length; // dependency: re-run on every new ply
+    const last = moveListEl?.lastElementChild as HTMLElement | null;
+    last?.scrollIntoView({ block: 'nearest' });
+  });
+
   async function onMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
     if (!session || status !== 'playing' || turnColor() !== playerColor) return;
+    // A new move invalidates any prior on-demand blunder-check verdict (P2, AP-PLAYUX-5).
+    checkVerdict = null;
+    checkedFen = null;
     // Controller validates turn + legality and advances the board (no auto-chain — C1-1).
     const snap = session.applyPlayerMove(from, to, promo);
     if (!snap) return;
@@ -474,22 +543,28 @@
     if (!m || !opp) return;
     const botElo = opp.state.targetElo;
 
-    if (variant === 'chess960') {
-      // Update the chess960 pool — seeded lazily on the first 960 game from classical (AP-960-7).
-      const seed = m.gameRatings.chess960 ?? m.gameRatings.classical ?? poolRating(m, 'classical');
-      const { nextOpp, nextRating } = applyGameResult(seed, poolOpponent(m, 'chess960'), outcome, botElo);
-      m.opponentByPool.chess960 = nextOpp;
-      opp.state = nextOpp;
-      await opp.applyStrength().catch(() => {});
-      m.gameRatings.chess960 = nextRating;
-    } else {
-      // Standard path: adjust the SELECTED pool's adaptive bot toward the 55% band (AP-TC-3).
-      const pool = selectedPool;
-      const { nextOpp, nextRating } = applyGameResult(poolRating(m, pool), poolOpponent(m, pool), outcome, botElo);
-      m.opponentByPool[pool] = nextOpp;
-      opp.state = nextOpp;
-      await opp.applyStrength().catch(() => {});
-      m.gameRatings[pool] = nextRating;
+    // Rating-integrity policy (P2/ADR-0058): a game the player took a move back in is un-counted —
+    // skip the whole rating-write block (no updateRating / no opponent-pool / no gameRatings write)
+    // and persist the record with `unrated: true`. Default OFF, so a normal game is byte-identical to
+    // today. The single decision authority is the pure `shouldRate` (AP-PLAYUX-3).
+    if (shouldRate(unrated)) {
+      if (variant === 'chess960') {
+        // Update the chess960 pool — seeded lazily on the first 960 game from classical (AP-960-7).
+        const seed = m.gameRatings.chess960 ?? m.gameRatings.classical ?? poolRating(m, 'classical');
+        const { nextOpp, nextRating } = applyGameResult(seed, poolOpponent(m, 'chess960'), outcome, botElo);
+        m.opponentByPool.chess960 = nextOpp;
+        opp.state = nextOpp;
+        await opp.applyStrength().catch(() => {});
+        m.gameRatings.chess960 = nextRating;
+      } else {
+        // Standard path: adjust the SELECTED pool's adaptive bot toward the 55% band (AP-TC-3).
+        const pool = selectedPool;
+        const { nextOpp, nextRating } = applyGameResult(poolRating(m, pool), poolOpponent(m, pool), outcome, botElo);
+        m.opponentByPool[pool] = nextOpp;
+        opp.state = nextOpp;
+        await opp.applyStrength().catch(() => {});
+        m.gameRatings[pool] = nextRating;
+      }
     }
 
     const now = Date.now();
@@ -500,6 +575,7 @@
       botElo,
       playedAt: now,
       coached,
+      ...(unrated ? { unrated: true } : {}), // ADR-0058: persist the honest un-counted marker
       playerColor: playerColor[0] as 'w' | 'b', // F5: persist side for correct history re-analysis
       ...(variant === 'chess960'
         ? { variant: 'chess960', startFen: startFen960 ?? undefined }
@@ -543,6 +619,7 @@
    *  auto-run all run the identical idempotent sequence. */
   async function analyzePlayed() {
     if (!lastGameRec || !model) return;
+    const gen = analyzeGen; // capture; a rematch/newGame bumps it and we must discard a stale result
     aStatus = 'analyzing';
     aProgress = 0;
     aTotal = 0;
@@ -553,6 +630,7 @@
           aTotal = t;
         },
       });
+      if (gen !== analyzeGen) return; // a new game started while analysing — drop the stale result
       aResult = analysis;
       // The persisted count (set by generatePuzzles, BatchAnalyzer stamps it) — correct even on the
       // idempotent cached-result branch, unlike the old hard 0 (audit P3-16).
@@ -560,6 +638,7 @@
       aStatus = 'done';
       await refreshBacklog();
     } catch (e) {
+      if (gen !== analyzeGen) return;
       result = t('play.analysisFailed') + String(e);
       aStatus = 'idle';
     }
@@ -569,6 +648,7 @@
    *  (Q-C=b). The displayed N == backlogGames.length == what runs (F-P1-3). */
   async function analyzeBacklogNow() {
     if (!model || backlogGames.length === 0) return;
+    const gen = analyzeGen; // capture; discard a stale batch result if a new game starts meanwhile
     batchCancelled = false;
     batchRunning = true;
     aStatus = 'analyzing';
@@ -585,11 +665,13 @@
           /* per-position ticks are noisy across many games; the bar tracks games via onGameStart */
         },
       });
+      if (gen !== analyzeGen) return; // a new game started while analysing — drop the stale result
       aResult = res.last;
       aPuzzles = res.last?.puzzlesGenerated ?? 0;
       aStatus = res.last ? 'done' : 'idle';
       await refreshBacklog();
     } catch (e) {
+      if (gen !== analyzeGen) return;
       result = t('play.analysisFailed') + String(e);
       aStatus = 'idle';
     } finally {
@@ -612,6 +694,60 @@
       result = t('play.youResigned');
       void finishGame('loss');
     }
+  }
+
+  // ── P2 handlers (play-in-game-ux §4 A4) ──
+
+  /** Confirm-before-resign (PL8, AP-PLAYUX-4): the Resign button opens a ConfirmDialog instead of
+   *  ending the game directly. The clock keeps running while the dialog is open — it's the player's
+   *  own time. Only confirmResign() may call the real resign(). */
+  function requestResign() {
+    if (status === 'playing' || status === 'thinking') resignOpen = true;
+  }
+  function confirmResign() {
+    resignOpen = false;
+    resign();
+  }
+  function cancelResign() {
+    resignOpen = false;
+  }
+
+  /** On-demand in-play take-back (PL7, Q-B=a, ADR-0058). Opt-in (gated by `canTakeBack`). Undoes the
+   *  bot's reply + the player's move so it's the player's turn again. If the game is rated (every
+   *  Play game is today), exercising the takeback forfeits the rating for this game — surfaced
+   *  immediately via the "won't count" note, applied in finishGame via shouldRate. NEVER fires the
+   *  engine (the loop resumes on the player's next move — AP-PLAYUX-10); the clock is NOT rewound
+   *  (the time was honestly spent). */
+  function takeBack() {
+    if (!canTakeBack || !session) return;
+    unrated = true; // ADR-0058: a takeback in a rated game un-counts it (visible before it ends)
+    const snap = session.takeBackPlayerMove(); // undoes bot reply + player move; recomputes lastMove
+    fen = snap.fen;
+    lastMove = snap.lastMove;
+    // The position changed under the player — invalidate any prior on-demand check verdict.
+    checkVerdict = null;
+    checkedFen = null;
+  }
+
+  /** Rematch (PL10, Q-D=a): start a fresh game with the SAME color / time control / variant — a thin
+   *  call-through to newGame() (the in-memory colorChoice/variant/selectedTC are reused). Distinct
+   *  button so the intent reads clearly. newGame() bumps the analysis generation token, so any
+   *  in-flight "Analyse this game" result is discarded rather than landing on the fresh game
+   *  (FOLD A4 / AP-PLAYUX-10). */
+  function rematch() {
+    void newGame();
+  }
+
+  /** On-demand blunder check (PL7, Q-C=a, FOLD A8): run the existing shallow depth-8 coachEvalBad and
+   *  show a non-blocking advisory verdict. One check per position (guard on game.fen — AP-PLAYUX-5);
+   *  available regardless of coached mode. NEVER moves, undoes, presses the clock, or touches the
+   *  rating. The verdict is a best-effort hint that can disagree with the full-strength post-game
+   *  analysis (the copy frames it as "looks risky/fine", not a definitive judgement). */
+  async function checkMove() {
+    if (!canCheckMove) return;
+    if (checkedFen === game.fen) return; // already checked this position — no-op (no engine spam)
+    checkedFen = game.fen;
+    checkVerdict = (await coachEvalBad()) ? 'risky' : 'fine';
   }
 </script>
 
@@ -692,29 +828,68 @@
     <p class="muted" style="font-size:0.82rem">{playerColor === 'white' ? t('play.youPlayWhite') : t('play.youPlayBlack')}</p>
   {/if}
 
-  <div class="board-wrap">
-    <Board
-      {fen}
-      orientation={playerColor}
-      turnColor={turnColor()}
-      movableColor={status === 'playing' && turnColor() === playerColor ? playerColor : undefined}
-      dests={status === 'playing' && turnColor() === playerColor ? game.dests() : new Map()}
-      {lastMove}
-      check={inCheck}
-      {onMove}
-      onMoveText={(t) => {
-        if (status !== 'playing' || turnColor() !== playerColor) return false;
-        const r = game.resolveMove(t);
-        if (!r) return false;
-        void onMove(r.from, r.to, r.promo ?? 'q');
-        return true;
-      }}
-    />
+  <div class="play-area">
+    <div class="board-wrap">
+      <Board
+        {fen}
+        orientation={playerColor}
+        turnColor={turnColor()}
+        movableColor={status === 'playing' && turnColor() === playerColor ? playerColor : undefined}
+        dests={status === 'playing' && turnColor() === playerColor ? game.dests() : new Map()}
+        {lastMove}
+        check={inCheck}
+        {onMove}
+        onMoveText={(t) => {
+          if (status !== 'playing' || turnColor() !== playerColor) return false;
+          const r = game.resolveMove(t);
+          if (!r) return false;
+          void onMove(r.from, r.to, r.promo ?? 'q');
+          return true;
+        }}
+      />
+    </div>
+
+    <!-- P2 move list (PL3, Q-A=a): scrollable, auto-following SAN list rendered beside the board (or
+         below it on narrow screens). History log — aria-live="off" so it does NOT announce every ply
+         (AP-PLAYUX-9); the latest ply carries aria-current as the orientation cue. View-only; the
+         single numbering authority is toMovePairs (AP-PLAYUX-1/2 — no click navigation here). -->
+    {#if status !== 'idle'}
+      <div class="move-list" role="log" aria-live="off" aria-label={t('play.moveListLabel')} bind:this={moveListEl}>
+        {#if movePairs.length === 0}
+          <p class="muted move-empty">{t('play.moveListEmpty')}</p>
+        {:else}
+          {#each movePairs as pair (pair.no)}
+            <div class="move-row">
+              <span class="move-no">{pair.no}.</span>
+              {#if pair.white}
+                <span class="move-san" class:latest={pair.whitePly === latestPly}
+                      aria-current={pair.whitePly === latestPly ? 'true' : undefined}>{pair.white}</span>
+              {:else}
+                <span class="move-san move-skip">…</span>
+              {/if}
+              {#if pair.black}
+                <span class="move-san" class:latest={pair.blackPly === latestPly}
+                      aria-current={pair.blackPly === latestPly ? 'true' : undefined}>{pair.black}</span>
+              {/if}
+            </div>
+          {/each}
+        {/if}
+      </div>
+    {/if}
   </div>
 
   <p class="feedback {status === 'over' ? 'good' : ''}">
     {#if thinking}{t('play.botThinking')}{:else}{result}{/if}
   </p>
+
+  <!-- P2 on-demand check verdict (non-blocking, advisory; cleared on the next move / takeback). -->
+  {#if checkVerdict && status !== 'idle'}
+    <p class="muted" style="font-size:0.82rem">{checkVerdict === 'risky' ? t('play.checkRisky') : t('play.checkFine')}</p>
+  {/if}
+  <!-- P2 un-rated note (ADR-0058): surfaced the moment a takeback un-counts the game, before it ends. -->
+  {#if unrated && status !== 'idle'}
+    <p class="muted" style="font-size:0.82rem; color:var(--bad)">{t('play.unratedNote')}</p>
+  {/if}
 
   {#if steerNote && status !== 'idle'}
     <p class="muted" style="font-size:0.82rem">{steerNote}</p>
@@ -726,8 +901,20 @@
     {/if}
     {#if status === 'idle' || status === 'over'}
       <button onclick={newGame}>{t('play.newGame')}</button>
+      {#if status === 'over'}
+        <!-- P2 Rematch (PL10, Q-D=a): same color / time control / variant; thin call-through. -->
+        <button onclick={rematch}>{t('play.rematch')}</button>
+      {/if}
     {:else}
-      <button onclick={resign} style="background:var(--bad)">{t('play.resign')}</button>
+      <button onclick={requestResign} style="background:var(--bad)">{t('play.resign')}</button>
+      <!-- P2 on-demand blunder check (PL7, Q-C=a): advisory shallow eval on the player's turn. -->
+      {#if canCheckMove}
+        <button class="ghost" onclick={checkMove} disabled={checkedFen === fen}>{t('play.checkMove')}</button>
+      {/if}
+      <!-- P2 opt-in take-back (PL7, Q-B=a): only when the player has moved (canTakeBack). -->
+      {#if canTakeBack}
+        <button class="ghost" onclick={takeBack}>{t('play.takeBack')}</button>
+      {/if}
     {/if}
     {#if status === 'over' && lastGame && variant !== 'chess960'}
       <button class="ghost" onclick={analyzePlayed} disabled={aStatus === 'analyzing'}>
@@ -792,6 +979,20 @@
     onConfirm={coachTakeBack}
     onCancel={coachKeep}
   />
+
+  <!-- P2 confirm-before-resign (PL8, AP-PLAYUX-4): a second ConfirmDialog instance, danger-styled.
+       Confirm → the existing resign()/finishGame('loss') path; cancel → nothing changes (clock keeps
+       running — it's the player's time). Escape cancels (ConfirmDialog behaviour). -->
+  <ConfirmDialog
+    open={resignOpen}
+    danger
+    title={t('play.resignConfirmTitle')}
+    body={t('play.resignConfirmBody')}
+    confirmLabel={t('play.resignConfirmYes')}
+    cancelLabel={t('play.resignConfirmNo')}
+    onConfirm={confirmResign}
+    onCancel={cancelResign}
+  />
 </section>
 
 <style>
@@ -801,4 +1002,27 @@
   .clocks { display: flex; flex-direction: column; gap: 0.3rem; align-items: center; margin: 0.4rem 0; }
   .clock { font-variant-numeric: tabular-nums; font-size: 1.6rem; font-weight: 700; padding: 0.1rem 0.8rem; border-radius: 6px; background: var(--panel-2); color: var(--text); min-width: 5rem; text-align: center; }
   .clock.active { background: var(--accent); color: #000; }
+
+  /* P2 move list: beside the board on wide screens, below it on narrow ones (wrap). */
+  .play-area { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; justify-content: center; }
+  .move-list {
+    min-width: 9rem;
+    max-width: 14rem;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    text-align: left;
+  }
+  .move-empty { margin: 0; font-size: 0.82rem; }
+  .move-row { display: grid; grid-template-columns: 2.2rem 1fr 1fr; gap: 0.3rem; align-items: baseline; }
+  .move-no { color: var(--muted); }
+  .move-san { color: var(--text); }
+  .move-san.move-skip { color: var(--muted); }
+  .move-san.latest { background: var(--accent); color: #000; border-radius: 4px; padding: 0 0.25rem; font-weight: 700; }
 </style>

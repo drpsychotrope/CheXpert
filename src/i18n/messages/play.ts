@@ -126,6 +126,20 @@ export const play: Messages = {
   // Export a played game's PGN (F5, ADR-0056) — Play tail + history rows.
   'play.exportPgn': { fr: 'Exporter le PGN', en: 'Export PGN' },
 
+  // ---- In-game / after-game UX (P2, play-in-game-ux-spec) ----
+  'play.rematch':            { fr: 'Revanche',                       en: 'Rematch' },
+  'play.takeBack':           { fr: 'Annuler le coup',                en: 'Take back' },
+  'play.checkMove':          { fr: 'Vérifier ce coup',               en: 'Check this move' },
+  'play.checkRisky':         { fr: 'Ce coup semble risqué.',         en: 'This move looks risky.' },
+  'play.checkFine':          { fr: 'Ce coup semble correct.',        en: 'This move looks fine.' },
+  'play.unratedNote':        { fr: 'Coup repris — cette partie ne comptera pas.', en: "Move taken back — this game won't count." },
+  'play.moveListLabel':      { fr: 'Liste des coups',                en: 'Move list' },
+  'play.moveListEmpty':      { fr: "Aucun coup pour l'instant.",     en: 'No moves yet.' },
+  'play.resignConfirmTitle': { fr: 'Abandonner ?',                   en: 'Resign?' },
+  'play.resignConfirmBody':  { fr: 'La partie sera perdue et comptera comme une défaite.', en: 'The game will be lost and counts as a defeat.' },
+  'play.resignConfirmYes':   { fr: 'Abandonner',                     en: 'Resign' },
+  'play.resignConfirmNo':    { fr: 'Continuer',                      en: 'Keep playing' },
+
   // ---- Play→analysis loop closure (play.loop.*) — P1, play-loop-closure-spec ----
   // "Analyse your N unanalysed games" — N is unanalyzedPlayedGames(...).length (F-P1-3).
   'play.loop.analyseAllOne': {

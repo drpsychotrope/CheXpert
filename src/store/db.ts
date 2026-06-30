@@ -25,6 +25,9 @@ export interface GameRecord {
   botElo: number;
   playedAt: number;
   coached: boolean;
+  /** Set when the player used an in-play takeback (P2/ADR-0058); the game is persisted but its
+   *  rating update is skipped. Additive — absent reads `?? false`. NO DB_VERSION bump. */
+  unrated?: boolean;
   /** Time control this game was played under (absent on legacy records = untimed classical). */
   timeControl?: { initialSec: number; incrementSec: number; category: Category; untimed?: boolean };
   /** Chess960 (ADR-0041): default 'standard'. Additive — no DB_VERSION bump. */
@@ -124,6 +127,10 @@ export interface SettingsRecord {
    *  960 games never auto-run. Additive optional; a legacy/absent value reads as the default false
    *  (read-site `?? false`). NO DB_VERSION bump (mirrors `metacogEnabled?`/`opponentStyle?`). */
   autoAnalyzeOnFinish?: boolean;
+  /** Opt-in: allow on-demand takeback during a normal game (P2). Default false (read-site
+   *  `?? false`). A takeback in a rated game marks that game un-counted (ADR-0058). No DB_VERSION
+   *  bump (mirrors `metacogEnabled?`/`autoAnalyzeOnFinish?`). */
+  takebackInPlay?: boolean;
   /** Data-shape revision (audit W13). See PlayerModel.schemaRev. */
   schemaRev?: number;
 }

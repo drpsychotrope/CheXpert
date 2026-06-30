@@ -306,6 +306,40 @@ describe('gameSession controller (F6, ADR-0057)', () => {
     expect(s.turn).toBe('white'); // back on move
   });
 
+  // P2 in-play take-back (ADR-0058): undo the bot reply + the player move, back to the player's turn.
+  it('takeBackPlayerMove undoes the bot reply AND the player move (back to player turn)', async () => {
+    const engine = new FakeEngine(['e7e5']);
+    const s = makeSession(engine); // player white
+    s.applyPlayerMove('e2', 'e4');
+    await s.engineReply(); // bot e5 → 2 plies, player to move again
+    expect(s.gameRef.history()).toEqual(['e4', 'e5']);
+    expect(s.turn).toBe('white');
+
+    const after = s.takeBackPlayerMove();
+    expect(s.gameRef.history()).toEqual([]); // both plies undone
+    expect(after.fen).toBe(START_FEN);
+    expect(after.lastMove).toBeNull(); // no prior ply → no highlight
+    expect(s.turn).toBe('white'); // still the player's turn
+    expect(after.status).toBe('playing');
+    // It must NOT have consulted the engine (no auto-fire — AP-PLAYUX-10): one pick from engineReply.
+    expect(engine.pickMoveCalls).toHaveLength(1);
+  });
+
+  it('takeBackPlayerMove recomputes lastMove from the prior player ply', async () => {
+    const engine = new FakeEngine(['e7e5', 'b8c6']);
+    const s = makeSession(engine); // player white
+    s.applyPlayerMove('e2', 'e4');
+    await s.engineReply(); // bot e5
+    s.applyPlayerMove('g1', 'f3');
+    await s.engineReply(); // bot Nc6 → history [e4,e5,Nf3,Nc6], player to move
+    expect(s.gameRef.history()).toEqual(['e4', 'e5', 'Nf3', 'Nc6']);
+
+    const after = s.takeBackPlayerMove(); // undo Nc6 + Nf3
+    expect(s.gameRef.history()).toEqual(['e4', 'e5']);
+    expect(after.lastMove).toEqual(['e7', 'e5']); // the now-last ply (bot's e5) is highlighted
+    expect(s.turn).toBe('white');
+  });
+
   // bookMove capability: a provided book move is played WITHOUT consulting the engine port.
   it('bookMove plays the book move and skips the engine port', async () => {
     const engine = new FakeEngine(['should-not-be-used']);

@@ -330,6 +330,27 @@ export class GameSession {
     return this.snapshot();
   }
 
+  /** On-demand in-play take-back (P2, ADR-0058): undo the bot's last reply AND the player's move
+   *  beneath it, landing back on the player's turn. Pops both UCIs, reverts the game twice, and
+   *  recomputes `lastMove` from the now-last ply (or null) so the prior move stays highlighted.
+   *  Caller MUST pre-gate with the pure `canTakeBackInPlay` (the player has actually moved — this
+   *  must never undo the bot's OPENING move, AP-PLAYUX-10). NEVER fires the engine: after the double
+   *  undo it is the player's turn and the loop resumes on their next move (the component must not
+   *  call engineReply here). Returns a snapshot (the component reassigns `fen`). */
+  takeBackPlayerMove(): SessionSnapshot {
+    // Undo the bot's reply, then the player's move.
+    this.game.undo();
+    this.playedUci.pop();
+    this.game.undo();
+    this.playedUci.pop();
+    // Recompute the highlight from the now-last ply: the player's previous move if any, else none.
+    const last = this.playedUci[this.playedUci.length - 1];
+    this._lastMove = last ? [last.slice(0, 2), last.slice(2, 4)] : null;
+    // After undoing back past the player's move it is the player's turn again.
+    this._status = 'playing';
+    return this.snapshot();
+  }
+
   /** Resign (P1-14 partner): set status 'over' synchronously so an in-flight `engineReply` drops
    *  its late move. Mirrors the inline `resign()` guard; the component does the result string +
    *  fold + clock stop. Returns a snapshot. */
