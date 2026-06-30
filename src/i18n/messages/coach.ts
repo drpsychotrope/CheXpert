@@ -49,6 +49,22 @@ export const coach: Messages = {
   'coach.playGame': { fr: 'Jouer la partie →', en: 'Play the game →' },
   'coach.skip': { fr: 'Passer', en: 'Skip' },
 
+  // ── C4 real-data assessment (coach.*) — source-choice step + history provenance. The coach can
+  // assess from a recent WINDOW of the user's real analysed games (imported + played) via the same
+  // buildWeaknessProfile, instead of one toy game. Directional, sample-size-labelled, no grade. ──
+  'coach.useMyGames': { fr: '📊 Utiliser mes parties récentes →', en: '📊 Use my recent games →' },
+  'coach.useMyGamesHint': {
+    fr: 'Évaluer à partir de vos {n} dernières parties analysées (importées ou jouées) — pas de partie à jouer.',
+    en: 'Assess from your last {n} analysed games (imported or played) — no game to play.',
+  },
+  'coach.importMore': { fr: 'Importer d\'autres parties →', en: 'Import more games →' },
+  'coach.basedOnGames': {
+    fr: '{n} parties récentes ({played} jouées, {imported} importées)',
+    en: '{n} recent games ({played} played, {imported} imported)',
+  },
+  'coach.fromHistory': { fr: 'votre historique', en: 'your history' },
+  'coach.fromSingleGame': { fr: 'une courte partie', en: 'one short game' },
+
   // ── C3 designed-position probes (coach.*) — opt-in top-ups at the offer-game step for the two axes
   // a short even game under-measures. Directional, no grade (AP-CDESIGN-5); each is one designed game. ──
   'coach.probesTitle': {

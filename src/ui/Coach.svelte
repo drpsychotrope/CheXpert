@@ -7,12 +7,14 @@
   import { ChessGame } from '../game/ChessGame';
   import { PuzzleLadder } from '../calibration/Calibration';
   import { AdaptiveOpponent, initOpponentState } from '../engine/AdaptiveOpponent';
-  import { runAnalysis } from '../analysis/runAnalysis';
+  import { runAnalysis, loadAllAnalyses } from '../analysis/runAnalysis';
   import { loadPlayerModel } from '../store/playerModel';
   import { recordTacticsAttempt } from '../store/attemptsRepo';
   import { resultToGrade } from '../srs/fsrs';
   import { buildWeaknessProfile, type DimensionScore } from '../analysis/weakness';
+  import type { GameAnalysis } from '../analysis/types';
   import { buildCoachProfile } from '../coach/diagnostic';
+  import { recentAnalyses, analysesBySource, COACH_ASSESS_WINDOW, COACH_ASSESS_MIN_GAMES } from '../coach/assessmentWindow';
   import { COACH_PROBES, seedForSide, extractProbeDim, type CoachProbe } from '../coach/probes';
   import {
     buildProbePlan,
@@ -116,6 +118,21 @@
   let profile = $state<CoachProfile | null>(null);
   let programPreview = $state<ReturnType<typeof buildCoachProgram>>([]);
 
+  // ── C4 real-data assessment ───────────────────────────────────────────────
+  // The coach can build its profile from a recent WINDOW of the user's real analysed games (imported
+  // + played, already unified by loadAllAnalyses) via the SAME buildWeaknessProfile — never a fork
+  // (AP-CREAL-1). `historyAvailable` gates the "use my recent games" option at the offer step; it's
+  // read once on mount (cheap; loadAllAnalyses is cached). `historyCounts` drives the honest
+  // provenance line (FOLD-C4): for the history path it carries the windowed per-source counts; the
+  // toy-game path sets a single-game count so the line distinguishes history vs single (FOLD-C6).
+  let historyAvailable = $state(false);
+  let historyCounts = $state<{ games: number; played: number; imported: number; fromHistory: boolean } | null>(null);
+  onMount(async () => {
+    try {
+      historyAvailable = (await loadAllAnalyses()).length >= COACH_ASSESS_MIN_GAMES;
+    } catch { /* storage unavailable — hide the history option, fall back to toy game/ladders */ }
+  });
+
   // C1 — surface the already-persisted (write-only, ADR-0045) coach profile on the intro.
   // `saved`/`savedPrev`/`savedTrend` are $derived off app.model so they re-render when a fresh
   // assessment commits a new profile (Svelte 5 reactivity; ADR-0051 lesson). `nowMs` is UI-stamped
@@ -132,6 +149,23 @@
   // Result-screen trend: commit() has already shifted coachProfile→coachProfilePrev, so prev is the
   // run-before-this and `profile` is the new one (correct prev→current direction).
   const resultTrend = $derived(profile ? buildCoachTrend(profile, app.model?.coachProfilePrev) : null);
+
+  // C4 (§2.5/§2.7): the honest provenance "source" phrase fed into coach.directional. Ladders prefix
+  // (or "no puzzle data"), then — when a real game contributed dimensions — either the windowed
+  // history count ("N recent games (M played, K imported)") or the single short-game suffix, so the
+  // text matches what ACTUALLY fed the profile (FOLD-C6 / AP-CREAL-9). Directional, no grade.
+  const provenanceSource = $derived.by(() => {
+    const ladders = profile?.source.ladders ? t('coach.sourceLadders') : t('coach.sourceNoData');
+    if (!profile?.source.game) return ladders;
+    if (historyCounts?.fromHistory) {
+      // "…two puzzles per motif + your history: N recent games (M played, K imported)"
+      return ladders + ' + ' + t('coach.fromHistory') + ': ' + t('coach.basedOnGames', {
+        n: historyCounts.games, played: historyCounts.played, imported: historyCounts.imported,
+      });
+    }
+    // single toy game — distinguish from history explicitly (FOLD-C6)
+    return ladders + ' + ' + t('coach.fromSingleGame');
+  });
 
   /** Resume WITHOUT re-probing (Q-D / AP-CPROF-6): rebuild the program from the saved profile via the
    *  pure buildCoachProgram, then wrap it exactly like startCoaching. Reload-safe — derived from the
@@ -491,12 +525,35 @@
         now: Date.now(),
       });
       gameDimensions = buildWeaknessProfile([analysis], baseline(), getLocale()).dimensions;
+      // Toy-game provenance (FOLD-C6): a single played game, so the line reads "1 recent game
+      // (1 played, 0 imported)" — distinct from the history path's window. Only when the analysis
+      // produced dims (else the line stays the single-game text below at render).
+      historyCounts = { games: 1, played: 1, imported: 0, fromHistory: false };
     } catch { /* fall through with no game dims */ }
     await commit(gameDimensions);
   }
 
   async function finishWithoutGame() {
     await commit(null);
+  }
+
+  /** C4 (§2.1/§2.3a): assess from the user's REAL recent games. Window the already-unified analyses
+   *  (imported + played) and feed the array to the SAME buildWeaknessProfile the coach consumes —
+   *  consume, never fork (AP-CREAL-1). Below the floor → fall back to the ladders-only path so we
+   *  never render an all-"not measured" radar as an assessment (FOLD-C2 / AP-CREAL-5). Windowing is
+   *  pure (sorts the records' own analyzedAt); this function only owns the loadAllAnalyses() read. */
+  async function finishWithHistory() {
+    step = 'analysing';
+    info = t('coach.analysingGame');
+    let all: GameAnalysis[] = [];
+    try {
+      all = await loadAllAnalyses();
+    } catch { return finishWithoutGame(); } // storage unavailable → fall back (AP-CREAL-5)
+    const window = recentAnalyses(all, COACH_ASSESS_WINDOW);
+    if (window.length < COACH_ASSESS_MIN_GAMES) return finishWithoutGame(); // thin history → fall back
+    const gameDimensions = buildWeaknessProfile(window, baseline(), getLocale()).dimensions;
+    historyCounts = { games: window.length, ...analysesBySource(window), fromHistory: true };
+    await commit(gameDimensions);
   }
 
   /** C3: analyse the finished probe game through the EXISTING pipeline, extract ONLY the targeted
@@ -662,9 +719,19 @@
       {#if skipNaDims.length}
         <p class="feedback" style="font-size:0.85rem">{t('coach.skipCost', { dims: skipNaDims.join(', ') })}</p>
       {/if}
+      <!-- C4 source choice (§2.3): assess from real recent games (a) — shown only when history exists;
+           play a quick game (b, existing); or import more (c). The toy game is one option, not the
+           only one. (a) builds dimensions from a recent window via the SAME buildWeaknessProfile. -->
+      {#if historyAvailable}
+        <div class="row center">
+          <button onclick={finishWithHistory}>{t('coach.useMyGames')}</button>
+        </div>
+        <p class="muted" style="font-size:0.8rem">{t('coach.useMyGamesHint', { n: COACH_ASSESS_WINDOW })}</p>
+      {/if}
       <ColorPicker bind:value={coachColorChoice} />
       <div class="row center">
         <button onclick={startGame}>{t('coach.playGame')}</button>
+        <button style="background:transparent;border:1px solid var(--border)" onclick={() => app.go('import')}>{t('coach.importMore')}</button>
         <button style="background:transparent;border:1px solid var(--border)" onclick={finishWithoutGame}>{t('coach.skip')}</button>
       </div>
 
@@ -710,7 +777,7 @@
     <div class="panel col center" style="gap:0.75rem;width:100%">
       <h3>{t('coach.profileTitle')}</h3>
       <Radar dimensions={profile.dimensions} />
-      <p class="muted" style="font-size:0.8rem">{t('coach.directional', { source: (profile.source.ladders ? t('coach.sourceLadders') : t('coach.sourceNoData')) + (profile.source.game ? t('coach.sourceGameSuffix') : '') })}</p>
+      <p class="muted" style="font-size:0.8rem">{t('coach.directional', { source: provenanceSource })}</p>
       <div class="row" style="gap:1.5rem;align-items:flex-start">
         <div class="col"><b>{t('coach.strengths')}</b>{#each profile.strengths as s}<span>✔ {s}</span>{:else}<span class="muted">—</span>{/each}</div>
         <div class="col"><b>{t('coach.focusOn')}</b>{#each profile.weaknesses as w}<span>△ {w}</span>{:else}<span class="muted">—</span>{/each}</div>

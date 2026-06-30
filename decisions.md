@@ -1655,3 +1655,51 @@ cores; no `DB_VERSION` bump; Insights byte-identical; bilingual FR+EN. The timed
 interactive Coach board, wired with onMoveText (F2 a11y invariant preserved — wiring test 2->3). 834
 tests green (800 + 34). Cross-links: ADR-0045/0048/0055, `specs/coach-probe-engine-v2-spec.md`.
 Recovered + verified green after a mid-run process restart before commit.
+
+---
+
+## C4 — coach-real-data-assessment (no new ADR; additive consumption, mirrors F1/F2/F4)
+
+The coach re-probed from zero every run and ignored all played-game history: it analysed **one toy bot
+game** and derived the radar from `buildWeaknessProfile([thatOneGame], …)`, while `loadAllAnalyses()`
+already held every analysed game (imported + played, unified). C4 closes that gap at the **consumption**
+layer: the coach can now assess from a recent **window** of the user's REAL analyses. A pre-flight scan
+confirmed the surface was already built — `buildWeaknessProfile` is already N-game (`weakness.ts:204`),
+`loadAllAnalyses()` already unifies imported+played (`runAnalysis.ts:93`), `GameAnalysis` already carries
+`source`+`analyzedAt`, and `Import.svelte` already parses/guards/persists real PGN — so C4 = **pass the
+real windowed array**, no fork, no new import, no schema change. Arbitrages (RESOLVED): **Q-A=both**
+(history-first, import optional); **Q-B=a** — recent window **N=10** by `analyzedAt`, sample-size-labelled,
+via a **pure** `recentAnalyses` (no `Date.now` — sorts the records' own timestamps, AP-CREAL-4);
+**Q-C=a** — imported games persist via the EXISTING import path, never a coach rating pool (these are real
+analysed games, not probe puzzles, so AP-COACH-8 is about probe→pool seeding, untouched here);
+**Q-D=consume** — the coach calls `buildWeaknessProfile`, never forks it (AP-CREAL-1 / AP-COACH-1).
+
+**New pure core** `src/coach/assessmentWindow.ts`: `recentAnalyses(analyses, n)` (copy-then-sort by
+`analyzedAt` desc, slice N; stable ties; clamps n<0→0) + `analysesBySource(analyses)` ({played, imported}
+for provenance) + `COACH_ASSESS_WINDOW=10` / `COACH_ASSESS_MIN_GAMES=1`. `Coach.svelte`: a new
+`finishWithHistory()` path windows `loadAllAnalyses()` and feeds the array to the unchanged
+`buildWeaknessProfile`; below the floor (or storage unavailable) it **falls back to the existing
+toy-game/ladders path** so an all-"not measured" radar is never shown as an assessment (FOLD-C2 /
+AP-CREAL-5). The `offer-game` step generalises into a **source choice** — "use my recent games" (shown
+only when history exists), "play a quick game" (unchanged toy game), "import more" (routes to the existing
+Import view via `app.go('import')`) — no new top-level view (AP-CREAL-11). The provenance line states what
+fed the profile honestly: "…two puzzles per motif + your history: **N** recent games (**M** played, **K**
+imported)" for the window, or "+ one short game" for the toy game (FOLD-C6 / AP-CREAL-9); `source.game` is
+set true for free by passing history dims (`buildCoachProfile` already does `!!gameDimensions`). Directional,
+no grade; `gamesAnalyzed`/`sampleSize` inherited from `buildWeaknessProfile`.
+
+**Additive, read-only over existing stores**: **no `DB_VERSION` bump**, no new store/index, no rating-pool
+write, no network. `weakness.ts`/`studyPlan.ts`/`db.ts`/`diagnostic.ts` **byte-identical** (empty diff) ⇒
+Insights unchanged (AP-COACH-1). Every new `coach.*` label is FR+EN (parity by construction). **Tests:**
+`assessmentWindow.test.ts` (18 — window size/sort/n>len/n=0/negative/empty/no-mutation/tie-stability/
+determinism for `recentAnalyses`; mixed/all-played/all-imported/empty + window-sum for `analysesBySource`;
+the thin-history fallback predicate; and a consume-not-fork composition proving
+`buildWeaknessProfile(recentAnalyses(all, N))` === profiling the window directly). **876 tests green**
+(858 + 18), svelte-check **0/0** (427 files), build green. **Rollback:** revert the commit —
+`assessmentWindow.ts`/its test/the `finishWithHistory` path/the source buttons/the provenance text/the new
+i18n keys vanish; `buildWeaknessProfile`/`buildCoachProfile`/`loadAllAnalyses`/Import/the DB are untouched,
+no migration ran. Cross-links: ADR-0045 (coach mode), F5 (`games-store-pgn-io-spec.md` — history/import
+surface), `specs/coach-real-data-assessment-spec.md` §2/§4/§6/§9, `enhancements-architecture-spec.md` C4.
+Folds CO11 (assess from imported PGN) + CO6 (blend played history). Follow-ups (§11): user-tunable N /
+per-source filters (C5), opening→repertoire from blended history (C7), game-review surfacing for the games
+that fed the profile (C6), bulk multi-game `.pgn` upload (F5 §11).
