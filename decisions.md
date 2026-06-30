@@ -1827,3 +1827,73 @@ mode), ADR-0052/0053 (i18n), F4 (`SolutionReveal`), `specs/coach-output-teaching
 efficacy — did the review/card help?); historical-game review on the result/Dashboard (needs F5 + a
 selection UI — DEFER); reveal/card usage telemetry (DEFER); richer narrative (prev-profile trend belongs to
 C1; opening-name-aware) — C6 keeps the narrative to the current profile (single concern).
+
+---
+
+## C7 — Configurable budget + mastery steps + closed-loop efficacy + opening routing (coach-program-v2)
+**Date:** 2026-06-30 · **Status:** accepted · **ADR:** none (note only — see below) · **DB_VERSION:** 4 (unchanged)
+
+The coach program (`buildCoachProgram` → `buildSession` → `Session.svelte`) was rigid (hardcoded 30-min
+budget), time-boxed (never mastery-based), open-loop (efficacy lived only in Insights), and generic in its
+opening routing. C7 makes it configurable, mastery-based, closed-loop, and opening-specific — **additively**,
+reusing the Insights/efficacy/eco patterns next door, with **no `DB_VERSION` bump** and the honesty posture
+intact. Records `specs/coach-program-v2-spec.md` Q-A..Q-D = the spec defaults; no fork of `buildStudyPlan`
+(Insights byte-identical, AP-COACH-1/AP-CPROG-6); cores stay pure (AP-CPROG-9).
+
+**Q-A — configurable budget (CO5).** A 15/30/60 toggle in `Coach.svelte` mirroring Insights, default 30.
+It is **not cosmetic** (AP-CPROG-1): the chosen budget drives the `$derived` program preview AND is stamped
+on `app.activeSession.budgetMin` (a NEW in-memory-only field — no schema), which `Session.svelte` now reads
+(`budgetMin ?? 30`) in place of the old `const minutes = 30`. The Insights generic-session path omits
+`budgetMin` ⇒ falls back to 30 (back-compat). The `minutes` parameter on `buildCoachProgram` already
+existed and was already budget-bounded by `take()`, so CO5 was *wiring the toggle into the two hardcoded
+call-sites*, not adding a core parameter.
+
+**Q-B — mastery steps (CO16).** A NEW **optional** `PlanItem.mastery?` field (`MasteryCriterion`:
+`{ kind: 'streak'|'missRate', target, motifKey? }`) carried through to `SessionStep`. `buildCoachProgram`
+attaches it per step: weak-motif tactics → `streak` (4-in-a-row), endgame motif → `streak` (3), dimension
+steps (conversion/time/resilience/openingAccuracy) → `missRate` (0.25). `minutes` is now the **SAFETY CAP**
+(criterion-or-cap, whichever first — AP-CPROG-2/3): `Session.svelte` surfaces the criterion + cap and nudges
+advance once the per-step cap elapses (the hard bound). `play-steered` is **criterion-less** by design — a
+full game is its own unit (AP-CPROG-2). `buildStudyPlan` never sets `mastery` ⇒ Insights' study plan +
+snapshot stay byte-identical (verified by a dedicated test, AP-CPROG-6).
+
+**Q-C — closed loop (CO10), descriptive only.** A NEW pure module `src/coach/coachLoop.ts`:
+`programEfficacy(program, analyses)` reuses the EXISTING `motifEfficacy` (the SAME read Insights uses) to
+return per-measurable-step before/after + a SOFT advisory `looksImproved = enoughData && deltaPct < 0`. It is
+**descriptive, never causal** and **never mutates the profile** (AP-CPROG-4) — the result-screen header
+carries `insights.didItMoveBody` verbatim. Honesty branches (E2/AP-CPROG-5): `neverMeasured` (no game ever
+contained the motif → "play some games to see if this moves") is distinguished from thin-but-present data
+("too little data"); a ladders-only run with **no** analysed games → `programEfficacy` returns `[]` → the UI
+renders **no** efficacy section (E3), not a hollow header. Dimension/`endgame` keys are skipped (not leak
+clusters). The loop takes `(program, analyses)` and returns data only — read-only by type.
+
+**Q-D — opening routing (CO17), book-agnostic.** `namedOpeningForGap(analyses, ecoTable, locale)` (pure, in
+`coachLoop.ts`) names the player's most-played line via the bundled `eco.json` (longest-prefix `nameOpening`,
+localized). The name is injected into `buildCoachProgram` via a NEW optional **5th** positional arg
+`opts.namedOpening` (the C5 4th arg `goal` is untouched — every existing 4-arg call still compiles) and
+appears in the `openingAccuracy` step's **`reason`** only; `focus` stays the stable `'opening lines'` routing
+key (AP-CPROG-8). No entry is added to `OPENING_BOOK` — P4 owns the steering book (AP-CPROG-7); the existing
+`play-steered`/`app.steerDimension` steer is reused. When no line is identifiable, the generic reason is used.
+
+**No new ADR.** The mastery-step model is an **additive-optional field** on the shared `PlanItem`, never
+emitted by `buildStudyPlan`, with no schema or persistence change — a note, not an architectural change to
+the `PlanItem` contract. **ADR-0059 stays RESERVED** (do not pre-spend; 0054–0058 in use); allocate only if
+a future reviewer judges the mastery-step model decision-worthy.
+
+**Files:** `analysis/studyPlan.ts` (+`MasteryCriterion`/`PlanItem.mastery?`), `analysis/session.ts`
+(`SessionStep.mastery?` + copy-through), `coach/program.ts` (5th `opts` arg + criteria + named reason),
+`coach/coachLoop.ts` (NEW pure: `programEfficacy`/`namedOpeningForGap`), `state/app.svelte.ts`
+(`activeSession.budgetMin?`), `ui/Coach.svelte` (budget toggle + named-opening load + inline efficacy +
+mastery badge + `budgetMin` on both session-launch paths), `ui/Session.svelte` (read `budgetMin`, render
+criterion+cap, cap-elapsed nudge), i18n (`program.openingAccuracyNamed`; `coach.budgetLabel`/
+`masteryStreak`/`masteryMissRate`/`masteryCap`/`looksImproved`/`notMeasuredYet`; `session.masteryGoal`/
+`masteryStreak`/`masteryMissRate`/`capReached`), all FR+EN. **Tests:** `coachLoop.test.ts` (new, 11) +
+`program.test.ts` (+7: mastery/opening/budget) + `studyPlan.test.ts` (+1 byte-identity guard) →
+**927 green** (908 + 19), svelte-check **0/0** (433 files), build green. **Rollback** (§10): pure-additive —
+drop `coachLoop.ts`+test, the `program.ts` `opts` branch + `mastery` attachment, the optional `mastery?`
+fields, the Coach/Session toggle+advisory wiring, the `budgetMin` field, and the new i18n keys; no schema,
+no `DB_VERSION`, no `buildStudyPlan`/`OPENING_BOOK` change → nothing to undo in IndexedDB; old 4-arg
+`buildCoachProgram` calls still compile. Cross-links: ADR-0045 (coach mode), ADR-0039 (efficacy/session),
+ADR-0027 (study-plan/budget), ADR-0028 (eco naming), P4 (opening-steering symmetry — owns `OPENING_BOOK`),
+C5 (intake goal — the 4th arg), C1 (profile persistence — owns the persisted-mastery follow-up),
+`specs/coach-program-v2-spec.md` §4/§5/§6/§9, `enhancements-architecture-spec.md` (C7).

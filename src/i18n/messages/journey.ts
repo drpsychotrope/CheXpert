@@ -86,6 +86,15 @@ export const journey: Messages = {
     fr: 'Lance le vrai trainer. Revenez ici via « Session » dans la navigation pour reprendre cette étape.',
     en: 'Launches the real trainer. Return here via "Session" in the nav to resume this step.',
   },
+  // ── C7/CO16 mastery criterion + cap on a coach step. {goal}=the criterion text, {cap}=the cap min.
+  // The criterion can only end a step EARLIER; the cap is the hard bound (AP-CPROG-2/3). ──
+  'session.masteryGoal': { fr: 'Objectif : {goal} · plafond {cap} min', en: 'Goal: {goal} · cap {cap} min' },
+  'session.masteryStreak': { fr: '{n} d\'affilée', en: '{n} in a row' },
+  'session.masteryMissRate': { fr: 'taux d\'échec < {pct} %', en: 'miss-rate < {pct}%' },
+  'session.capReached': {
+    fr: 'Plafond de temps atteint — vous pouvez passer à la suite.',
+    en: 'Time cap reached — you can move on.',
+  },
   'session.noSession': { fr: 'Aucune session disponible.', en: 'No session available.' },
   'session.backToInsights': { fr: 'Retour au Bilan', en: 'Back to Insights' },
 

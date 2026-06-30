@@ -176,6 +176,107 @@ describe('leverageStepFor (C5/Q-D/CO18)', () => {
   });
 });
 
+// ── C7 mastery criteria + cap (CO16) ─────────────────────────────────────────
+describe('buildCoachProgram mastery criteria (C7/CO16)', () => {
+  it('attaches a streak criterion to each weak-motif tactics step, with minutes as the cap', () => {
+    const p = profile({ motifs: [
+      { theme: 'fork', rating: 900, baseline: 1200, delta: -300, n: 4 },
+      { theme: 'pin', rating: 1000, baseline: 1200, delta: -200, n: 4 },
+    ] });
+    const plan = buildCoachProgram(p, 60);
+    const fork = plan.find((s) => s.activity === 'tactics' && s.focus === 'fork')!;
+    expect(fork.mastery).toMatchObject({ kind: 'streak', motifKey: 'fork' });
+    expect(fork.mastery!.target).toBeGreaterThan(0);
+    expect(fork.minutes).toBeGreaterThan(0); // the cap is still present (criterion-or-cap, AP-CPROG-3)
+  });
+
+  it('attaches a streak criterion (motifKey endgame) to the endgame-motif step', () => {
+    const p = profile({ motifs: [{ theme: 'endgame', rating: 1000, baseline: 1200, delta: -200, n: 4 }] });
+    const eg = buildCoachProgram(p, 30)[0];
+    expect(eg.activity).toBe('endgames');
+    expect(eg.mastery).toMatchObject({ kind: 'streak', motifKey: 'endgame' });
+  });
+
+  it('attaches missRate criteria to dimension steps with the right motifKey', () => {
+    const p = profile({ dimensions: [
+      dim('openingAccuracy', 25), dim('timeManagement', 20), dim('resilience', 15), dim('endgameConversion', 30),
+    ] });
+    const plan = buildCoachProgram(p, 60);
+    const byKey = (k: string) => plan.find((s) => s.mastery?.motifKey === k)?.mastery;
+    expect(byKey('endgameConversion')).toMatchObject({ kind: 'missRate' });
+    expect(byKey('openingAccuracy')).toMatchObject({ kind: 'missRate' });
+    expect(byKey('timeManagement')).toMatchObject({ kind: 'missRate' });
+    expect(byKey('resilience')).toMatchObject({ kind: 'missRate' });
+    // all missRate targets are a fraction in (0,1)
+    for (const k of ['endgameConversion', 'openingAccuracy', 'timeManagement', 'resilience']) {
+      const t = byKey(k)!.target;
+      expect(t).toBeGreaterThan(0); expect(t).toBeLessThan(1);
+    }
+  });
+
+  it('the play-steered step carries NO mastery (a full game is its own unit — AP-CPROG-2)', () => {
+    const p = profile({ dimensions: [dim('openingAccuracy', 25)] });
+    const steered = buildCoachProgram(p, 60).find((s) => s.activity === 'play-steered')!;
+    expect(steered).toBeDefined();
+    expect(steered.mastery).toBeUndefined();
+  });
+});
+
+// ── C7 opening-name enrichment (CO17) ────────────────────────────────────────
+describe('buildCoachProgram opening name (C7/CO17)', () => {
+  const weakOpening = () => profile({ dimensions: [dim('openingAccuracy', 25)] });
+
+  it('puts the opening LABEL in the repertoire step reason, keeping focus the stable routing key', () => {
+    const plan = buildCoachProgram(weakOpening(), 60, 'en', undefined, {
+      namedOpening: { key: 'Sicilian Defence', label: 'Sicilian Defence' },
+    });
+    const rep = plan.find((s) => s.activity === 'repertoire')!;
+    expect(rep.focus).toBe('opening lines');         // routing key UNCHANGED (AP-CPROG-8)
+    expect(rep.reason).toContain('Sicilian Defence'); // the name lives in reason only
+  });
+
+  it('falls back to the generic reason when no opening is supplied', () => {
+    const plan = buildCoachProgram(weakOpening(), 60, 'en');
+    const rep = plan.find((s) => s.activity === 'repertoire')!;
+    expect(rep.focus).toBe('opening lines');
+    expect(rep.reason).not.toContain('Sicilian');
+    expect(rep.reason.length).toBeGreaterThan(0);
+  });
+
+  it('5th opts arg is optional — adding it does not disturb the 4-arg goal call (purity/back-compat)', () => {
+    const p = profile({ motifs: [{ theme: 'fork', rating: 900, baseline: 1200, delta: -300, n: 4 }] });
+    expect(buildCoachProgram(p, 30, 'en', undefined, {})).toEqual(buildCoachProgram(p, 30, 'en', undefined));
+  });
+});
+
+// ── C7 budget threading (CO5 — the core honours minutes) ──────────────────────
+describe('buildCoachProgram budget (C7/CO5)', () => {
+  const many = () => profile({ motifs: [
+    { theme: 'fork', rating: 900, baseline: 1200, delta: -300, n: 4 },
+    { theme: 'pin', rating: 950, baseline: 1200, delta: -250, n: 4 },
+    { theme: 'skewer', rating: 980, baseline: 1200, delta: -220, n: 4 },
+    { theme: 'mate', rating: 990, baseline: 1200, delta: -210, n: 4 },
+  ] });
+
+  it('15-minute budget keeps the total within 15', () => {
+    const total = buildCoachProgram(many(), 15).reduce((s, i) => s + i.minutes, 0);
+    expect(total).toBeLessThanOrEqual(15);
+  });
+
+  it('60 admits at least as many steps as 15 (the toggle is a real lever)', () => {
+    const at15 = buildCoachProgram(many(), 15).length;
+    const at60 = buildCoachProgram(many(), 60).length;
+    expect(at60).toBeGreaterThanOrEqual(at15);
+    expect(at60).toBeGreaterThan(1);
+  });
+
+  it('is pure: identical inputs → deep-equal output', () => {
+    const p = many();
+    expect(buildCoachProgram(p, 30, 'en', 'fix-blunders', { namedOpening: { key: 'k', label: 'L' } }))
+      .toEqual(buildCoachProgram(p, 30, 'en', 'fix-blunders', { namedOpening: { key: 'k', label: 'L' } }));
+  });
+});
+
 // ── C5 end-to-end through buildCoachProgram + buildSession ────────────────────
 describe('buildCoachProgram with goal + leverage (C5)', () => {
   it('a no-strength profile with goal undefined is byte-identical to the 3-arg call', () => {

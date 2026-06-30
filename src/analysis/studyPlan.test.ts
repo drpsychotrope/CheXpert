@@ -38,6 +38,17 @@ describe('buildStudyPlan', () => {
     expect(buildStudyPlan(leaks, 'tactics', 30)).toEqual(buildStudyPlan(leaks, 'tactics', 30));
   });
 
+  // C7/AP-CPROG-6: the shared PlanItem.mastery field is coach-only. buildStudyPlan must NEVER emit it,
+  // so Insights' study plan (and its snapshot) stay byte-identical after the additive-optional change.
+  it('never emits the C7 mastery field (Insights byte-identity, AP-CPROG-6)', () => {
+    const plan = buildStudyPlan(
+      [leak('fork', 'middlegame', 5, 30), leak('endgameMistake', 'endgame', 3, 20)],
+      'resilience', 60, { visionWeakSquares: ['a8'], locale: 'en' },
+    );
+    expect(plan.length).toBeGreaterThan(0);
+    expect(plan.every((i) => i.mastery === undefined)).toBe(true);
+  });
+
   // ADR-0043: due vision squares retarget the warm-up.
   it('targets weak squares in the vision step when provided', () => {
     const plan = buildStudyPlan([], null, 30, { visionWeakSquares: ['a8', 'h1', 'e4'], locale: 'en' });

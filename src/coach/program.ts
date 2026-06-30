@@ -155,11 +155,27 @@ export function profileToLeaks(profile: CoachProfile): Leak[] {
     }));
 }
 
+/**
+ * C7/CO16: per-step mastery criteria. The `minutes` value on a coach step is now the SAFETY CAP
+ * (Q-B); the criterion can only end a step EARLIER, never extend it past the cap (AP-CPROG-2/3).
+ *  - drill-to-pattern steps (motif tactics, endgame) → a `streak` (N correct in a row);
+ *  - dimension steps (conversion / time / resilience) → a `missRate` (recent rate below threshold).
+ * `play-steered` is criterion-less by design — a full game is its own unit (AP-CPROG-2). `motifKey`
+ * stays the step's STABLE English routing/measurement key (feeds motifEfficacy; never translated). */
+const STREAK_MOTIF = 4;   // a tactical motif: 4-in-a-row before we consider it addressed
+const STREAK_ENDGAME = 3; // an endgame: 3-in-a-row (fewer, longer puzzles)
+const DIM_MISS_RATE = 0.25; // a weak dimension: advance when recent miss-rate drops below 25%
+
 export function buildCoachProgram(
   profile: CoachProfile,
   minutes = 30,
   locale: Locale = 'fr',
   goal?: CoachGoal,
+  // C7/CO17 (NEW, optional, 5th positional so the C5 4-arg `goal` calls keep working): a UI-derived
+  // opening NAME for the openingAccuracy step's reason. Display-only — `focus` stays a routing key and
+  // NO entry is added to OPENING_BOOK (book-agnostic, P4 owns it — AP-CPROG-7). Purity preserved: the
+  // label is data passed in; the eco.json/async read lives at the UI boundary (AP-CPROG-9).
+  opts: { namedOpening?: { key: string; label: string } } = {},
 ): PlanItem[] {
   const plan: PlanItem[] = [];
   let used = 0;
@@ -171,13 +187,14 @@ export function buildCoachProgram(
     const mins = take(8);
     if (mins <= 0) break;
     if (m.theme === 'endgame') {
-      plan.push({ activity: 'endgames', focus: 'endgame conversion', minutes: mins, reason: gt('program.endgameDrill', locale, { delta: -m.delta }) });
+      plan.push({ activity: 'endgames', focus: 'endgame conversion', minutes: mins, reason: gt('program.endgameDrill', locale, { delta: -m.delta }), mastery: { kind: 'streak', target: STREAK_ENDGAME, motifKey: 'endgame' } });
     } else {
       plan.push({
         activity: 'tactics',
         focus: m.theme,
         minutes: mins,
         reason: gt('program.motifDrill', locale, { motif: gt('motif.' + m.theme, locale), delta: -m.delta }),
+        mastery: { kind: 'streak', target: STREAK_MOTIF, motifKey: m.theme },
       });
     }
     used += mins;
@@ -188,14 +205,25 @@ export function buildCoachProgram(
   for (const d of weakDims) {
     if (used >= minutes) break;
     if (d.dimension === 'endgameConversion') {
-      const m = take(8); if (m > 0) { plan.push({ activity: 'endgames', focus: 'endgame conversion', minutes: m, reason: gt('program.endgameConversion', locale, { score: d.score }) }); used += m; }
+      const m = take(8); if (m > 0) { plan.push({ activity: 'endgames', focus: 'endgame conversion', minutes: m, reason: gt('program.endgameConversion', locale, { score: d.score }), mastery: { kind: 'missRate', target: DIM_MISS_RATE, motifKey: 'endgameConversion' } }); used += m; }
     } else if (d.dimension === 'openingAccuracy') {
-      const m1 = take(6); if (m1 > 0) { plan.push({ activity: 'repertoire', focus: 'opening lines', minutes: m1, reason: gt('program.openingAccuracy', locale, { score: d.score }) }); used += m1; }
-      const m2 = take(8); if (m2 > 0) { plan.push({ activity: 'play-steered', focus: 'openingAccuracy', minutes: m2, reason: gt('program.openingSteer', locale) }); used += m2; }
+      const m1 = take(6); if (m1 > 0) {
+        plan.push({
+          activity: 'repertoire',
+          focus: 'opening lines', // STABLE routing key — the opening name lives in `reason`, never here (AP-CPROG-8)
+          minutes: m1,
+          reason: opts.namedOpening
+            ? gt('program.openingAccuracyNamed', locale, { score: d.score, opening: opts.namedOpening.label })
+            : gt('program.openingAccuracy', locale, { score: d.score }),
+          mastery: { kind: 'missRate', target: DIM_MISS_RATE, motifKey: 'openingAccuracy' },
+        });
+        used += m1;
+      }
+      const m2 = take(8); if (m2 > 0) { plan.push({ activity: 'play-steered', focus: 'openingAccuracy', minutes: m2, reason: gt('program.openingSteer', locale) }); used += m2; } // play-steered: no criterion (AP-CPROG-2)
     } else if (d.dimension === 'timeManagement') {
-      const m = take(6); if (m > 0) { plan.push({ activity: 'tactics', focus: 'time', minutes: m, reason: gt('program.timeManagement', locale, { score: d.score }) }); used += m; }
+      const m = take(6); if (m > 0) { plan.push({ activity: 'tactics', focus: 'time', minutes: m, reason: gt('program.timeManagement', locale, { score: d.score }), mastery: { kind: 'missRate', target: DIM_MISS_RATE, motifKey: 'timeManagement' } }); used += m; }
     } else if (d.dimension === 'resilience') {
-      const m = take(8); if (m > 0) { plan.push({ activity: 'comeback', focus: 'defend & recover', minutes: m, reason: gt('program.resilience', locale, { score: d.score }) }); used += m; }
+      const m = take(8); if (m > 0) { plan.push({ activity: 'comeback', focus: 'defend & recover', minutes: m, reason: gt('program.resilience', locale, { score: d.score }), mastery: { kind: 'missRate', target: DIM_MISS_RATE, motifKey: 'resilience' } }); used += m; }
     }
     // 'tactics' dim intentionally skipped — covered by per-motif steps.
   }

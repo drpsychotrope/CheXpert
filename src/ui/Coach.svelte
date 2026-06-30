@@ -30,6 +30,8 @@
   import { initTimedProbe, recordTimed, timedDimension, type TimedProbeState } from '../coach/timedProbe';
   import { initClock, startClock, stopClock, tick, flagged, type ClockState } from '../clock/Clock';
   import { buildCoachProgram } from '../coach/program';
+  import { programEfficacy, namedOpeningForGap } from '../coach/coachLoop';
+  import { loadEco, type EcoEntry } from '../opening/eco';
   import { buildCoachNarrative, rankByLeverage } from '../coach/narrative';
   import { criticalMoments } from '../analysis/criticalMoments';
   import { explainPly } from '../analysis/explain';
@@ -43,7 +45,7 @@
   import type { TacticalTrainer } from '../trainer/TacticalTrainer';
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
-  import { t, getLocale } from '../i18n';
+  import { t, getLocale, fmtPct } from '../i18n';
   import { labelOrRaw, gt } from '../i18n/gen';
 
   type Step = 'intro' | 'goals' | 'ladders' | 'timed' | 'offer-game' | 'game' | 'analysing' | 'result';
@@ -140,7 +142,31 @@
   const gameInCheck = $derived(gameFen ? game.inCheck() : false);
 
   let profile = $state<CoachProfile | null>(null);
-  let programPreview = $state<ReturnType<typeof buildCoachProgram>>([]);
+
+  // ── C7 configurable budget + closed loop ──────────────────────────────────
+  // CO5: the 15/30/60 budget toggle mirroring Insights. Default 30 (no behaviour change until the
+  // user picks). It drives BOTH the preview (below, $derived) AND the launched session (startCoaching/
+  // resumeProgram stamp app.activeSession.budgetMin) — never cosmetic (AP-CPROG-1).
+  let budget = $state(30);
+  // CO10/CO17 inputs, loaded once at result time (the UI owns the async eco/analyses reads — the cores
+  // stay pure, AP-CPROG-9). `coachAnalyses` is the window the profile was built from (history path) or
+  // the single played game; `ecoTable` is the bundled CC0 opening table.
+  let coachAnalyses = $state<GameAnalysis[]>([]);
+  let ecoTable = $state<EcoEntry[]>([]);
+
+  // CO17: the most-played opening across the analysed games (null when none identifiable → generic
+  // reason). Pure derive over loaded data; re-localizes on FR/EN switch (getLocale() is reactive).
+  const namedOpening = $derived(namedOpeningForGap(coachAnalyses, ecoTable, getLocale()));
+  // The program preview is now $derived so the budget toggle (and a language switch) recompute it
+  // live. Feeds buildCoachProgram the goal (C5, 4th arg) AND the named opening (C7, 5th arg).
+  const programPreview = $derived<ReturnType<typeof buildCoachProgram>>(
+    profile ? buildCoachProgram(profile, budget, getLocale(), profile.goal, { namedOpening: namedOpening ?? undefined }) : [],
+  );
+  // CO10: descriptive before/after per measurable step (the SAME motifEfficacy read Insights uses).
+  // [] for a ladders-only run (no analysed games) → the result renders NO efficacy header (E3).
+  const efficacy = $derived(programPreview.length ? programEfficacy(programPreview, coachAnalyses) : []);
+  // Joinable by motifKey for the inline per-step advisory (E1).
+  const efficacyByKey = $derived(new Map(efficacy.map((e) => [e.motifKey, e])));
 
   // ── C6 coach-output teaching ──────────────────────────────────────────────
   // The result screen COMMUNICATES + TEACHES (C6). All four surfaces read the SAME profile (and,
@@ -242,8 +268,10 @@
   function resumeProgram() {
     if (!saved) return;
     // Resume re-weights from the goal the saved profile was built with (C5 — persisted on the profile).
-    const plan = buildCoachProgram(saved, 30, getLocale(), saved.goal);
-    app.activeSession = { plan: buildSession(plan), current: 0, startedAt: Date.now(), reflection: '' };
+    // C7/CO5: honour the chosen budget here too (default 30 ⇒ byte-identical) and stamp it on the
+    // session so Session.svelte runs the right budget (AP-CPROG-1). No named opening on the intro path.
+    const plan = buildCoachProgram(saved, budget, getLocale(), saved.goal);
+    app.activeSession = { plan: buildSession(plan), current: 0, startedAt: Date.now(), reflection: '', budgetMin: budget };
     app.go('session');
   }
 
@@ -694,7 +722,19 @@
     // softly weights the program AND lets a re-run pre-select the picker.
     p.goal = goal;
     profile = p;
-    programPreview = buildCoachProgram(p, 30, getLocale(), goal);
+    // C7/CO10+CO17: load the inputs for the closed loop + opening naming. The eco table + the player's
+    // analysed games are read HERE (UI boundary) and handed to the pure cores via $derived. We read
+    // ALL analyses (the SAME read Insights' efficacy uses) so the before/after split spans history; a
+    // ladders-only run with no games yields [] → no efficacy header (E3). Failures degrade silently:
+    // empty table/array → generic reason + no efficacy section (graceful).
+    try {
+      const [eco, all] = await Promise.all([loadEco(), loadAllAnalyses()]);
+      ecoTable = eco;
+      coachAnalyses = all;
+    } catch {
+      ecoTable = [];
+      coachAnalyses = [];
+    }
     // C5/CO14: ONE descriptive calibration sentence — ONLY when metacog is enabled (opt-in gate) AND
     // there is enough reported data (the readout's own sample floor). Below either ⇒ null = no line
     // (anti-fabrication, AP-CINTAKE-4). Reads the EXISTING attempts/calibration — Insights untouched.
@@ -717,9 +757,22 @@
     step = 'result';
   }
 
+  /** C7/CO16: the human-readable mastery criterion + cap for a program step, e.g. "4 in a row · ≤8 min".
+   *  The cap is always shown (the hard bound, AP-CPROG-3); the criterion part depends on its kind. */
+  function masteryBadge(item: ReturnType<typeof buildCoachProgram>[number]): string {
+    const cap = t('coach.masteryCap', { min: item.minutes });
+    if (!item.mastery) return cap;
+    const crit = item.mastery.kind === 'streak'
+      ? t('coach.masteryStreak', { n: item.mastery.target })
+      : t('coach.masteryMissRate', { pct: Math.round(item.mastery.target * 100) });
+    return crit + ' · ' + cap;
+  }
+
   function startCoaching() {
     if (!profile) return;
-    app.activeSession = { plan: buildSession(programPreview), current: 0, startedAt: Date.now(), reflection: '' };
+    // C7/CO5: stamp the chosen budget so the launched Session honours it instead of a hardcoded 30
+    // (AP-CPROG-1). The program preview already reflects `budget` (it is $derived on it).
+    app.activeSession = { plan: buildSession(programPreview), current: 0, startedAt: Date.now(), reflection: '', budgetMin: budget };
     app.go('session');
   }
 </script>
@@ -930,13 +983,55 @@
       {:else if goal === 'fix-blunders' && !app.settings?.metacogEnabled}
         <p class="muted" style="font-size:0.82rem">{t('coach.metacogOffHint')}</p>
       {/if}
-      <h4>{t('coach.yourProgram')}</h4>
+      <h4 class="row" style="align-items:center;gap:0.5rem">
+        {t('coach.yourProgram')}
+        <!-- C7/CO5: budget toggle mirroring Insights (insights.min15/30/60 reused). Drives the
+             $derived preview AND the launched session (startCoaching stamps budgetMin) — AP-CPROG-1. -->
+        <label style="font-size:0.8rem;font-weight:normal" class="muted">
+          {t('coach.budgetLabel')}
+          <select bind:value={budget} style="margin-left:0.3rem">
+            <option value={15}>{t('insights.min15')}</option>
+            <option value={30}>{t('insights.min30')}</option>
+            <option value={60}>{t('insights.min60')}</option>
+          </select>
+        </label>
+      </h4>
+
+      <!-- C7/CO10: the closed loop — DESCRIPTIVE before/after on what you drilled, under the SAME
+           honesty caveat as Insights (no causal claim, no verdict — AP-CPROG-4). Rendered only when
+           there are measurable steps with analysed games (E3: ladders-only run → no header). The
+           per-step numbers appear inline on each step below, joined by mastery.motifKey. -->
+      {#if efficacy.length}
+        <div class="col" style="width:100%;text-align:left;gap:0.2rem">
+          <h5 style="margin:0.25rem 0 0">{t('insights.didItMove')}</h5>
+          <p class="muted" style="font-size:0.75rem;margin:0">{t('insights.didItMoveBody')}</p>
+        </div>
+      {/if}
+
       <ol style="text-align:left">
         {#each programPreview as item}
+          {@const eff = item.mastery?.motifKey ? efficacyByKey.get(item.mastery.motifKey) : undefined}
           <li>
             <b>{labelOrRaw('activity', item.activity, getLocale())}</b>
             {#if item.kind === 'leverage'}<span class="tag tag-leverage">{t('coach.tagLeverage')}</span>{:else if item.kind === 'goal'}<span class="tag tag-goal">{t('coach.tagGoal')}</span>{/if}
             <span class="muted">{t('coach.programItemMeta', { minutes: item.minutes, reason: item.reason })}</span>
+            {#if item.mastery}<span class="tag tag-mastery">{masteryBadge(item)}</span>{/if}
+            {#if eff}
+              <!-- CO10 inline per-step efficacy. Honesty branches (E2/AP-CPROG-5): enoughData → the
+                   before/after + soft advisory; neverMeasured → "play some games to see if this moves";
+                   thin-but-present → the Insights "too little data" line. Never a fabricated verdict. -->
+              <div class="efficacy muted" style="font-size:0.78rem;margin:0.15rem 0 0">
+                {#if eff.readout.enoughData}
+                  <span>{t('insights.missRate', { early: fmtPct(eff.readout.early.missRate * 100), recent: fmtPct(eff.readout.recent.missRate * 100) })}</span>
+                  <span style="color:{eff.readout.deltaPct <= 0 ? 'var(--good)' : 'var(--bad)'}">{t('insights.deltaPts', { sign: eff.readout.deltaPct <= 0 ? '' : '+', pts: Math.round(eff.readout.deltaPct * 100) })}</span>
+                  {#if eff.looksImproved}<span class="looks-improved" style="color:var(--good)"> — {t('coach.looksImproved')}</span>{/if}
+                {:else if eff.neverMeasured}
+                  <span>{t('coach.notMeasuredYet')}</span>
+                {:else}
+                  <span>{t('insights.tooLittleData')}</span>
+                {/if}
+              </div>
+            {/if}
           </li>
         {/each}
       </ol>
@@ -1037,6 +1132,8 @@
     vertical-align: middle;
   }
   .tag-leverage { border-color: var(--accent, #6aa); color: var(--accent, #6aa); }
+  /* C7 mastery criterion + cap badge on a program step (criterion-or-cap, AP-CPROG-2/3). */
+  .tag-mastery { font-variant-numeric: tabular-nums; }
 
   /* C6 coach-output: "Learn the pattern" toggle (mirrors ConceptCard's button.link). */
   .learn-toggle {

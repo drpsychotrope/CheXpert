@@ -176,6 +176,12 @@ export const generators: Messages = {
     fr: "La précision en ouverture est un point faible (score {score}).",
     en: 'Opening accuracy is a weak spot (score {score}).',
   },
+  // C7/CO17: the named variant — {opening} is the localized opening name (display-only; the routing
+  // `focus` stays the English 'opening lines' key). Used when the UI could name a most-played line.
+  'program.openingAccuracyNamed': {
+    fr: "La précision en ouverture est un point faible (score {score}) — travaillez votre {opening}.",
+    en: 'Opening accuracy is a weak spot (score {score}) — work on your {opening}.',
+  },
   'program.openingSteer': {
     fr: "Jouez une partie où le bot oriente vers votre lacune d'ouverture.",
     en: 'Play a game where the bot steers into your opening gap.',

@@ -160,6 +160,27 @@ export const coach: Messages = {
     en: 'Directional — absolute per-motif ratings, small samples. Not a grade.',
   },
 
+  // ── C7 configurable budget + mastery steps + closed loop (coach.*) ─────────
+  // Budget toggle: a 15/30/60 lever mirroring Insights (drives BOTH the preview AND the launched
+  // Session — AP-CPROG-1). The min15/30/60 values are reused from insights.* (already FR/EN).
+  'coach.budgetLabel': { fr: 'Budget', en: 'Budget' },
+  // Mastery badge (CO16): the per-step criterion + cap, e.g. "4 d'affilée · ≤8 min". The cap is the
+  // hard bound; the criterion can only end a step earlier (AP-CPROG-2/3).
+  'coach.masteryStreak': { fr: '{n} d\'affilée', en: '{n} in a row' },
+  'coach.masteryMissRate': { fr: 'taux d\'échec < {pct} %', en: 'miss-rate < {pct}%' },
+  'coach.masteryCap': { fr: '≤ {min} min', en: '≤{min} min' },
+  // Closed loop (CO10): the soft, DESCRIPTIVE advisory shown only when enoughData && deltaPct<0. Never
+  // a causal claim — the header carries the insights.didItMoveBody caveat verbatim (AP-CPROG-4).
+  'coach.looksImproved': {
+    fr: 'Semble en progrès — vous pouvez passer à la suite.',
+    en: 'Looks improved — you can move on.',
+  },
+  // Never-measured (E2): this motif never occurred in any analysed game — distinct from thin data.
+  'coach.notMeasuredYet': {
+    fr: 'Pas encore mesuré — jouez quelques parties pour voir si cela bouge.',
+    en: 'Not measured yet — play a few games to see if this moves.',
+  },
+
   // ── Dashboard.svelte (dashboard.*) ────────────────────────────────────────
   'dashboard.title': { fr: 'Tableau des faiblesses', en: 'Weakness dashboard' },
   'dashboard.loading': { fr: 'Chargement…', en: 'Loading…' },
