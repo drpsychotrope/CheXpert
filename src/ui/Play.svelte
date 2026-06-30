@@ -25,11 +25,17 @@
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
   import { applyGameResult, botMovetime, flagOutcome } from '../game/playSession';
+  import { createGameSession, type GameSession } from '../game/gameSession';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import { downloadPgn, pgnFilename } from './pgnDownload';
   import { t } from '../i18n';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  // The DOM-free controller (F6, ADR-0057) owns the move/engine/end loop + the rules-truth game.
+  // Play keeps its $state mirrors (fen drives ADR-0051 reactivity; status/result/lastMove the view)
+  // and reassigns `fen` from each returned snapshot. `game` points at the controller's ChessGame so
+  // the view's `game.*` reads (dests/turn/inCheck/fenForEngine/history/pgn) are unchanged.
+  let session = $state<GameSession | null>(null);
   let game = $state(new ChessGame());
   let fen = $state(START_FEN);
   let lastMove = $state<[string, string] | null>(null);
@@ -86,9 +92,9 @@
   let aProgress = $state(0);
   let aTotal = $state(0);
 
-  // Loop closure: the bot (Black here) opens toward the player's weakest area.
+  // Loop closure: the bot (Black here) opens toward the player's weakest area. The played-UCI list
+  // that book steering consults now lives in the controller (F6); `opening` stays here (view).
   let opening: OpeningEntry | null = null;
-  let playedUci: string[] = [];
   // Guard against finishGame() running twice (onFlag + checkEnd race, audit W6).
   let gameFinished = false;
 
@@ -132,7 +138,6 @@
     startFen960 = null;
     castle960 = null;
     lastMove = null;
-    playedUci = [];
     gameFinished = false;
     coachOpen = false;
     engineError = false;
@@ -149,12 +154,10 @@
       startFen960 = pos.startFen;
       castle960 = pos.castle;
       sp960Input = String(pos.id); // reflect the chosen id back to the field
-      game = new ChessGame(startFen960, { variant: 'chess960', castle: castle960 });
       opening = null; // no opening book / steering for 960 (no theory)
       app.steerDimension = null; // discard any pending steer so it doesn't leak to a later standard game (M-1)
       steerNote = t('play.chess960Steer', { id: pos.id });
     } else {
-      game = new ChessGame();
       // Read the weakness profile (from analysed games) and steer the opening.
       let weakest: Dimension | null = null;
       try {
@@ -169,8 +172,6 @@
       steerNote = steeringNote(opening, weakestDim);
     }
 
-    fen = game.fen;
-
     // Seed the bot from the active pool's adaptive state.
     // 960 uses the chess960 pool (lazy seed from classical); standard uses selectedPool (AP-TC-3).
     const activePool: RatingPool = variant === 'chess960' ? 'chess960' : selectedPool;
@@ -183,6 +184,39 @@
     } else {
       clock = startClock(initClock(initialSecOf(selectedTC) * 1000, incrementSecOf(selectedTC) * 1000, 'w'));
     }
+
+    // Construct the shared controller (F6). It owns the loop + the rules-truth game; Play turns ON
+    // exactly the capabilities it uses today so behaviour is unchanged: humanMove per opponentStyle,
+    // retry, book steering (standard only), a clock-aware movetime budget, and 960 X-FEN feeding.
+    // Defaults (siblings: pickMove/500/no-retry) are not engaged here.
+    const opp = opponent;
+    session = createGameSession({
+      startFen: variant === 'chess960' ? (startFen960 ?? START_FEN) : START_FEN,
+      playerSide: playerColor,
+      // Port: picks via the adaptive opponent; interrupt via the engine client (Play's original
+      // retry interrupts app.engine, then re-asks the opponent — preserved exactly).
+      engine: {
+        pickMove: (f, mt) => opp.pickMove(f, mt),
+        pickHumanMove: (f, mt) => opp.pickHumanMove(f, mt),
+        interrupt: () => app.engine.interrupt(),
+      },
+      variant,
+      castle: castle960,
+      config: {
+        humanMove: opponentStyle !== 'engine',
+        retry: true,
+        bookMove: (played) => (opening ? nextBookMove(opening, played) : null),
+        // Clock-aware budget from the BOT's own remaining time (AP-TC-4); untimed/960 → null so the
+        // controller uses pickHumanMove's 300ms default / pickMove's 500ms, exactly as today.
+        movetime: (g, side) =>
+          clock
+            ? botMovetime(side === 'w' ? clock.whiteMs : clock.blackMs, g.history().length, selectedPool as Category)
+            : null,
+        engineFen: (g) => (variant === 'chess960' ? g.fenForEngine() : g.fen),
+      },
+    });
+    game = session.gameRef; // view reads (dests/turn/inCheck/fenForEngine/history/pgn) hit the same instance
+    fen = session.fen;
 
     // Persist the chosen time control for next time (skip for untimed and 960).
     if (variant !== 'chess960' && !selectedTC.untimed && app.settings) {
@@ -243,6 +277,9 @@
    *  (Q-C); otherwise the side that flagged loses. */
   async function onFlag(flaggedSide: Side) {
     stopClockLoop();
+    // Sync the controller's status so an in-flight engineReply drops its late move on a bot flag,
+    // exactly as the resign-during-think guard does (P1-14 family).
+    session?.markOver();
     status = 'over';
     const { outcome, draw } = flagOutcome(flaggedSide, playerSideClock, game.fen);
     result = draw
@@ -260,17 +297,17 @@
   // In-check king highlight: `game` is mutated in place each move and Svelte 5 doesn't proxy the
   // ChessGame instance, so a bare `game.inCheck()` binding never re-fires (movableColor/dests are
   // saved only by their co-dependency on the toggling `status`). Depend on the reactive `fen`
-  // (reassigned every move) so the highlight refreshes mid-game. ADR-0051.
-  const inCheck = $derived(fen ? game.inCheck() : false);
+  // (reassigned every move) so the highlight refreshes mid-game. ADR-0051. The controller exposes
+  // `inCheckFor(fen)`; the $derived stays here, anchored on the reactive `fen`.
+  const inCheck = $derived(fen && session ? session.inCheckFor(fen) : false);
 
   async function onMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
-    if (status !== 'playing' || turnColor() !== playerColor) return;
-    const uci = from + to + (game.isPromotion(from, to) ? promo : '');
-    const san = game.move(from, to, promo);
-    if (!san) return;
-    playedUci.push(uci);
-    fen = game.fen;
-    lastMove = [from, to];
+    if (!session || status !== 'playing' || turnColor() !== playerColor) return;
+    // Controller validates turn + legality and advances the board (no auto-chain — C1-1).
+    const snap = session.applyPlayerMove(from, to, promo);
+    if (!snap) return;
+    fen = snap.fen;
+    lastMove = snap.lastMove;
 
     // Coached mode: shallow-eval the move BEFORE pressing the clock to the opponent. If it looks
     // like a blunder, pause on a non-blocking dialog — the player's own clock keeps running while
@@ -282,7 +319,9 @@
     await commitPlayerMove();
   }
 
-  /** Finalize the player's move: press the clock to the opponent, then end-check / engine reply. */
+  /** Finalize the player's move: press the clock to the opponent, then end-check / engine reply.
+   *  This interposition (coached gate above + clock press here) is exactly why the controller does
+   *  NOT auto-chain applyPlayerMove → engineReply (Q-G / C1-1). */
   async function commitPlayerMove() {
     if (clock) clock = press(clock, playerSideClock);
     if (checkEnd()) return;
@@ -292,10 +331,10 @@
   /** Coached take-back (non-blocking): undo the move; the player stays on move, on their own clock. */
   function coachTakeBack() {
     coachOpen = false;
-    game.undo();
-    fen = game.fen;
-    lastMove = null;
-    playedUci.pop();
+    if (!session) return;
+    const snap = session.undoPlayerMove();
+    fen = snap.fen;
+    lastMove = snap.lastMove;
   }
 
   /** Coached keep: dismiss the warning and play on. */
@@ -319,83 +358,71 @@
     }
   }
 
+  /** The bot's reply, via the controller. The controller owns the book/budget/style branch and both
+   *  guards (P1-14 resign-during-think, P1-17 illegal-move halt); Play keeps the clock press, the
+   *  `thinking` flag, the result strings (AP-CTRL-1), and the end-check side effects. */
   async function engineMove() {
-    if (!opponent) return;
+    if (!session || !opponent) return;
     status = 'thinking';
     thinking = true;
     engineError = false;
-    try {
-      // In 960, feed the engine X-FEN/Shredder rights via fenForEngine(); standard uses game.fen.
-      const engineFen = variant === 'chess960' ? game.fenForEngine() : game.fen;
-      // Loop closure: play the steering opening's book move if still on the line;
-      // opening is null in 960 (no theory), so the engine always picks its own move.
-      let uci = opening ? nextBookMove(opening, playedUci) : null;
-      if (!uci) {
-        // Clock-aware budget from the BOT's own remaining time (AP-TC-4); untimed/960 keeps the defaults.
-        const budget = clock
-          ? botMovetime(botSide === 'w' ? clock.whiteMs : clock.blackMs, game.history().length, selectedPool as Category)
-          : null;
-        if (opponentStyle === 'engine') {
-          uci = await opponent.pickMove(engineFen, budget ?? 500);
-        } else {
-          uci = budget != null ? await opponent.pickHumanMove(engineFen, budget) : await opponent.pickHumanMove(engineFen);
-        }
-      }
-      if ((status as string) === 'over') { thinking = false; return; }
-      if (uci) {
-        // shim routes a king-to-rook castle UCI (e.g. e1h1); chess.js handles the rest.
-        const san = game.moveUci(uci);
-        if (!san) {
-          // Engine returned a move the rules layer rejected (desync/illegal). Halt rather
-          // than advance a phantom move and corrupt the board/last-move (audit W6).
-          result = t('play.engineIllegal');
-          status = 'over';
-          stopClockLoop();
-          if (clock) clock = stopClock(clock);
-          thinking = false;
-          return;
-        }
-        playedUci.push(uci);
-        fen = game.fen;
-        lastMove = [uci.slice(0, 2), uci.slice(2, 4)];
-        if (clock) clock = press(clock, botSide);
-      }
-    } catch {
+    applyEngineReply(await session.engineReply());
+  }
+
+  /** Apply a controller engine-reply snapshot to Play's view + clock (shared by engineMove/retry).
+   *  Reproduces the inline loop's tail: error → Retry; illegal → halt; resign-mid-think → leave as
+   *  resign() set it; else press the clock for a real bot move and run the end-check side effects. */
+  function applyEngineReply(snap: import('../game/gameSession').SessionSnapshot) {
+    if (!session) return;
+    fen = snap.fen;
+    lastMove = snap.lastMove;
+    status = session.status;
+    thinking = false;
+    if (session.engineError) {
       // The bot's move threw (worker crash / timeout). Don't fall back to 'playing' on the bot's
       // turn — that strands the game on a frozen board. Offer an explicit Retry (audit v2 P1-05).
       result = t('play.engineError');
       engineError = true;
-      thinking = false;
       return;
     }
-    thinking = false;
+    if (session.illegalHalt) {
+      // Engine returned a move the rules layer rejected (desync/illegal). Halt rather than advance
+      // a phantom move and corrupt the board/last-move (audit W6, P1-17).
+      result = t('play.engineIllegal');
+      stopClockLoop();
+      if (clock) clock = stopClock(clock);
+      return;
+    }
+    if ((status as string) === 'over') return; // P1-14: resign landed mid-think; resign() set result/clock
+    if (session.movePlayed && clock) clock = press(clock, botSide);
+    // Run the end-check side effects (result string + fold/persist); the controller already set
+    // status to 'over'/'playing' but Play owns those side effects (AP-CTRL-9).
     if (!checkEnd()) status = 'playing';
   }
 
-  /** Recover from a bot-move engine error: drop any stuck search and try the move again (P1-05). */
+  /** Recover from a bot-move engine error: drop any stuck search and try the move again (P1-05).
+   *  Mirrors the original orchestration exactly: interrupt the engine, then re-run engineMove (which
+   *  re-sets status/thinking), so the thinking-indicator timing during recovery is unchanged. */
   async function retryEngineMove() {
+    if (!session) return;
     engineError = false;
     result = '';
-    try {
-      await app.engine.interrupt();
-    } catch {
-      /* respawn is best-effort */
-    }
+    await session.interruptEngine();
     await engineMove();
   }
 
   function checkEnd(): boolean {
-    const term = game.terminal();
+    // Pure, idempotent terminal query from the controller (AP-CTRL-1/9); Play owns the result
+    // string mapping + the fold/persist side effects behind its `gameFinished` guard.
+    const term = session?.checkTerminal() ?? { over: false };
     if (!term.over) return false;
     status = 'over';
     stopClockLoop();
     if (clock) clock = stopClock(clock);
-    let outcome: GameOutcome;
+    const outcome: GameOutcome = term.outcome ?? 'draw';
     if (term.reason === 'checkmate') {
-      outcome = term.winner === playerColor[0] ? 'win' : 'loss';
       result = outcome === 'win' ? t('play.checkmateWin') : t('play.checkmateLost');
     } else {
-      outcome = 'draw';
       result = t('play.drawReason', { reason: term.reason ?? '' });
     }
     void finishGame(outcome);
@@ -495,6 +522,9 @@
 
   function resign() {
     if (status === 'playing' || status === 'thinking') {
+      // Tell the controller first so any in-flight engineReply sees status 'over' and drops its late
+      // move (P1-14 resign-during-think guard); then run Play's view + clock side effects.
+      session?.resign();
       status = 'over';
       stopClockLoop();
       if (clock) clock = stopClock(clock);

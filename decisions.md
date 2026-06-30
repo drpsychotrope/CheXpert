@@ -1135,3 +1135,30 @@ ADR-0037 (additive-field precedent), ADR-0053 (i18n discipline), `enhancements-a
 F5. Follow-ups: **C4** (coach PGN-assessment consumer), **P1** (auto-queue the last unanalysed game),
 bulk file import, imported-games history, **C8/CF10** (coach profile export), history management
 (delete/paginate/filter).
+
+---
+
+## ADR-0057 — Shared game-session controller (F6): extract Play's loop to `gameSession.ts`
+
+**Context.** `Play.svelte` (666 ln), `Sparring.svelte`, `Comeback.svelte` each reimplemented the
+`onMove→checkEnd→engineReply→checkEnd` loop, the ADR-0051 in-check reactivity contract, the P1-17
+illegal-move halt, and the P1-14 resign-during-think guard; only Play carried clock / `pickHumanMove` /
+`retryEngineMove`. F6 extracts the loop into a pure, DOM-free `src/game/gameSession.ts` (`GameSession`
+class + `createGameSession`), consuming the existing `playSession.ts` helpers + `AdaptiveOpponent` via an
+injected `EnginePort` (no `Date`/`Math.random`/`performance.now` in the core).
+
+**Decisions.** (Q-A) controller owns the loop, the component keeps the view. (Q-B) clock optional,
+default off — siblings stay clockless. (Q-C) `pickHumanMove`/`retryEngineMove` opt-in flags; Play turns
+on exactly what it used → **behaviour-preserving**. (Q-D) Play migrated this PR; Sparring/Comeback
+fast-follow. (Q-E) new `gameSession.ts`; `playSession.ts` stays pure helpers. (Q-F) injected ports.
+(Q-G) **return-state API, NO auto-chain** of `applyPlayerMove`→`engineReply` — Play's coached takeback +
+clock press interpose (Play.svelte ~265-289), preserved exactly. `startFen` is a first-class init param
+(enables C3 designed probes). `checkTerminal` pure + idempotent (W6 double-fold guard).
+
+**Delivered.** New `gameSession.ts` + 22-test parity core (`gameSession.test.ts`); Play migrated to
+consume it with observable behaviour unchanged. svelte-check **0/0**, **577 Vitest green** (555 baseline
++ 22), build green. No `DB_VERSION` bump. **Rollback:** revert Play to its pre-F6 inline loop and drop
+`gameSession.{ts,test.ts}`. Cross-links: ADR-0050/0051 (engine concurrency / in-check reactivity),
+audit-v2 W12 (`playSession` pure home), `enhancements-architecture-spec.md` F6. Follow-ups: migrate
+Sparring + Comeback onto the controller (inheriting human-move + retry); **P3** (opponent agency) and
+**C3** (designed probes) consume this controller.
