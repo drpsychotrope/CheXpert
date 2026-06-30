@@ -7,6 +7,8 @@
   import { AdaptiveOpponent, initOpponentState } from '../engine/AdaptiveOpponent';
   import { runAnalysis } from '../analysis/runAnalysis';
   import { loadPlayerModel } from '../store/playerModel';
+  import { recordTacticsAttempt } from '../store/attemptsRepo';
+  import { resultToGrade } from '../srs/fsrs';
   import { buildWeaknessProfile, type DimensionScore } from '../analysis/weakness';
   import { buildCoachProfile, COACH_MOTIF_PROBES, COACH_LADDER_MIN, COACH_LADDER_MAX } from '../coach/diagnostic';
   import { buildCoachProgram } from '../coach/program';
@@ -91,15 +93,65 @@
     const res = trainer.playUserMove(uci);
     if (res === 'wrong') {
       ladder.report(false);
+      void recordProbe(trainer, false); // capture trainer before nextProbePuzzle reassigns it
       feedback = t('coach.missed');
       setTimeout(nextProbePuzzle, 450);
     } else if (res === 'solved') {
       ladder.report(true);
+      void recordProbe(trainer, true);
       feedback = t('coach.solved');
       setTimeout(nextProbePuzzle, 400);
     } else {
       display = new ChessGame(trainer.getFen());
       fen = display.fen;
+    }
+  }
+
+  /**
+   * Record a coach diagnostic probe through the EXISTING persistence path (F3 / CF1, ADR-0055):
+   * an attempt row (`coachProbe: true`) + a graded FSRS card + a weaknessCounters increment-on-miss,
+   * all in `recordTacticsAttempt`'s one atomic tx — WITHOUT moving any rating pool.
+   *
+   * AP-COACH-8 / AP-ATTEMPT-1 enforcement: `gradeAttempt` is NEVER called for a probe. The puzzle row
+   * is passed with its Glicko fields UNCHANGED (Q-F) and the model with `puzzleRating` UNCHANGED (Q-A).
+   * `ratingBefore = ratingAfter = baseline()` is recorded honestly — a probe is a diagnostic, not a
+   * graded delta. The ladder's internal `rating` stays local and is never persisted to `puzzleRating`
+   * (today's correct behaviour, preserved). source stays 'curated' (Q-E) — provenance is the flag only.
+   */
+  async function recordProbe(tr: TacticalTrainer, solved: boolean): Promise<void> {
+    if (!app.model) return;
+    const now = Date.now();
+    const ms = tr.elapsedMs(now);
+    const puzzle = tr.puzzle; // the probe puzzle; passed UNCHANGED (no rating mutation)
+    const base = baseline();
+    // weaknessCounters increment-on-miss mirrors Tactics/Review. Mutate the live model so the
+    // increment is folded into the SAME atomic tx below AND survives to commit()'s reload (I-1).
+    if (!solved) {
+      for (const theme of puzzle.themes) {
+        app.model.weaknessCounters[theme] = (app.model.weaknessCounters[theme] ?? 0) + 1;
+      }
+    }
+    try {
+      await recordTacticsAttempt({
+        attempt: {
+          id: `${puzzle.id}:${now}`,
+          puzzleId: puzzle.id,
+          solved,
+          ms,
+          themes: puzzle.themes,
+          ratingBefore: base, // probes do NOT move the pool (Q-A/F) — record the baseline, not a delta
+          ratingAfter: base,
+          playedAt: now,
+          source: 'curated', // probe puzzles ARE curated; provenance via coachProbe (Q-E, AP-ATTEMPT-5)
+          coachProbe: true,
+        },
+        puzzle: { ...puzzle }, // rating/ratingDeviation UNCHANGED (AP-COACH-8 / Q-F)
+        model: $state.snapshot(app.model), // puzzleRating UNCHANGED (AP-COACH-8 / Q-A)
+        srs: { kind: 'puzzle', refId: puzzle.id, grade: resultToGrade(solved, ms) },
+        now,
+      });
+    } catch {
+      /* never break the assessment flow on a persistence hiccup (storage full / unavailable) */
     }
   }
 

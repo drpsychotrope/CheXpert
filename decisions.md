@@ -950,3 +950,60 @@ common theme sub-tags to `generators.ts`, a generic `labelOrRaw(ns,key,locale)` 
 theme keys passed downstream stay raw; Insights study-plan DATA byte-identical; no `DB_VERSION` bump.
 §11 deferred (own PR, raw fallback meanwhile): `Session.svelte` `step.kind` (`SessionStepKind` = activity
 ∪ review/reflection — needs labels outside `activity.*`) and the open-vocabulary `focus` prose line.
+
+## ADR-0055 — F3: coach probe recording + weaknessCounters rehabilitation
+**Date:** 2026-06-30 · **Status:** accepted
+
+**Spec:** `specs/attempt-recording-weakness-spec.md` (V1). **Parent:** `specs/enhancements-architecture-spec.md`
+§2 (F3). Folds CF1 + TR2; TR3 (self-tag→action) deferred to T1, display of counters deferred to T2.
+
+**Two verified gaps closed with one coherent move.** (CF1) The coach assessment's ~14 diagnostic
+probes (2 per motif × 6 + 2 endgame; `diagnostic.ts` `COACH_LADDER_MIN = MAX = 2`) were thrown away —
+`Coach.svelte:onLadderMove` called only `ladder.report()`, never writing an attempt row, FSRS card, or
+weakness increment. (TR2) `weaknessCounters` was a **dead-read**: written on miss (Tactics/Review) and
+per played-game motif (runAnalysis) but consulted by no selection path. F3 makes the existing
+persistence path *also* fire from the coach, and makes `weaknessCounters` a **live read** that softly
+biases the trainer's no-drill curated fallback. **This supersedes audit-v2 V2-W10's "delete
+weaknessCounters" option in favour of rehabilitation.**
+
+**Arbitrages (defaults applied).** **Q-A** probe records SRS card + weaknessCounters but **not** the
+rating pool. **Q-B** weakness steering is a **soft bias** (top-k themes passed to `next()` with a wide
+rating window), never a hard filter. **Q-C** TR3 self-tag→action is out (T1); the selfTag write path is
+untouched. **Q-D** the steered branch sits **between personal and plain curated** — preserving the
+shipped order drill > personal > *(new)* weakness-biased curated > plain curated. **Q-E** probe
+`source` stays `'curated'` (probe puzzles ARE curated); provenance is an additive optional
+`coachProbe?: boolean` flag, **no `PuzzleAttemptRecord.source` union change** (AP-ATTEMPT-5). **Q-F** the
+probe puzzle's own Glicko rating is passed unchanged — a low-stakes diagnostic must not perturb curated
+difficulty.
+
+**AP-COACH-8 isolation (the load-bearing invariant).** `gradeAttempt` is **never** called for a probe.
+`recordTacticsAttempt` is invoked with the probe puzzle's rating fields **unchanged** and the model's
+`puzzleRating` **unchanged**; only `puzzleAttempts`, `srsCards`, and `weaknessCounters` change.
+`ratingBefore = ratingAfter = baseline()` is recorded honestly. The decisive regression guard
+(`coach-probe-record.test.ts`) records a mix of solved/missed probes and asserts both `puzzleRating`
+and the probe puzzle's `rating`/`ratingDeviation` are byte-unchanged. The PuzzleLadder's internal
+`rating` stays local, never persisted (today's correct behaviour, preserved).
+
+**AP-COACH-1 guarantee (study-plan byte-identity).** `buildStudyPlan`/`buildCoachProgram` consume
+`leaks` (from `fingerprint.ts`) + the weakest radar dimension — **never** `weaknessCounters`. F3 adds no
+edit to `studyPlan.ts` or its inputs; the existing `studyPlan.test.ts` determinism test is the
+mechanical proof and stays green. weaknessCounters steers the *trainer*, not the *plan*.
+
+**Mechanism.** New PURE `src/trainer/weaknessSelect.ts` (`steerFromWeakness`: no `Date`/`Math.random`,
+deterministic tie-break by theme key; `minCount` default 2 noise floor so a single miss never
+redirects the queue — AP-ATTEMPT-4; `k` default 1; returns `{ themes: undefined }` when there is no
+signal → the caller falls through to plain curated, the no-regression escape hatch). `Coach.svelte`
+gains a `recordProbe()` that mutates the live model's counters (so the fold lands in the same atomic tx
+AND survives `commit()`'s reload — the I-1 reload-then-persist discipline is preserved, no
+double-count, AP-ATTEMPT-6) and records via `recordTacticsAttempt`. `Tactics.loadNext` inserts one
+steered branch; a biased `next()` returning null falls through (AP-ATTEMPT-2/3, never dead-ends). The
+false `runAnalysis.ts` comment ("used by the trainer's personalised selection and the dashboard") is
+corrected to the now-true behaviour.
+
+**Additive, no migration.** `coachProbe?` is an optional field on `PuzzleAttemptRecord`; absent on
+legacy/normal rows reads falsy. **NO `DB_VERSION` bump, NO `schemaRev` bump** (precedent
+ADR-0035/0037/0040/0043/0053). Adds no user-facing string. Delivered: svelte-check 0/0, 533 Vitest green
+(514 baseline + 19 new: 10 pure-core + 5 probe-record incl. the no-pool-leak guard + 4 selection seam),
+build green. Rollback is per-half independent (recording A2 and selection A3 revert separately); existing
+`coachProbe: true` rows read harmlessly. Cross-links: ADR-0045 (coach diagnostic/program), ADR-0037
+(additive-field precedent), ADR-0053 (i18n — no new strings here).

@@ -11,6 +11,7 @@
   import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
   import { cardForThemes, loadConcepts, type ConceptCard as ConceptCardData } from '../concepts/concepts';
   import { failCountByPuzzle, isLeech } from '../srs/schedule';
+  import { steerFromWeakness } from '../trainer/weaknessSelect';
   import { t, getLocale } from '../i18n';
   import { motifLabelOrRaw } from '../i18n/gen';
 
@@ -126,7 +127,8 @@
 
     // Selection priority closes the loop: a dashboard drill filter wins; else
     // prefer the player's own personal puzzles (from their real mistakes); else
-    // fall back to the curated set in the player's rating zone.
+    // (F3 / TR2, ADR-0055) softly bias the curated zone toward the player's top
+    // weakness theme; else fall back to the plain curated set in the rating zone.
     let p =
       drillThemes && drillThemes.length
         ? await app.puzzles.next({ rating: model.puzzleRating.rating, window: 400, exclude: seen, themes: drillThemes })
@@ -136,6 +138,17 @@
     if (!p) {
       p = await app.puzzles.next({ rating: model.puzzleRating.rating, window: 600, exclude: seen, source: 'personal' });
       if (p) mode = 'personal';
+    }
+    // Weakness-steered curated (soft bias, Q-B/Q-D): only when no explicit drill filter is active.
+    // steerFromWeakness returns undefined themes when there's no signal → we skip straight to plain
+    // curated, so behaviour is byte-identical to baseline for a fresh/empty model. A biased next()
+    // returning null also falls through (AP-ATTEMPT-2/3 — never dead-end the loop).
+    if (!p) {
+      const steer = steerFromWeakness(model.weaknessCounters);
+      if (steer.themes) {
+        p = await app.puzzles.next({ rating: model.puzzleRating.rating, window: 250, exclude: seen, themes: steer.themes });
+        if (p) mode = 'mixed';
+      }
     }
     if (!p) {
       p = await app.puzzles.next({ rating: model.puzzleRating.rating, window: 250, exclude: seen });

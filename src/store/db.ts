@@ -46,6 +46,11 @@ export interface PuzzleAttemptRecord {
   // metacognition: optional, additive — no migration (ADR-0037).
   confidence?: 'sure' | 'unsure' | 'guess'; // self-reported before the reveal; absent on legacy records
   selfTag?: string; // self-diagnosed cause (closed taxonomy key); absent on legacy / when skipped
+  /** True when this attempt came from a coach diagnostic probe (F3, ADR-0055). Provenance tag
+   *  ONLY — probes are graded into FSRS + weaknessCounters but never move the rating pools
+   *  (AP-COACH-8). Additive optional; absent on legacy/normal attempts reads falsy. No `source`
+   *  union change (AP-ATTEMPT-5), NO DB_VERSION bump. */
+  coachProbe?: boolean;
 }
 
 export interface PlayerModel {
