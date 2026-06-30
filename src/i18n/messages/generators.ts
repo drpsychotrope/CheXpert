@@ -43,6 +43,34 @@ export const generators: Messages = {
   'motif.mate': { fr: 'Schémas de mat', en: 'Mating patterns' },
   'motif.endgame': { fr: 'Finales', en: 'Endgames' },
 
+  // ── Common Lichess theme sub-tags (F1 Q-B: trainer theme-line coverage) ──
+  // The detector (analysis/motif.ts) + bundled puzzles emit these into `puzzle.themes`.
+  // motifLabelOrRaw resolves them here; the open-vocabulary long tail stays raw (§11).
+  // Standard French chess vocabulary, consistent with motif.*/motifExpl.* (FOLD I2).
+  'motif.mateIn1': { fr: 'Mat en un', en: 'Mate in one' },
+  'motif.mateIn2': { fr: 'Mat en deux', en: 'Mate in two' },
+  'motif.mateIn3': { fr: 'Mat en trois', en: 'Mate in three' },
+  'motif.backRankMate': { fr: 'Mat de la dernière rangée', en: 'Back-rank mate' },
+  'motif.knightFork': { fr: 'Fourchette de cavalier', en: 'Knight fork' },
+  'motif.absolutePin': { fr: 'Clouage absolu', en: 'Absolute pin' },
+  'motif.relativePin': { fr: 'Clouage relatif', en: 'Relative pin' },
+  'motif.discoveredCheck': { fr: 'Échec à la découverte', en: 'Discovered check' },
+  'motif.doubleCheck': { fr: 'Échec double', en: 'Double check' },
+  'motif.crushing': { fr: 'Coup gagnant', en: 'Crushing' },
+  'motif.advantage': { fr: 'Avantage', en: 'Advantage' },
+
+  // ── Activity labels (F1: PlanItem.activity union — Coach + Insights display) ──
+  // DISPLAY ONLY. The raw key keeps feeding session routing / tacticsFilterThemes (AP-I18N-1).
+  // Closed union: every PlanItem.activity value MUST have an entry (parity test gates it,
+  // AP-I18N-4). Standard FR chess register (FOLD I2).
+  'activity.tactics': { fr: 'Tactique', en: 'Tactics' },
+  'activity.endgames': { fr: 'Finales', en: 'Endgames' },
+  'activity.repertoire': { fr: 'Répertoire', en: 'Repertoire' },
+  'activity.comeback': { fr: 'Retour au score', en: 'Comeback' },
+  'activity.vision': { fr: 'Vision', en: 'Vision' },
+  'activity.sparring': { fr: 'Sparring', en: 'Sparring' },
+  'activity.play-steered': { fr: 'Partie ciblée', en: 'Steered game' },
+
   // ── Weakness dimension labels (diagnostic.ts DIM_LABELS — full) ──────────
   'dim.tactics': { fr: 'Tactique', en: 'Tactics' },
   'dim.openingAccuracy': { fr: 'Précision en ouverture', en: 'Opening accuracy' },

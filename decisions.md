@@ -942,3 +942,11 @@ Insights leak motif/phase labels + `DimensionScore.detail` (weakness.ts) + `scen
 and the static `<title>` (set at load, not reactive). None block use; each is a follow-up. Cross-links:
 ADR-0052 (the FR decision this implements + supersedes Q3), ADR-0050/0051 (reactivity), ADR-0037 (additive
 field precedent).
+
+**ADR-0053 follow-up — F1 i18n-label-routing:** display keys (activity/themes) routed through the
+catalogue; routing keys unchanged. Added `activity.*` (7-value `PlanItem.activity` union, FR+EN) +
+common theme sub-tags to `generators.ts`, a generic `labelOrRaw(ns,key,locale)` resolver in `gen.ts`
+(consumed by Coach + Insights), and a union-exhaustive parity test. Display-only: `focus`/`activity`/
+theme keys passed downstream stay raw; Insights study-plan DATA byte-identical; no `DB_VERSION` bump.
+§11 deferred (own PR, raw fallback meanwhile): `Session.svelte` `step.kind` (`SessionStepKind` = activity
+∪ review/reflection — needs labels outside `activity.*`) and the open-vocabulary `focus` prose line.

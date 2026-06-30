@@ -12,7 +12,7 @@
   import { allAttempts } from '../store/attemptsRepo';
   import { calibration, type MetacogAttempt } from '../metacog/metacog';
   import { t, fmtPct, getLocale } from '../i18n';
-  import { motifLabelOrRaw } from '../i18n/gen';
+  import { motifLabelOrRaw, labelOrRaw } from '../i18n/gen';
 
   let loading = $state(true);
   let leaks = $state<Leak[]>([]);
@@ -140,7 +140,7 @@
     <div class="col" style="gap:0.2rem">
       {#each plan as item}
         <div class="panel">
-          <b>{t('insights.planItem', { minutes: item.minutes, activity: item.activity })}</b> — {item.focus}<br />
+          <b>{t('insights.planItem', { minutes: item.minutes, activity: labelOrRaw('activity', item.activity, getLocale()) })}</b> — {item.focus}<br />
           <span class="muted" style="font-size:0.8rem">{item.reason}</span>
         </div>
       {/each}

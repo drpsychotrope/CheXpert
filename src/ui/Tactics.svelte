@@ -12,6 +12,7 @@
   import { cardForThemes, loadConcepts, type ConceptCard as ConceptCardData } from '../concepts/concepts';
   import { failCountByPuzzle, isLeech } from '../srs/schedule';
   import { t, getLocale } from '../i18n';
+  import { motifLabelOrRaw } from '../i18n/gen';
 
   let trainer = $state<TacticalTrainer | null>(null);
   let puzzle = $state<Puzzle | null>(null);
@@ -396,7 +397,7 @@
   </div>
   {#if puzzle}
     <p class="muted" style="font-size:0.8rem">
-      {t('tactics.themes', { themes: puzzle.themes.join(', ') || t('tactics.themesEmpty') })}
+      {t('tactics.themes', { themes: puzzle.themes.map((th) => motifLabelOrRaw(th, getLocale())).join(', ') || t('tactics.themesEmpty') })}
       {#if puzzle.source === 'personal'}{t('tactics.fromYourGameTag')}{/if}
     </p>
   {/if}

@@ -16,6 +16,7 @@
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
   import { t, getLocale } from '../i18n';
+  import { labelOrRaw } from '../i18n/gen';
 
   type Step = 'intro' | 'ladders' | 'offer-game' | 'game' | 'analysing' | 'result';
   let step = $state<Step>('intro');
@@ -257,7 +258,7 @@
       <h4>{t('coach.yourProgram')}</h4>
       <ol style="text-align:left">
         {#each programPreview as item}
-          <li><b>{item.activity}</b> — {item.focus} <span class="muted">{t('coach.programItemMeta', { minutes: item.minutes, reason: item.reason })}</span></li>
+          <li><b>{labelOrRaw('activity', item.activity, getLocale())}</b> <span class="muted">{t('coach.programItemMeta', { minutes: item.minutes, reason: item.reason })}</span></li>
         {/each}
       </ol>
       <div class="row center">
