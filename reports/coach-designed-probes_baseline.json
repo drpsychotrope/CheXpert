@@ -1,0 +1,47 @@
+{
+  "pr": "coach-designed-probes",
+  "feature": "C3",
+  "measured": "2026-06-30",
+  "head": "9296aff",
+  "tests": {
+    "passed": 504,
+    "files": 69,
+    "command": "npx vitest run",
+    "source": "reports/trainer-feedback-core_baseline.json (same HEAD 9296aff) — authoritative current anchor",
+    "note": "Specs deliver NO code, so no run was performed here. Re-confirm exact count at build time; must not regress 504."
+  },
+  "svelte_check": { "files": 383, "errors": 0, "warnings": 0, "command": "npx svelte-check --tsconfig ./tsconfig.json" },
+  "db_version": 4,
+  "schema_revs": { "PlayerModel.schemaRev": 1, "SettingsRecord.schemaRev": 1 },
+  "latest_adr_in_decisions": "0053",
+  "reserved_adrs_by_unbuilt_specs": {
+    "0054": "enhancements-architecture-spec.md (portfolio cascade)",
+    "0055": "attempt-recording-weakness (F3)",
+    "0056": "games-store-pgn-io (F5)",
+    "0057": "game-session-controller (F6)",
+    "0058": "play-in-game-ux (P2)"
+  },
+  "adr_for_this_pr": "NONE EXPECTED. C3 is additive-optional, reuses existing scoring (buildWeaknessProfile) + the F6 controller contract + the existing buildCoachProfile merge point. No architectural decision. IF an ADR proves unavoidable it must be >=0059 (0054-0058 are taken).",
+  "current_coach_behaviour": {
+    "single_game": "Coach.svelte:130 startGame -> new ChessGame() (start position, EVEN) vs AdaptiveOpponent at puzzle-rating Elo; GAME_MOVE_LIMIT=48 plies (line 43); optional (offer-game step, skippable).",
+    "analysis": "finishGame (line 159) -> runAnalysis(engine, puzzles, {pgn, playerColor:coachSide, source:'played', baseRating}) -> buildWeaknessProfile([analysis], baseRating, locale).dimensions -> commit(gameDimensions).",
+    "merge": "commit -> buildCoachProfile({puzzleRating, probes, gameDimensions, assessedAt, locale}). source={ladders, game}.",
+    "rating_pool": "opponent.finishGame / recordGame is NEVER called by Coach — the even game does NOT fold into the bot's adaptive Elo. (AP-COACH-8 already honoured.)"
+  },
+  "under_measured_dimensions_today": {
+    "endgameConversion": "phaseAcpl(endgame) needs MIN_PHASE_PLIES=4; a short even game often never reaches a 4-ply endgame -> sampleSize 0 -> radar shows neutral 50 'not measured'.",
+    "resilience": "resilienceScore needs MIN_BEHIND_EPISODES=3; an even game where the player is never clearly behind 3x -> sampleSize 0 -> neutral 50.",
+    "impact": "These two radar axes are the weakest-measured today; they are exactly C3's targets."
+  },
+  "byte_identity_anchors": [
+    "Insights study-plan snapshot (AP-COACH-1): buildStudyPlan reads fingerprint leaks + weakest dim, NOT the coach designed-probe outcome path; C3 adds an optional probe step and must not change buildStudyPlan inputs or output.",
+    "buildCoachProfile existing tests (coach diagnostic): C3 either (a) feeds a DimensionScore through the SAME gameDimensions merge with no signature change, or (b) extends the args additively. Existing program.test.ts / diagnostic behaviour must stay green.",
+    "weakness.ts buildWeaknessProfile + resilienceScore + thresholds: C3 REUSES these unchanged (designed game is still a GameAnalysis). No change to weakness.ts scoring."
+  ],
+  "i18n": {
+    "pure_core_keys": "src/i18n/messages/generators.ts — gt(key, locale, params); dim.endgameConversion / dim.resilience already exist; scenario.* + program.* live here.",
+    "component_keys": "src/i18n/messages/coach.ts — t() keys (coach.offerGameBody, coach.playGame, coach.skip, coach.directional, coach.sourceGameSuffix...).",
+    "rule": "Every new user-facing string needs FR+EN (bilingual parity, ADR-0053). Pure-core (seed names/goals, probe detail) -> generators.ts via gt; component labels (probe step buttons/headers) -> coach.ts via t()."
+  },
+  "targeted_tests_to_watch": ["program.test.ts", "scenarios.test.ts", "weakness.test.ts (resilience/endgame thresholds)", "studyPlan.test.ts (AP-COACH-1)", "diagnostic / buildCoachProfile coverage"]
+}

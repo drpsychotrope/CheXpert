@@ -64,8 +64,10 @@ export async function runAnalysis(
   invalidateAnalysesCache(); // a new analysis → drop the dashboard cache (audit W15)
   if (puzzles.length) await repo.addPuzzles(puzzles);
 
-  // Fold motif tags into the player's weakness counters (used by the trainer's
-  // personalised selection and the dashboard).
+  // Fold motif tags into the player's weakness counters. These steer the trainer's
+  // weakness-biased no-drill curated selection (F3 / TR2, ADR-0055) via
+  // steerFromWeakness in Tactics.loadNext. NOT a study-plan input — buildStudyPlan
+  // consumes leaks + the radar, never weaknessCounters (AP-COACH-1).
   const model = await db.get('playerModel', 'singleton');
   if (model) {
     for (const ply of analysis.plies) {

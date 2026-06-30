@@ -28,8 +28,13 @@
   let now = $state(0);
   let reflectTimerDone = $state(false);
   let reflectTimerId: ReturnType<typeof setTimeout> | null = null;
+  // C7/CO16: when the CURRENT step became active — used to compare per-step elapsed against the
+  // mastery `minutes` cap (the hard bound, AP-CPROG-3). Re-stamped on advance + on resume.
+  let stepStartedAt = $state(0);
 
-  const minutes = 30; // same default budget as Insights
+  // C7/CO5: honour the coach's chosen budget (15/30/60) instead of a hardcoded 30. Falls back to 30
+  // for the Insights generic session path (which doesn't stamp budgetMin) — AP-CPROG-1.
+  const minutes = $derived(app.activeSession?.budgetMin ?? 30);
 
   const model = $derived(app.model);
   const step = $derived<SessionStep | null>(
@@ -38,6 +43,11 @@
   const elapsedMin = $derived(
     now && app.activeSession ? (now - app.activeSession.startedAt) / 60000 : 0,
   );
+  // Per-step elapsed minutes (since the step became active) and whether it has reached its cap.
+  const stepElapsedMin = $derived(now && stepStartedAt ? (now - stepStartedAt) / 60000 : 0);
+  // C7/CO16/AP-CPROG-3: the cap is the hard bound — once the step's `minutes` cap elapses, advancing
+  // is auto-eligible (we nudge the user; the criterion can only end a step EARLIER, never later).
+  const capReached = $derived(!!step && step.kind !== 'reflection' && !!step.mastery && stepElapsedMin >= step.minutes);
   const remainingMin = $derived(
     app.activeSession
       ? Math.max(0, Math.round(app.activeSession.plan.totalMinutes - elapsedMin))
@@ -53,6 +63,7 @@
 
   onMount(() => {
     now = Date.now();
+    stepStartedAt = now; // C7: start the per-step cap clock for whatever step is current on (re)mount
     // Lightweight elapsed-time tick (UI-owned; never in a core).
     const tickId = setInterval(() => { now = Date.now(); }, 1000);
 
@@ -111,10 +122,19 @@
     const next = app.activeSession.current + 1;
     if (next < total) {
       app.activeSession.current = next;
+      stepStartedAt = Date.now(); // C7: reset the per-step cap clock for the step we just moved to
       reflectTimerDone = false;
       const nextStep = app.activeSession.plan.steps[next];
       if (nextStep && nextStep.kind === 'reflection') startReflectTimer();
     }
+  }
+
+  /** C7/CO16: the criterion text for a step's mastery goal ("4 in a row" | "miss-rate < 25%"). */
+  function masteryGoalText(s: SessionStep): string {
+    if (!s.mastery) return '';
+    return s.mastery.kind === 'streak'
+      ? t('session.masteryStreak', { n: s.mastery.target })
+      : t('session.masteryMissRate', { pct: Math.round(s.mastery.target * 100) });
   }
 
   function startReflectTimer() {
@@ -158,6 +178,12 @@
       <div class="panel col" style="gap:0.4rem">
         <b>{t('session.stepHeader', { minutes: step.minutes, kind: step.kind })}</b> — {step.focus}
         <span class="muted" style="font-size:0.82rem">{step.reason}</span>
+        <!-- C7/CO16: surface the mastery criterion + cap (criterion-or-cap; the cap is the hard
+             bound, AP-CPROG-2/3). When the cap elapses, nudge that advancing is now eligible. -->
+        {#if step.mastery}
+          <span class="muted" style="font-size:0.78rem">🎯 {t('session.masteryGoal', { goal: masteryGoalText(step), cap: step.minutes })}</span>
+          {#if capReached}<span class="feedback" style="font-size:0.78rem">{t('session.capReached')}</span>{/if}
+        {/if}
         <div class="row" style="gap:0.5rem">
           <button onclick={() => launch(step)}>{t('session.openTrainer', { kind: step.kind })}</button>
           <button onclick={advance}>{t('session.doneNext')}</button>

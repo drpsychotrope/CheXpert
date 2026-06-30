@@ -1,0 +1,53 @@
+{
+  "pr": "trainer-integrity-retention",
+  "feature": "T3",
+  "parent_spec": "specs/enhancements-architecture-spec.md (§3 Trainer T3; deps F3 + metacog)",
+  "dependency_contract": "specs/attempt-recording-weakness-spec.md (F3 — builds first; T3 consumes the recorded attempt stream)",
+  "scanned_at": "2026-06-30",
+  "head": "9296aff",
+  "verdict": "PREMISE CONFIRMED with corrections — all named hooks exist; several prompt locations/owners corrected",
+  "folds_verified": {
+    "TR5_usedHint_clamp": {
+      "claim": "hint() reveals the solution's from-square (Tactics:288) and is NOT recorded; the hinted solve grades as a clean win, inflating Glicko + FSRS",
+      "status": "CONFIRMED",
+      "evidence": [
+        "src/ui/Tactics.svelte:288-296 hint() calls trainer.expectedMove() and sets feedback t('tactics.hint',{sq:m.slice(0,2)}) — reveals the FROM-square of the next expected user move",
+        "CORRECTION: hint() calls trainer.expectedMove() (TacticalTrainer.ts:38), NOT 'revealSolution'. There is no revealSolution symbol anywhere (grep: only expectedMove). F4's Calculate.revealSolution is a different surface (Calculate, not Tactics).",
+        "src/store/db.ts:36-49 PuzzleAttemptRecord has NO usedHint field (fields: id,puzzleId,solved,ms,themes,ratingBefore,ratingAfter,playedAt,source,confidence?,selfTag?). grep usedHint over src = ZERO hits.",
+        "src/ui/Tactics.svelte:222-271 finish(solved): calls gradeAttempt(model.puzzleRating,puzzle,solved) (line 227) -> applies full Glicko gain; srs grade = resultToGrade(solved,ms) (line 267) -> Good/Easy on a clean fast solve. A hinted FIRST-attempt solve therefore grades identically to an unaided one (inflation confirmed).",
+        "Hinted-then-solve flow: hint() (sets feedback only) -> user plays the revealed move via onMove -> result 'solved' -> finish(true) grades CLEAN. retry() (line 300) is already-graded practice (no re-score), so inflation is on the first post-hint solve, not retry."
+      ]
+    },
+    "TR8_streak_goal_lasttrained": {
+      "claim": "solvedThisSession/attemptedThisSession are component-memory only; PlayerModel has no daily goal/streak/last-trained",
+      "status": "CONFIRMED",
+      "evidence": [
+        "src/ui/Tactics.svelte:27-28 solvedThisSession/attemptedThisSession are component-local $state (reset on mount, never persisted).",
+        "src/store/db.ts:51-75 PlayerModel has NO streak / dailyGoal / lastTrained fields. grep dailyGoal|lastTrained|currentStreak over src = ZERO hits.",
+        "Additive-optional precedent on PlayerModel is rich: conceptSeen? (db.ts:62), visionStats? (:64), coachProfile?/coachProfilePrev? (:67-68) — all documented 'NO DB_VERSION bump'. New retention fields mirror this exactly.",
+        "COLLISION NOTE: 'streak' already exists as Vision.svelte:27 component-local in-drill streak (consecutive correct board-vision answers) + i18n vision.scoreLine. This is UNRELATED to a training-DAY streak. Name the new PlayerModel field distinctly (e.g. dailyStreak / trainingStreak) to avoid semantic collision."
+      ]
+    },
+    "impulsivity_movetime_signal": {
+      "claim": "elapsedMs is recorded but used only for the FSRS grade; surface avg solve time + flag fast+wrong (impulsive) vs slow+right; metacog 'rushed' self-tag hints this is a known failure mode",
+      "status": "CONFIRMED",
+      "evidence": [
+        "ms is recorded on every PuzzleAttemptRecord (Tactics.svelte:238 ms=trainer.elapsedMs(now); db.ts:40). Its ONLY consumer is resultToGrade(solved,ms) (fsrs.ts:28) for the FSRS grade — no aggregate/avg/pattern read exists.",
+        "src/metacog/metacog.ts:14-22 SELF_TAGS includes 'rushed' — the self-reported impulsivity cause already in the closed taxonomy. metacog.ts is a PURE core (no Date/Math.random; caller passes attempts).",
+        "src/ui/Insights.svelte:165-196 already renders the metacog calibration section (gated app.settings.metacogEnabled), consuming pure calibration() over MetacogAttempt[]. This is the natural home for an impulsivity readout (same descriptive-honesty pattern, locale-following $derived).",
+        "MetacogAttempt (metacog.ts:37-41) currently carries {solved,confidence?,selfTag?} but NOT ms — an impulsivity pure-core needs an attempt shape with {solved, ms}. allAttempts() (Insights.svelte:46) returns full PuzzleAttemptRecord (has ms) and is downcast to MetacogAttempt[] — the ms is present at runtime, only the TS type omits it."
+      ]
+    }
+  },
+  "reuse_hooks_verified": {
+    "src/srs/fsrs.ts": "resultToGrade(solved,ms,thresholds) at :28-37 (the grade clamp target). First-exposure clamp pattern at :85 (Easy->Good on State.New) — the EXACT precedent for a hint clamp (cap the effective grade). gradeCard at :79.",
+    "src/trainer/TacticalTrainer.ts": "gradeAttempt(playerRating,puzzle,solved) at :93 returns {player,puzzle} Glicko (wraps rating/glicko2 updateRating). CORRECTION: prompt said 'Glicko gradeAttempt' — the symbol lives in TacticalTrainer.ts (re-exported), not glicko2.ts. expectedMove() at :38.",
+    "src/store/db.ts": "PlayerModel (additive-optional precedent conceptSeen?/visionStats?/coachProfile?) + PuzzleAttemptRecord. DB_VERSION=4 (:125). Migration policy comment :121-124 (additive => schemaRev bump, NO DB_VERSION bump).",
+    "src/ui/Tactics.svelte": "hint() :288, finish() :222, session counters :27-28, loadNext() :117. F3 (attempt-recording-weakness) will ALSO edit loadNext (steered branch) + finish path — coordinate (see collision report).",
+    "src/metacog/metacog.ts": "rushed tag :17; pure calibration() core. Impulsivity readout should be a sibling pure function here OR a new pure module, mirroring this file's structure.",
+    "src/state/app.svelte.ts": "dueReview $state :64 (boot/Review badge count via dueCount, SrsStore.ts:42) — the retention/re-engagement signal. persistModel(now) :101, refreshDue(now) :92.",
+    "src/srs/types.ts": "SrsCardRecord.stability :20 (FSRS mastery signal) — present but per-card; not required for a day-based streak (DEFER mastery surfacing)."
+  },
+  "insights_surface": "src/ui/Insights.svelte renders calibration (:165-196) under metacogEnabled; the impulsivity signal folds here. studyPlan (buildStudyPlan) MUST stay byte-identical (AP-COACH-1) — impulsivity is a NEW section, not a studyPlan input.",
+  "i18n": "src/i18n/messages/tactics.ts already bilingual FR/EN incl. tactics.hint (:25 reveals from-square), tactics.hintBtn (:32). New progressive-hint + retention + impulsivity strings ship FR+EN via the same catalogue (ADR-0053 parity)."
+}

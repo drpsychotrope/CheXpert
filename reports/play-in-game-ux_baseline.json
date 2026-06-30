@@ -1,0 +1,22 @@
+{
+  "pr": "play-in-game-ux",
+  "captured": "2026-06-30",
+  "branch": "claude/vigorous-hofstadter-7b1751",
+  "git_head": "9296affc0fd5fe9a7f96fc4abe18be833662bd31 (Merge PR #32 audit-v2-w18-data-residual)",
+  "tests": { "result": "504 passed / 69 files", "runner": "vitest run", "matches_portfolio_anchor": true },
+  "svelte_check": { "result": "0 errors / 0 warnings / 383 files", "matches_portfolio_anchor": true },
+  "db_version": { "value": 4, "source": "src/store/db.ts; asserted db.test.ts:18", "p2_bumps_it": false },
+  "component_test_harness": {
+    "present": false,
+    "detail": "zero *.svelte.test.ts; no @testing-library/svelte. Per portfolio §8 + F2 precedent, P2 verifies via PURE-CORE unit tests (move-list formatter) + static wiring-presence + manual/preview — NOT component mount tests."
+  },
+  "i18n_parity_mechanism": {
+    "test": "src/i18n/translate.test.ts:50-61",
+    "guards": [
+      "every ALL_MESSAGES entry has truthy fr AND en",
+      "no cross-domain key collision (sum of domain key counts === ALL_MESSAGES count)"
+    ],
+    "implication": "new play.* keys auto-inherit the guard; both locales mandatory"
+  },
+  "no_regression_floor": "npm test 504 green, npm run check 0/0, vite build green BEFORE any edit"
+}

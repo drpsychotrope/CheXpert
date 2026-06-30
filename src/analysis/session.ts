@@ -5,7 +5,7 @@
 // Reuses the Insights/drillTarget leak→trainer mapping for tactics steps — does NOT
 // re-derive a parallel routing (AP-ES-2). MUST NOT import Svelte or `app`.
 
-import type { PlanItem } from './studyPlan';
+import type { PlanItem, MasteryCriterion } from './studyPlan';
 
 export type SessionStepKind =
   | 'vision' | 'tactics' | 'endgames' | 'repertoire' | 'comeback' | 'sparring' | 'play-steered' | 'review' | 'reflection';
@@ -18,6 +18,7 @@ export interface SessionStep {
   reason: string;         // carried from PlanItem, for the runner's "why this" line
   themes?: string[];      // tactics → app.tacticsFilterThemes
   timed?: boolean;        // tactics → app.tacticsTimed (time-management focus)
+  mastery?: MasteryCriterion; // C7/CO16 — carried from PlanItem.mastery (coach steps only; study-plan/review/reflection omit it)
 }
 
 export interface SessionPlan {
@@ -54,6 +55,7 @@ export function buildSession(
       focus: item.focus,
       minutes: item.minutes,
       reason: item.reason,
+      mastery: item.mastery, // C7: copy through (undefined for study-plan items → no behavioural change)
     };
     if (item.activity === 'tactics') {
       const r = tacticsRouting(item.focus);

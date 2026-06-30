@@ -1,0 +1,50 @@
+{
+  "pr": "play-opponent-agency",
+  "feature": "P3",
+  "captured_at": "2026-06-30",
+  "head": "9296aff",
+  "node": "v20.20.2",
+  "tests": {
+    "command": "npm test",
+    "files": 69,
+    "passed": 504,
+    "failed": 0,
+    "status": "GREEN",
+    "duration_s": 7.74,
+    "note": "Matches portfolio anchor (504/69). No Svelte component-test harness: zero *.svelte.test.ts; all 504 are pure/logic tests. P3 verifies via pure-core unit tests (AdaptiveOpponent difficulty + bot-resign/draw decision logic ARE unit-testable as pure functions) + static wiring-presence + manual/preview."
+  },
+  "svelte_check": {
+    "command": "npm run check",
+    "files": 383,
+    "errors": 0,
+    "warnings": 0,
+    "status": "GREEN"
+  },
+  "build": {
+    "command": "npm run build",
+    "status": "not re-run this scan (svelte-check + tests green; F1..F6 scans confirmed build green at this HEAD); P3 §3 pre-flight will re-confirm at PR time"
+  },
+  "db_version": 4,
+  "schema_revs": { "player": 1, "settings": 1 },
+  "latest_committed_adr": "ADR-0053",
+  "adr_reservations": {
+    "0054": "enhancements-architecture portfolio",
+    "0055": "F3 attempt-recording-weakness",
+    "0056": "F5 games-store-pgn-io",
+    "0057": "F6 game-session-controller",
+    "next_free_for_P3": "0058",
+    "note": "Per portfolio §8 + task doctrine, a feature PR takes NO new ADR unless a real architectural decision. P3's honesty rule (override game does not move adaptive pool — Q-E) mirrors existing AP-CHESS-13/24 honesty doctrine and is NOT a new architectural axis -> default: NO new ADR. Flag ADR-0058 only if the bot-resign/draw realism model is deemed a genuine new decision at PR time."
+  },
+  "reuse_targets_verified_green": [
+    "src/engine/AdaptiveOpponent.ts (AdaptiveOpponent.test.ts: 5 tests green — pure-core pattern P3 mirrors)",
+    "src/game/playSession.ts (playSession.test.ts: 6 tests green)",
+    "src/ui/Play.svelte (no component test — verified by reading; svelte-check clean)"
+  ],
+  "doctrine_anchors": {
+    "additive_optional_no_db_bump": "settings/game additive optional fields + schemaRev (db.ts:121-125)",
+    "pure_cores": "no Date/Math.random in logic modules; bot-resign/draw DECISION is a pure fn of (eval cp, plies, bot Elo); the eval fetch + Math.random sampling stay at the edge",
+    "honesty": "AP-CHESS-13/24 directional/sample-size-labelled; Q-E override-does-not-move-pool extends it",
+    "bilingual": "all P3 user strings need FR+EN in src/i18n/messages/play.ts (catalogue confirmed present)",
+    "insights_byte_identity": "P3 does not touch buildStudyPlan / Insights output — must stay byte-identical (verify via existing snapshot)"
+  }
+}

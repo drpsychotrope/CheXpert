@@ -1,0 +1,56 @@
+{
+  "pr": "game-session-controller",
+  "foundation": "F6",
+  "scan_date": "2026-06-30",
+  "purpose": "Verify the refactor premise: the same onMove->engineMove->checkEnd loop is triplicated across Play/Sparring/Comeback, and the reuse hooks named in the architecture spec exist as described.",
+  "verdict": "PREMISE CONFIRMED — proceed. Triplication is real and measurable; reuse hooks exist; no controller module exists yet.",
+  "targets": {
+    "components_with_duplicated_loop": [
+      { "path": "src/ui/Play.svelte", "lines": 666, "role": "STRONG copy (clock + pickHumanMove + retryEngineMove + coached takeback + 960 + opening steering + persistence)", "exists": true },
+      { "path": "src/ui/Sparring.svelte", "lines": 173, "role": "WEAK copy (no clock, pickMove only, no retry, no persistence; seeds from Scenario.fen)", "exists": true },
+      { "path": "src/ui/Comeback.svelte", "lines": 179, "role": "WEAK copy (no clock, pickMove only, no retry, no persistence; seeds from ComebackPosition.fen)", "exists": true }
+    ]
+  },
+  "reuse_hooks": {
+    "src/game/playSession.ts": {
+      "exists": true,
+      "lines": 50,
+      "contents": "PURE helpers only (botMovetime, flagOutcome, applyGameResult, BUDGET_BOUNDS). NO controller / NO loop. Confirms audit-v2 W12 intent: this is the 'pure home' but the stateful loop still lives in the 3 components.",
+      "implication": "F6 EXTENDS playSession.ts (or a sibling module) with the stateful loop; the existing pure helpers are consumed unchanged."
+    },
+    "src/engine/AdaptiveOpponent.ts": {
+      "exists": true,
+      "lines": 119,
+      "methods_verified": ["pickMove(fen, movetime=500)", "pickHumanMove(fen, movetime=300)", "applyStrength()", "finishGame(outcome)", "recordGame (pure export)"],
+      "note": "pickHumanMove uses Math.random() internally (humanMove sampling) — NOT pure; must stay behind the EngineClient boundary, the controller calls it but the controller core can stay injection-based."
+    },
+    "src/engine/EngineClient.ts": {
+      "exists": true,
+      "methods_verified": ["evaluate", "analyzeLines", "applyOptions", "resetVariant", "interrupt"],
+      "note": "interrupt() backs Play.retryEngineMove (drop stuck search). Available to siblings if retry is adopted later."
+    },
+    "src/game/ChessGame.ts": {
+      "exists": true,
+      "methods_verified": ["move", "moveUci", "resolveMove", "terminal()", "inCheck()", "dests()", "fen", "turn", "fenForEngine() (960)"],
+      "note": "Mutated in place; Svelte 5 does not deep-proxy it — root cause of ADR-0050/0051 reactivity rule the controller must respect (reassign fen each move)."
+    },
+    "Play.retryEngineMove": { "exists": true, "location": "src/ui/Play.svelte:375-384", "note": "Play-only capability; absent in Sparring/Comeback. Opt-in flag in the controller, adoption DEFERRED." },
+    "Play.coachEvalBad/coachTakeBack/coachKeep": { "exists": true, "location": "src/ui/Play.svelte:291-319", "note": "Play-only coached-takeback; non-blocking. Out of scope for the shared loop core (view concern + Play-specific); keep in Play." }
+  },
+  "c3_enabler_starting_fen": {
+    "requirement": "Controller must accept a starting FEN so Coach/Sparring can seed designed positions (C3).",
+    "already_satisfiable": true,
+    "evidence": [
+      "src/analysis/scenarios.ts Scenario.fen + sideToTrain (Sparring already seeds new ChessGame(s.fen))",
+      "src/analysis/comeback.ts ComebackPosition.fen + playerColor (Comeback already seeds new ChessGame(positions[i].fen))",
+      "Play seeds standard START_FEN or chess960Position(...).startFen"
+    ],
+    "conclusion": "A startFen parameter is a natural, zero-friction part of the controller's init contract; no producer changes needed."
+  },
+  "no_existing_controller": {
+    "searched": ["src/game/playSession.ts", "src/game/*", "src/engine/*"],
+    "found": false,
+    "note": "No GameSessionController / session state machine exists. This is a genuine extraction, not a rewrite of an existing abstraction."
+  },
+  "stop_escalation": null
+}

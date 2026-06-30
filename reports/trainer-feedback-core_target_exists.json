@@ -1,0 +1,53 @@
+{
+  "pr": "trainer-feedback-core",
+  "feature": "T1",
+  "scan_date": "2026-06-30",
+  "head": "9296affc0fd5fe9a7f96fc4abe18be833662bd31",
+  "verdict": "PROCEED",
+  "summary": "All four fold targets and every reuse hook exist and were read. Two premise corrections (see _collision.json) refine but do not block. T1 is a pure consumer of F4 (SolutionReveal) + F3 (recording/selfTag) and adds the reactions F3 explicitly deferred (TR3).",
+  "folds_verified": {
+    "TR1_show_solution_why_on_miss": {
+      "status": "CONFIRMED gap",
+      "tactics_miss_path": "src/ui/Tactics.svelte:193-203 — result==='wrong' -> stopTimer(); feedback=t('tactics.wrong'); finish(false); board RESET to puzzle.fen; lastMove=null. No solution shown.",
+      "review_miss_path": "src/ui/Review.svelte:91-98 — res==='wrong' -> feedback=t('review.missed'); board RESET to puzzle.fen; grade(false). No solution shown.",
+      "consumes": "F4 SolutionReveal.svelte (NOT YET BUILT) + theme-derived why via missWhy(themes, locale) (F4 helper, NOT YET BUILT). T1 must build AFTER F4 or co-build the component per F4 spec.",
+      "why_is_theme_derived": "A trainer miss has NO engine PlyAnalysis (puzzle lines pre-verified, no live engine). explainPly requires PlyAnalysis -> cannot be used. why = puzzle.themes -> motif idiom (F4 missWhy / Q-G). Confirmed by F4 spec premise-correction #2."
+    },
+    "TR3_self_tag_closes_loop": {
+      "status": "STORAGE EXISTS; ACTIONS MISSING (this is T1's core add)",
+      "selfTag_capture": "src/ui/Tactics.svelte:11,58,275-281,381-390 — SELF_TAGS chips render on status==='failed'; updateSelfTag() persists onto the same attempt row (AP-META-5). confidence chips at 336-343.",
+      "persisted_fields": "src/store/db.ts:47-48 — PuzzleAttemptRecord.confidence? + selfTag? already OPTIONAL+additive (ADR-0037). No new field for storage. Written at Tactics.svelte:262-263.",
+      "gate": "src/ui/Tactics.svelte:60 — chips only render when app.settings?.metacogEnabled. TR3 reactions inherit this gate (no reaction surfaces when metacog off).",
+      "review_has_no_selftag": "src/ui/Review.svelte has NO confidence/selfTag UI at all. TR3 reactions are Tactics-only; Review gets TR1+TR6 only.",
+      "reaction_hooks": {
+        "unfamiliar-pattern_to_card": "cardForThemes(themes, cards) src/concepts/concepts.ts:63 (pure, returns highest-precedence card or null); existing openLearn() Tactics.svelte:84-87 + app.conceptFocusMotif/app.go('concepts') Tactics.svelte:373 / app.svelte.ts:52,87.",
+        "rushed_to_timed": "app.tacticsTimed src/state/app.svelte.ts:48 (consumed by Tactics startTimer 95-107). 'offer timed' = set app.tacticsTimed=true + reload. No in-Tactics toggle today.",
+        "low_confidence_guess_solved_grade_clamp": "grade chosen at Tactics.svelte:267 resultToGrade(solved,ms); applied via recordTacticsAttempt -> gradeCard (attemptsRepo.ts:49). Clamp = wrap the grade at the call site, no better than Grade.Good. Confidence value 'guess'/'unsure' read from local `confidence` state. NOTE: 'guess' is a CONFIDENCE (metacog.ts:11), NOT a selfTag."
+      }
+    },
+    "TR6_second_try_before_fail": {
+      "status": "CONFIRMED gap",
+      "trainer_fails_instantly": "src/trainer/TacticalTrainer.ts:48-55 playUserMove — first non-matching move sets status='failed', mistakes+1, returns 'wrong'. No retry budget. SolveState.mistakes counts but never gates.",
+      "existing_retry": "src/ui/Tactics.svelte:300-312 retry() = FULL reset to start, already-graded, pure practice. NOT TR6: TR6 wants 1 in-flight retry on the actual board BEFORE locking the fail, and/or leaving the wrong move visible.",
+      "wrong_move_not_left_visible": "Tactics.svelte:199-201 + Review.svelte:94-95 reset display to puzzle.fen on a miss; the wrong move is erased."
+    },
+    "accept_alternate_winning_moves": {
+      "status": "CONFIRMED gap",
+      "samemove_too_strict": "src/trainer/TacticalTrainer.ts:81-86 sameMove(a,b) tolerates ONLY promotion suffix (e7e8 == e7e8q). Any other deviation -> 'wrong' even if equally/clearly winning.",
+      "engine_available": "src/engine/EngineClient.ts — analyzeLines(fen,{multipv,depth/movetime,fullStrength}) returns top-N lines best-first with whiteCp + mate (lines 205-248); evaluate(fen,opts) returns bestmove+whiteCp (161-197). CRITICAL: must pass fullStrength:true — the shared worker may be throttled to a bot Elo (UCI_LimitStrength sticky; audit C-1/P0-01) which would corrupt the eval.",
+      "apply_alt_move": "ChessGame.moveUci(uci) src/game/ChessGame.ts:222 applies a UCI and returns SAN/null -> produces the post-move FEN for the opponent-to-move eval."
+    }
+  },
+  "f4_dependency": {
+    "spec": "specs/teach-explain-surfacing-spec.md (V1, DRAFTED not built)",
+    "provides": "src/ui/SolutionReveal.svelte (prop-driven: fen, moves, orientation, why? source-agnostic, autoplay, stepMs, onDone) + missWhy(themes, locale) pure helper (theme-derived 'why', returns null on no high-precedence family).",
+    "contract": "T1 CONSUMES SolutionReveal + missWhy; MUST NOT re-implement the reveal (AP-TEACH-1) or fork the component. why? prop is the seam.",
+    "build_order": "F4 before T1 (per architecture DAG Phase1). If F4 unbuilt at T1 build time, escalate / co-build the component to F4 spec."
+  },
+  "f3_dependency": {
+    "spec": "specs/attempt-recording-weakness-spec.md (V1, DRAFTED not built)",
+    "provides": "recording of attempts incl. selfTag/confidence; weaknessCounters as a live read; explicitly DEFERS TR3 self-tag->action to T1 (F3 Q-C, §11).",
+    "contract": "T1 adds the reactions on top of F3's recording. T1 must not alter F3's recording path or weaknessCounters steering."
+  },
+  "baseline_anchor": { "tests": "504/69", "svelte_check": "383 files 0/0", "DB_VERSION": 4, "latest_ADR": "0053" }
+}

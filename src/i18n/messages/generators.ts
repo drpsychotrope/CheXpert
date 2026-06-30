@@ -42,6 +42,38 @@ export const generators: Messages = {
   'motif.discoveredAttack': { fr: 'Attaques à la découverte', en: 'Discovered attacks' },
   'motif.mate': { fr: 'Schémas de mat', en: 'Mating patterns' },
   'motif.endgame': { fr: 'Finales', en: 'Endgames' },
+  // C2/CF6 endgame sub-bucket labels (real Lichess theme keys; minorPieceEndgame is the C2 umbrella).
+  'motif.rookEndgame': { fr: 'Finales de tours', en: 'Rook endgames' },
+  'motif.pawnEndgame': { fr: 'Finales de pions', en: 'Pawn endgames' },
+  'motif.minorPieceEndgame': { fr: 'Finales de pièces mineures', en: 'Minor-piece endgames' },
+
+  // ── Common Lichess theme sub-tags (F1 Q-B: trainer theme-line coverage) ──
+  // The detector (analysis/motif.ts) + bundled puzzles emit these into `puzzle.themes`.
+  // motifLabelOrRaw resolves them here; the open-vocabulary long tail stays raw (§11).
+  // Standard French chess vocabulary, consistent with motif.*/motifExpl.* (FOLD I2).
+  'motif.mateIn1': { fr: 'Mat en un', en: 'Mate in one' },
+  'motif.mateIn2': { fr: 'Mat en deux', en: 'Mate in two' },
+  'motif.mateIn3': { fr: 'Mat en trois', en: 'Mate in three' },
+  'motif.backRankMate': { fr: 'Mat de la dernière rangée', en: 'Back-rank mate' },
+  'motif.knightFork': { fr: 'Fourchette de cavalier', en: 'Knight fork' },
+  'motif.absolutePin': { fr: 'Clouage absolu', en: 'Absolute pin' },
+  'motif.relativePin': { fr: 'Clouage relatif', en: 'Relative pin' },
+  'motif.discoveredCheck': { fr: 'Échec à la découverte', en: 'Discovered check' },
+  'motif.doubleCheck': { fr: 'Échec double', en: 'Double check' },
+  'motif.crushing': { fr: 'Coup gagnant', en: 'Crushing' },
+  'motif.advantage': { fr: 'Avantage', en: 'Advantage' },
+
+  // ── Activity labels (F1: PlanItem.activity union — Coach + Insights display) ──
+  // DISPLAY ONLY. The raw key keeps feeding session routing / tacticsFilterThemes (AP-I18N-1).
+  // Closed union: every PlanItem.activity value MUST have an entry (parity test gates it,
+  // AP-I18N-4). Standard FR chess register (FOLD I2).
+  'activity.tactics': { fr: 'Tactique', en: 'Tactics' },
+  'activity.endgames': { fr: 'Finales', en: 'Endgames' },
+  'activity.repertoire': { fr: 'Répertoire', en: 'Repertoire' },
+  'activity.comeback': { fr: 'Retour au score', en: 'Comeback' },
+  'activity.vision': { fr: 'Vision', en: 'Vision' },
+  'activity.sparring': { fr: 'Sparring', en: 'Sparring' },
+  'activity.play-steered': { fr: 'Partie ciblée', en: 'Steered game' },
 
   // ── Weakness dimension labels (diagnostic.ts DIM_LABELS — full) ──────────
   'dim.tactics': { fr: 'Tactique', en: 'Tactics' },
@@ -119,6 +151,13 @@ export const generators: Messages = {
   // ── diagnostic.ts ────────────────────────────────────────────────────────
   'diag.placeholderDim': { fr: 'Jouez la partie de calibration pour évaluer ceci', en: 'Play the calibration game to assess this' },
   'diag.motifsProbed': { fr: '{n} motifs sondés ({puzzles} problèmes)', en: '{n} motifs probed ({puzzles} puzzles)' },
+  // C2/CO15 timed-probe read (timedProbe.ts) — sample-size-labelled, directional, never a grade.
+  'diag.timedRead': { fr: 'Bloc chronométré : {solved}/{attempted} résolus, ~{sec} s/problème', en: 'Timed block: {solved}/{attempted} solved, ~{sec}s/puzzle' },
+  'diag.timedNone': { fr: 'Bloc chronométré ignoré ou aucun problème tenté', en: 'Timed block skipped or no puzzle attempted' },
+  // C3 designed-probe cell details (probes.ts extractProbeDim) — name the designed position so the radar
+  // reading is not a black box (FOLD E2). Directional, small sample — never a grade (AP-CDESIGN-4/5).
+  'diag.probeConversion': { fr: 'depuis une finale de tours conçue (un pion de plus)', en: 'from a designed rook-up endgame' },
+  'diag.probeResilience': { fr: 'depuis une position inférieure conçue à défendre', en: 'from a designed worse position to defend' },
 
   // ── program.ts coach-program reasons ─────────────────────────────────────
   'program.endgameDrill': {
@@ -137,6 +176,12 @@ export const generators: Messages = {
     fr: "La précision en ouverture est un point faible (score {score}).",
     en: 'Opening accuracy is a weak spot (score {score}).',
   },
+  // C7/CO17: the named variant — {opening} is the localized opening name (display-only; the routing
+  // `focus` stays the English 'opening lines' key). Used when the UI could name a most-played line.
+  'program.openingAccuracyNamed': {
+    fr: "La précision en ouverture est un point faible (score {score}) — travaillez votre {opening}.",
+    en: 'Opening accuracy is a weak spot (score {score}) — work on your {opening}.',
+  },
   'program.openingSteer': {
     fr: "Jouez une partie où le bot oriente vers votre lacune d'ouverture.",
     en: 'Play a game where the bot steers into your opening gap.',
@@ -152,6 +197,44 @@ export const generators: Messages = {
   'program.maintenance': {
     fr: 'Aucune faiblesse nette — gardez votre reconnaissance de motifs affûtée.',
     en: 'No clear weakness surfaced — keep your pattern recognition sharp.',
+  },
+
+  // ── C5 strength-leverage reasons (program.ts leverageStepFor) — play TO a clear strength.
+  // Directional, never a grade; {strength} is the already-localized strength label. ──
+  'program.leverageTactics': {
+    fr: 'Point fort : {strength} — jouez une partie attaquante pour le faire valoir.',
+    en: 'Strength: {strength} — play an attacking game to press it.',
+  },
+  'program.leverageEndgame': {
+    fr: 'Point fort : {strength} — entretenez-le par des finales.',
+    en: 'Strength: {strength} — keep it sharp with endgames.',
+  },
+  'program.leverageResilience': {
+    fr: 'Point fort : {strength} — mettez-le à profit dans des positions disputées.',
+    en: 'Strength: {strength} — put it to work in tough positions.',
+  },
+
+  // ── C5 goal-ensured step reasons (program.ts GOAL_PLAN.ensure) — added because the intake goal
+  // asked for it (e.g. opening-prep). Routing keys (activity/focus) stay English. ──
+  'program.goalOpening': {
+    fr: 'Objectif ouverture — solidifiez votre répertoire.',
+    en: 'Opening goal — shore up your repertoire.',
+  },
+  'program.goalOpeningSteer': {
+    fr: 'Objectif ouverture — jouez une partie orientée vers vos lignes.',
+    en: 'Opening goal — play a game steered into your lines.',
+  },
+
+  // ── C5 metacognition coach line (coaching.ts metacogCoachLine) — ONE descriptive sentence built
+  // from the EXISTING calibration readout. {verdict} = metacog.verdict* word; {cause} = selfTag.*
+  // label. NEVER a number/grade (AP-CINTAKE-3 — tests assert no digit). ──
+  'coaching.line': {
+    fr: 'Côté confiance, vous êtes plutôt {verdict} — gardez-le en tête en partie.',
+    en: 'On confidence, you read as {verdict} — keep that in mind over the board.',
+  },
+  'coaching.lineWithCause': {
+    fr: 'Côté confiance, vous êtes plutôt {verdict} ; vos erreurs tiennent surtout à : {cause}. Ralentissez sur celles-là.',
+    en: 'On confidence, you read as {verdict}; your misses cluster on: {cause}. Slow down on those.',
   },
 
   // ── studyPlan.ts plan-item reasons (focus/activity stay English routing keys) ──
@@ -189,4 +272,40 @@ export const generators: Messages = {
   'phaseLabel.opening': { fr: 'Ouverture', en: 'Opening' },
   'phaseLabel.middlegame': { fr: 'Milieu de partie', en: 'Middlegame' },
   'phaseLabel.endgame': { fr: 'Finale', en: 'Endgame' },
+
+  // ── teach-explain (F4): the trainer-miss "why", framed as a pattern HINT (FOLD-5 /
+  // AP-TEACH-2) — a cue, NOT a verdict and NOT the Coach's engine-backed review. Resolved
+  // by the PURE missWhy core via gt (injected locale); {motif} = family label (motif.*),
+  // {what} = the existing motifExpl.* idiom. A complete per-locale template (AP-TEACH-5). ──
+  'reveal.themeWhy': {
+    fr: 'Indice : le bon coup {what} ({motif}).',
+    en: 'Hint: the right move {what} ({motif}).',
+  },
+
+  // ── coach-output narrative (C6, narrative.ts buildCoachNarrative) — PURE templated prose
+  // resolved by gt (injected locale). Each value is a COMPLETE per-locale sentence (never
+  // concatenated fragments — AP-CTEACH-5); {areas}/{focus} are pre-joined localized labels.
+  // DIRECTIONAL, no grade (AP-CTEACH-2); no Elo / % payoff number is ever emitted (AP-CTEACH-3). ──
+  'coachReview.narrStrength': { fr: 'Vous êtes solide sur {areas}.', en: "You're solid on {areas}." },
+  'coachReview.narrWeak': { fr: '{areas} demandent du travail.', en: '{areas} need work.' },
+  'coachReview.startHere': {
+    fr: "Commencez par {focus} — c'est là que le travail rapportera le plus.",
+    en: "Start with {focus} — that's where the work will pay off most.",
+  },
+  // Honest, NON-NUMERIC payoff cue folded after startHere (no Elo, no % — AP-CTEACH-3 / FOLD-A8).
+  'coachReview.payoffSoft': {
+    fr: 'Quelques répétitions régulières là-dessus avancent plus vite que de tout éparpiller.',
+    en: 'Small, steady reps there move the needle faster than spreading thin.',
+  },
+  'coachReview.narrNoWeak': {
+    fr: 'Aucune faiblesse nette — gardez vos automatismes affûtés.',
+    en: 'No clear weakness — keep your patterns sharp.',
+  },
+  // Directional caveat when no full game backed the read (FOLD-A8 / AP-CTEACH-2).
+  'coachReview.narrPuzzleOnly': {
+    fr: 'Lecture issue des problèmes seulement — directionnelle, pas une note de partie complète.',
+    en: 'This read is from puzzles only — directional, not a full-game grade.',
+  },
+  // Locale-correct list join so {areas} never glues raw labels with a literal comma (AP-CTEACH-5).
+  'coachReview.listJoin': { fr: '{a} et {b}', en: '{a} and {b}' },
 };

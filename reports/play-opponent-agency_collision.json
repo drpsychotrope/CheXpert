@@ -1,0 +1,34 @@
+{
+  "pr": "play-opponent-agency",
+  "feature": "P3",
+  "checked_at": "2026-06-30",
+  "verdict": "NO BLOCKING COLLISION — clean greenfield surfaces; coordination notes vs sibling feature PRs",
+  "existing_p3_artifacts": {
+    "specs/play-opponent-agency-spec.md": "absent (this PR creates it)",
+    "reports/play-opponent-agency_*": "absent before this scan (this PR creates them)"
+  },
+  "name_collisions_in_src": {
+    "difficulty": "only unrelated FSRS/SRS card 'difficulty' fields + a journey copy string — NO Play/opponent difficulty concept exists. P3's difficulty-mode names are free.",
+    "drawOffer/botResign/offerDraw/acceptDraw": "0 matches in src — fully greenfield.",
+    "resign": "exists in Play/Sparring/Comeback (player resign only); P3 adds bot-side resign + draw without renaming the player path."
+  },
+  "feature_pr_overlap": {
+    "P2 (in-game UX, dep F2)": {
+      "shared_surface": "Play.svelte buttons row + ConfirmDialog; P2 owns confirm-before-resign + rematch + takeback + move-list.",
+      "collision": "LOW — P2 adds a confirm wrapper around the EXISTING player resign(); P3 adds the BOT's resign + draw-offer/accept. Both reuse ConfirmDialog. Boundary: P3 does NOT touch confirm-resign (P2) and does NOT add a move list/rematch. Sequence either order; if P2 lands first, P3 inherits the confirm pattern. Note in spec §0.5/§9.",
+      "draw_offer_ui": "P3 owns the draw-offer/accept-draw dialog (PL9). P2's confirm-resign is a different dialog. No shared state beyond the reusable component."
+    },
+    "F6 (game-session-controller)": {
+      "shared_surface": "the move/engine/end loop P3's bot-resign/draw decision hooks into.",
+      "collision": "DEPENDENCY not collision — P3 is a consumer (architecture §3: P3 dep=F6). F6 exposes humanMove/retry/clock opt-ins + checkTerminal; P3 adds bot-resign/draw as new controller capability/queries. P3 spec written against the F6 contract; F6 must land first (or P3 falls back to Play.svelte directly).",
+      "no_auto_chain_constraint": "F6 AP-CTRL-8: applyPlayerMove must not auto-call engineReply (coached takeback + clock press interpose). P3's bot-resign/draw evaluation runs in engineReply / after the bot's move — it must respect the same caller-orchestrated ordering and must NOT introduce auto-chaining.",
+      "checkTerminal_purity": "F6 AP-CTRL-1/-9: checkTerminal returns structured {over,reason,winner,outcome}, no localized string, no side effects. P3's agreed-draw / bot-resign are NON-rules ends (game.terminal() is not 'over') — P3 must surface them as a distinct structured result, NOT by faking a terminal reason, and keep the rating fold/persist in Play's finishGame behind its gameFinished guard."
+    },
+    "PLt tail also routed to F5": "PLt 'PGN export' is F5's (already drafted), NOT P3. P3 owns ONLY the PLt items named in scope: difficulty control/override, increment-in-movetime, difficulty-scaled coached-blunder threshold. opening-variety seed -> NOT P3 (P4 steering / leave as-is). No collision as long as P3 scope excludes PGN export + opening-variety seed."
+  },
+  "honesty_collision": {
+    "rating_pool": "Q-E: a Fixed/Easier/Harder (override) game must NOT move the adaptive opponent pool (poolOpponent) and must NOT move the Glicko game rating, mirroring honesty doctrine. This means finishGame must BRANCH on the override flag: an override game skips applyGameResult's pool/rating fold (still persists the GameRecord, flagged). Risk: silently leaking an easy-mode win into the rating pool would be a HONESTY regression. Spec must make the skip explicit + tested."
+  },
+  "insights_collision": "NONE — P3 does not import or alter buildStudyPlan / weakness profile / Insights. Verify byte-identity with the existing snapshot as a gate.",
+  "i18n_collision": "play.* namespace owns all new strings; no key clashes (new keys: play.difficulty*, play.botResigns, play.drawOffer*, play.drawAgreed, play.adaptedHarder/Easier/Same, play.overrideGameNote). FR+EN required (F1 routing already in place)."
+}

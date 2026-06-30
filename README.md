@@ -56,6 +56,11 @@ Everything runs in the browser. Nothing leaves your device by default.
   auto-analysed (the standard analysis pipeline assumes opening theory; see ADR-0041).
 - **One-click review** — after a game, *Analyse this game* runs the full local analysis (puzzles +
   weakness dashboard) with no PGN to copy or paste.
+- **In-game move list, rematch, confirm-resign, opt-in takeback, on-demand move check** — a
+  scrollable, auto-following SAN move list reads the game back as you play; *Rematch* restarts with the
+  same color/clock/variant; *Resign* asks first; an opt-in *Take back* (Settings) undoes your move and
+  the bot's reply — but a takeback in a rated game makes it **not count** (ADR-0058); *Check this move*
+  gives a quick, best-effort "looks risky/fine" hint before you commit.
 
 ### The differentiating loop
 - **Analyse a game** — paste a PGN; the engine reviews every move locally (~20 s for a 40-move

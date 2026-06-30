@@ -14,6 +14,16 @@ export const play: Messages = {
     fr: 'Le classement aux problèmes mesure la reconnaissance de motifs, pas la force de jeu — les deux diffèrent.',
     en: 'Puzzle rating measures pattern recognition, not playing strength — they differ.',
   },
+  // T3/TR8: training-day streak shown beside the Review badge (re-engagement signal).
+  'home.streak': { fr: '🔥 Série de {n} jours', en: '🔥 {n}-day streak' },
+  // CO20 (C8): the dismissible rough-patch coaching card on Home. Gentle, opt-in (AP-CFUNNEL-1) —
+  // surfaced only on a losing streak with no fresh profile (shouldOfferCoach).
+  'home.roughPatch': {
+    fr: 'Passage difficile ? Une évaluation de coaching peut cibler ce qui coince.',
+    en: 'Rough patch? A coaching read can pinpoint what to work on.',
+  },
+  'home.roughPatchCta': { fr: 'M’évaluer →', en: 'Assess me →' },
+  'home.roughPatchDismiss': { fr: 'Plus tard', en: 'Not now' },
   'home.playBot': { fr: "Jouer contre le bot adaptatif", en: 'Play the adaptive bot' },
   'home.todaysSession': { fr: "Session du jour", en: "Today's session" },
   'home.insights': { fr: 'Bilan', en: 'Insights' },
@@ -38,6 +48,36 @@ export const play: Messages = {
     en: 'Your {pool} rating {rating} · bot ≈ {elo} Elo',
   },
   'play.coachedOn': { fr: 'coaché activé', en: 'coached on' },
+
+  // ---- Difficulty control (P3, play-opponent-agency) ----
+  // The rating line under an override shows the EFFECTIVE bot Elo + a mode tag so it never lies about
+  // who you're playing (E1/AP-OPPAGENCY-14); the Adaptive line keeps `play.ratingLine` verbatim.
+  'play.ratingLineOverride': {
+    fr: 'Votre classement {pool} {rating} · bot {elo} Elo ({mode})',
+    en: 'Your {pool} rating {rating} · bot {elo} Elo ({mode})',
+  },
+  'play.difficultyLabel': { fr: 'Difficulté :', en: 'Difficulty:' },
+  'play.difficultyAdaptive': { fr: 'Adaptatif', en: 'Adaptive' },
+  'play.difficultyEasier': { fr: 'Plus facile (−200)', en: 'Easier (−200)' },
+  'play.difficultyHarder': { fr: 'Plus difficile (+200)', en: 'Harder (+200)' },
+  'play.difficultyFixed': { fr: 'Elo fixe', en: 'Fixed Elo' },
+  'play.fixedEloLabel': { fr: 'Elo :', en: 'Elo:' },
+  // Short tags shown inside `play.ratingLineOverride` ({mode}); adaptive needs none (uses the base line).
+  'play.difficultyTagEasier': { fr: 'plus facile', en: 'easier' },
+  'play.difficultyTagHarder': { fr: 'plus difficile', en: 'harder' },
+  'play.difficultyTagFixed': { fr: 'Elo fixe', en: 'fixed Elo' },
+
+  // Bot resign / player draw-offer (P3/Q-B/Q-C). Result strings + the offer button + pending line.
+  'play.offerDraw': { fr: 'Proposer nulle', en: 'Offer draw' },
+  'play.botResigns': { fr: "L'adversaire abandonne — vous gagnez ! ♚", en: 'Your opponent resigns — you win! ♚' },
+  'play.drawAgreed': { fr: 'Nulle par accord mutuel.', en: 'Draw by agreement.' },
+  'play.drawDeclined': { fr: 'Le bot refuse la nulle.', en: 'The bot declines the draw.' },
+  'play.drawOfferedPending': { fr: 'Nulle proposée — en attente du bot…', en: 'Draw offered — awaiting the bot…' },
+
+  // Post-game adaptation line (P3/Q-D), adaptive games only; suppressed for override games.
+  'play.adaptTougher': { fr: 'Le bot sera plus fort la prochaine fois (+{delta} Elo).', en: 'The bot will be tougher next game (+{delta} Elo).' },
+  'play.adaptEasier': { fr: 'Le bot sera plus faible la prochaine fois (−{delta} Elo).', en: 'The bot will be easier next game (−{delta} Elo).' },
+  'play.adaptUnchanged': { fr: 'La force du bot est inchangée pour la prochaine partie.', en: "The bot's strength is unchanged for the next game." },
 
   'play.opponentLabel': { fr: 'Adversaire :', en: 'Opponent:' },
   'play.opponentHuman': { fr: 'Type humain (coups variés)', en: 'Human-like (varied moves)' },
@@ -120,4 +160,79 @@ export const play: Messages = {
   'play.drawReason': { fr: 'Nulle ({reason}).', en: 'Draw ({reason}).' },
   'play.analysisFailed': { fr: "Échec de l'analyse : ", en: 'Analysis failed: ' },
   'play.youResigned': { fr: 'Vous avez abandonné.', en: 'You resigned.' },
+
+  // Export a played game's PGN (F5, ADR-0056) — Play tail + history rows.
+  'play.exportPgn': { fr: 'Exporter le PGN', en: 'Export PGN' },
+
+  // ---- In-game / after-game UX (P2, play-in-game-ux-spec) ----
+  'play.rematch':            { fr: 'Revanche',                       en: 'Rematch' },
+  'play.takeBack':           { fr: 'Annuler le coup',                en: 'Take back' },
+  'play.checkMove':          { fr: 'Vérifier ce coup',               en: 'Check this move' },
+  'play.checkRisky':         { fr: 'Ce coup semble risqué.',         en: 'This move looks risky.' },
+  'play.checkFine':          { fr: 'Ce coup semble correct.',        en: 'This move looks fine.' },
+  'play.unratedNote':        { fr: 'Coup repris — cette partie ne comptera pas.', en: "Move taken back — this game won't count." },
+  'play.moveListLabel':      { fr: 'Liste des coups',                en: 'Move list' },
+  'play.moveListEmpty':      { fr: "Aucun coup pour l'instant.",     en: 'No moves yet.' },
+  'play.resignConfirmTitle': { fr: 'Abandonner ?',                   en: 'Resign?' },
+  'play.resignConfirmBody':  { fr: 'La partie sera perdue et comptera comme une défaite.', en: 'The game will be lost and counts as a defeat.' },
+  'play.resignConfirmYes':   { fr: 'Abandonner',                     en: 'Resign' },
+  'play.resignConfirmNo':    { fr: 'Continuer',                      en: 'Keep playing' },
+
+  // ---- Play→analysis loop closure (play.loop.*) — P1, play-loop-closure-spec ----
+  // "Analyse your N unanalysed games" — N is unanalyzedPlayedGames(...).length (F-P1-3).
+  'play.loop.analyseAllOne': {
+    fr: 'Analyser votre {n} partie non analysée',
+    en: 'Analyse your {n} unanalysed game',
+  },
+  'play.loop.analyseAllMany': {
+    fr: 'Analyser vos {n} parties non analysées',
+    en: 'Analyse your {n} unanalysed games',
+  },
+  // Sequential batch progress (games done / total).
+  'play.loop.queueProgress': {
+    fr: 'Analyse de la partie {done} / {total}…',
+    en: 'Analysing game {done} / {total}…',
+  },
+  'play.loop.cancel': { fr: 'Annuler', en: 'Cancel' },
+  'play.loop.cancelling': { fr: 'Arrêt…', en: 'Stopping…' },
+  // Quiet confirmation after the opt-in auto-run analyses the just-finished game (F-P1-2).
+  'play.loop.autoAnalysed': { fr: 'Analysée ✓', en: 'Analysed ✓' },
+  // Dashboard / Home badge — N unanalysed games (links to the played-game history).
+  'play.loop.badgeOne': { fr: '{n} partie non analysée', en: '{n} unanalysed game' },
+  'play.loop.badgeMany': { fr: '{n} parties non analysées', en: '{n} unanalysed games' },
+  'play.loop.reviewHistory': { fr: "Voir l'historique →", en: 'Review history →' },
+  // Settings: opt-in auto-analyse-on-finish.
+  'play.loop.autoAnalyzeLabel': {
+    fr: 'Analyser automatiquement chaque partie à la fin',
+    en: 'Auto-analyse each game when it finishes',
+  },
+  'play.loop.autoAnalyzeHelp': {
+    fr: "Quand c'est activé, la partie que vous venez de terminer est analysée toute seule (sans clic) — vos erreurs deviennent des problèmes et votre tableau des faiblesses se met à jour. Seule la partie qui vient de se terminer est analysée, jamais tout l'arriéré (lourd pour le moteur). Désactivé par défaut ; les parties Chess960 ne sont jamais analysées.",
+    en: "When on, the game you just finished is analysed on its own (no click) — your mistakes become puzzles and your weakness dashboard updates. Only the just-finished game is analysed, never the whole backlog (heavy for the engine). Off by default; Chess960 games are never analysed.",
+  },
+
+  // ---- Played-game history (history.*) — section inside the Import view (F5, ADR-0056) ----
+  'history.title': { fr: 'Vos parties jouées', en: 'Your played games' },
+  'history.subtitle': {
+    fr: 'Les parties jouées contre le bot, les plus récentes en premier. Exportez le PGN ou analysez une partie non analysée.',
+    en: 'Games you played against the bot, newest first. Export the PGN or analyse a game that has not been analysed yet.',
+  },
+  'history.empty': {
+    fr: "Aucune partie jouée pour l'instant. Jouez une partie contre le bot, puis revenez ici.",
+    en: 'No played games yet. Play a game against the bot, then come back here.',
+  },
+  'history.analysed': { fr: 'Analysée', en: 'Analysed' },
+  'history.notAnalysed': { fr: 'Non analysée', en: 'Not analysed' },
+  'history.analyse': { fr: 'Analyser', en: 'Analyse' },
+  'history.export': { fr: 'Exporter le PGN', en: 'Export PGN' },
+  'history.resultWin': { fr: 'Victoire', en: 'Win' },
+  'history.resultLoss': { fr: 'Défaite', en: 'Loss' },
+  'history.resultDraw': { fr: 'Nulle', en: 'Draw' },
+  'history.botElo': { fr: 'Bot {elo} Elo', en: 'Bot {elo} Elo' },
+  'history.chess960': { fr: 'Chess960', en: 'Chess960' },
+  'history.untimed': { fr: 'Sans pendule', en: 'Untimed' },
+  'history.catBullet': { fr: 'Bullet', en: 'Bullet' },
+  'history.catBlitz': { fr: 'Blitz', en: 'Blitz' },
+  'history.catRapid': { fr: 'Rapide', en: 'Rapid' },
+  'history.catClassical': { fr: 'Classique', en: 'Classical' },
 };

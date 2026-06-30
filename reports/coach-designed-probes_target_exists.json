@@ -1,0 +1,42 @@
+{
+  "pr": "coach-designed-probes",
+  "feature": "C3",
+  "captured_at": "2026-06-30",
+  "head_commit": "9296aff",
+  "premise": "Replace the Coach's single even engine game with DESIGNED positions that probe specific dimensions (rook-up endgame -> conversion; passive/worse position -> resilience), so the radar axes that the even game cannot fairly measure get real evidence.",
+  "premise_verdict": "CONFIRMED — every hook the prompt names exists at the asserted location; the gap C3 fills is real and measured below. No STOP.",
+  "hooks_verified": {
+    "scenarios.ts": {
+      "path": "src/analysis/scenarios.ts (NOT src/coach/ — architecture spec line 19 comment was right: 'analysis/scenarios.ts')",
+      "IMBALANCE_LIBRARY": "EXISTS — 4 entries: iqp, opp-castle, bishop-pair, rook-up. Each carries {id,name,nameFr,category,fen,sideToTrain,goal,goalFr}. rook-up fen='8/5pk1/6p1/8/8/1R3PKP/r5P1/8 w - - 0 1' (rook ending a pawn up, White to convert) — exact conversion probe. opp-castle is an attack race, NOT a worse/passive position.",
+      "scenariosFromWeakness": "EXISTS — (analyses, locale) -> Scenario[] from fingerprint leaks' sampleFens; localized at build. Returns [] when no analyses (CLEAN empty).",
+      "no_resilience_seed": "TRUE GAP — IMBALANCE_LIBRARY has NO passive/worse position for resilience. A coach-specific 'defend-worse' seed must be ADDED (Q-B)."
+    },
+    "scenarioForFocus": {
+      "path": "src/coach/program.ts:19 (CONFIRMED line 19)",
+      "behaviour": "focus.toLowerCase(): endgame|rook -> 'rook-up'; castl|attack|resilien -> 'opp-castle'; else -> 'iqp'. NOTE: 'resilien' already maps to opp-castle, but opp-castle is an ATTACK race, not a defend-worse position — semantically wrong for a resilience PROBE. C3 needs its own focus->seed map, not reuse of this routing-only helper."
+    },
+    "AdaptiveOpponent": {
+      "path": "src/engine/AdaptiveOpponent.ts",
+      "pickMove": "EXISTS (fen, movetime=500) -> bestmove.",
+      "pickHumanMove": "EXISTS — MultiPV temperature sampling; uses Math.random (impure; injected in F6 controller).",
+      "finishGame/recordGame": "EXISTS — folds outcome into rolling Elo. AP-COACH-8: a designed PROBE must NOT call this (would perturb the bot's adaptive Elo from a diagnostic). Coach's even game already does NOT call finishGame (Coach.svelte never calls opponent.finishGame). C3 keeps that."
+    },
+    "F6_controller_startFen": {
+      "path": "specs/game-session-controller-spec.md (V1, drafted, NOT yet built)",
+      "contract": "createGameSession({startFen, playerSide, engine, opponent, config}); applyPlayerMove + engineReply are SEPARATE steps (no auto-chain); checkTerminal() is a PURE idempotent query returning {over,reason,winner,outcome} (NEVER a localized string, AP-CTRL-1); startFen seeding is an explicit C3 enabler (F6 spec §5 test 7, §2 IN, §11). config exposes humanMove/retry/bookMove/movetime opt-in.",
+      "status": "F6 is a HARD prerequisite and is currently a DRAFT (not built). C3 must document a Play-direct fallback (seed ChessGame(fen) + the existing Coach botReply loop, which is exactly today's even-game loop) so C3 is buildable even if F6 lands after."
+    }
+  },
+  "merge_point_for_probe_outcome": {
+    "where": "Coach.svelte commit(gameDimensions) -> buildCoachProfile({gameDimensions}) (diagnostic.ts:45)",
+    "how": "buildCoachProfile maps each game DimensionScore into the radar (replacing the tactics cell with the ladder one). A designed-probe outcome is a DimensionScore {dimension:'endgameConversion'|'resilience', score, detail, sampleSize} that OVERRIDES the matching cell. sampleSize>0 gates strengths/weaknesses (diagnostic.ts:91) — the probe must carry an honest sampleSize (Q-C).",
+    "scoring_engine_reused": "buildWeaknessProfile (weakness.ts:204) — resilienceScore + phaseAcpl(endgame) already compute exactly the two target dimensions from a GameAnalysis. A designed probe = seed FEN -> play out -> runAnalysis(source:'played') -> buildWeaknessProfile([analysis]).dimensions -> read the ONE targeted cell. Identical pipeline to today's even game (Coach.svelte:159-175), just seeded + single-cell read."
+  },
+  "the_real_gap_C3_closes": {
+    "weakness.ts_thresholds": "MIN_PHASE_PLIES=4 (endgame), MIN_BEHIND_EPISODES=3 (resilience). A single even <=48-ply game (GAME_MOVE_LIMIT=48, Coach.svelte:43) rarely reaches a 4+ply endgame OR generates 3 behind-episodes -> endgameConversion & resilience COLLAPSE to 'not measured' (sampleSize 0, neutral 50). This is the precise mechanism the radar 'n/a axes stay weak/n/a' problem (CO7) and why C3 (CO12) exists: a DESIGNED rook-up position starts IN the endgame (guaranteed 4+ endgame plies) and a DESIGNED worse position starts the player behind (engineered behind-episode).",
+    "conclusion": "Premise is empirically grounded, not speculative. The two target dimensions are demonstrably under-measured by the even game today."
+  },
+  "collision": "NONE — no coach-designed-probes spec/target, no designedProbe symbol, no AP-CDESIGN anywhere (grep clean). See _collision.json.",
+  "no_stop": "Premise holds on every checked point. Proceeding to /draft-general."
+}

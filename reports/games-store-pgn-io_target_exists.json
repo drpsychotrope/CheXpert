@@ -1,0 +1,84 @@
+{
+  "pr": "games-store-pgn-io",
+  "foundation": "F5",
+  "scanned_at": "2026-06-30",
+  "method": "pre-V0 empirical scan — READ real code before asserting any target/hook",
+  "verdict": "PROCEED",
+  "premise_holds": true,
+  "summary": "All reuse hooks named in the architecture spec exist. The PL1 premise (games store is write-only in src/) is CONFIRMED. PGN export does NOT exist anywhere (greenfield affordance). No STOP condition.",
+  "reuse_hooks": [
+    {
+      "hook": "gamesRepo.putGame",
+      "path": "src/store/gamesRepo.ts:9-12",
+      "exists": true,
+      "note": "Writes a GameRecord to the 'games' store. Called from src/ui/Play.svelte:450 (the ONLY runtime caller)."
+    },
+    {
+      "hook": "gamesRepo read for games store",
+      "path": "src/store/gamesRepo.ts",
+      "exists": false,
+      "note": "NO read of the 'games' store exists in gamesRepo.ts. getAnalysis(gameId) reads gameAnalyses, putImportedGame writes importedGames. F5 ADDS getAllGames() here — the natural home (file already centralises games/importedGames/gameAnalyses access)."
+    },
+    {
+      "hook": "games.playedAt index",
+      "path": "src/store/db.ts:108 (decl) + db.ts:169-170 (created in v1 upgrade)",
+      "exists": true,
+      "note": "interface TrainerDB: games: { key: string; value: GameRecord; indexes: { playedAt: number } }. Index physically created in the v1 upgrade block. getAllFromIndex('games','playedAt') is available WITHOUT a DB_VERSION bump or new index."
+    },
+    {
+      "hook": "GameRecord shape",
+      "path": "src/store/db.ts:21-34",
+      "exists": true,
+      "fields": ["id", "pgn", "result", "botElo", "playedAt", "coached", "timeControl?", "variant?", "startFen?"],
+      "note": "Has pgn (export source), playedAt (sort/index), result, botElo, variant (960 flag → exclude from analyse-affordance per existing AP-960-4). id format 'g:<epoch>' (Play) — distinct from analysis ids."
+    },
+    {
+      "hook": "analysis/pgn.ts parse API",
+      "path": "src/analysis/pgn.ts",
+      "exists": true,
+      "exports": ["parsePgn(pgn): ParsedGame (throws on malformed)", "inferPlayerColor(headers, playerName): 'w'|'b'|null", "parseIncrement", "clockToMs"],
+      "note": "Import.svelte already uses parsePgn + inferPlayerColor with full edge-case handling (multi-game split, headers-only guard, color-not-detected guard). F5 REUSES this exact flow — no new parser."
+    },
+    {
+      "hook": "runAnalysis source:'played'",
+      "path": "src/analysis/runAnalysis.ts:16-83",
+      "exists": true,
+      "note": "RunAnalysisInput.source accepts 'imported' | 'played'. Persists gameAnalyses keyed by gameId, generates puzzles, folds weaknessCounters. Idempotent re-run is handled at the CALLER via getAnalysis(gameId) (Play.svelte:461-466 short-circuits if an analysis exists). runAnalysis itself does NOT pre-check; it overwrites — caller owns idempotency."
+    },
+    {
+      "hook": "getAnalysis(gameId) — analysed/not marker",
+      "path": "src/store/gamesRepo.ts:19-22",
+      "exists": true,
+      "note": "Returns GameAnalysis | undefined. A history list maps each game id → analysed (defined) / not (undefined). NOTE: Play game ids are 'g:<epoch>'; gameAnalyses is keyed by gameId, so getAnalysis('g:<epoch>') is the correct lookup for a played game."
+    },
+    {
+      "hook": "AnalysisResult.svelte",
+      "path": "src/ui/AnalysisResult.svelte",
+      "exists": true,
+      "note": "Shared result panel (props: analysis, puzzlesMade). Already consumed by Import.svelte:186 AND Play.svelte:640. A history 'open analysis' affordance can reuse it verbatim."
+    },
+    {
+      "hook": "Import.svelte (PGN paste host)",
+      "path": "src/ui/Import.svelte",
+      "exists": true,
+      "note": "Owns the single-game paste → parsePgn → runAnalysis(source:'imported') flow + persists ImportedGameRecord. Reachable via nav key 'nav.analyse' (view 'import') and Home 'home.analyseGame'. NATURAL host for a games-history section (Q-A default)."
+    },
+    {
+      "hook": "GameAnalysis type",
+      "path": "src/analysis/types.ts:67-71",
+      "exists": true,
+      "note": "Has gameId, playerColor, analyzedAt. Confirms the analysed/not marker keys on gameId."
+    }
+  ],
+  "pgn_export_state": {
+    "exists": false,
+    "evidence": "grep for createObjectURL|Blob(|download=|.download|saveAs|a.click() across src/**/*.{ts,svelte} → NO matches. No download/export affordance anywhere in the app.",
+    "implication": "PGN export is a greenfield client-side affordance. GameRecord.pgn already holds a chess.js-serialised PGN (game.pgn() at Play.svelte:433) — export is a download wrapper over an existing string, no re-serialisation needed."
+  },
+  "routing_facts": {
+    "root_component": "src/ui/App.svelte (NOT src/App.svelte)",
+    "view_enum": "src/state/app.svelte.ts View union (23 views incl. 'import','dashboard','play')",
+    "nav_list": "App.svelte NAV[] — 'import' is labelled nav.analyse; adding a new top-level view requires View-union + loaders + NAV edits (heavier).",
+    "recommendation": "Attach history as a SECTION inside Import.svelte (no new view) — matches Q-A default and avoids View-union churn."
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "pr": "trainer-personalization",
+  "feature": "T2",
+  "scanned_at": "2026-06-30",
+  "head": "9296aff",
+  "verdict": "PROCEED",
+  "summary": "All trainer-side targets verified present. The three folds (TR4 provenance, TR9 mode toggle, TR10 exhaustion) are confirmed real gaps. The single dependency (F3 weaknessSelect/WeaknessSteer) is DRAFTED-V1 but NOT YET BUILT on disk — T2 consumes it as a contract; build order F3 -> T2 (matches architecture DAG Phase 2: T2 <- F3).",
+  "targets": [
+    {
+      "id": "generatePuzzles.meta",
+      "path": "src/analysis/generatePuzzles.ts",
+      "lines": "100-107",
+      "exists": true,
+      "detail": "personal puzzle .meta carries: sourceGameId, moveNumber (String), playedMove (p.san), severity, motifConfidence, kind ('mistake' | 'missed-win'). The solution move is puzzle.moves[0] = top[0].uci (the engine's best = 'the win you left'). Type: Puzzle.meta?: Record<string,string> (puzzle.ts:18).",
+      "fold": "TR4"
+    },
+    {
+      "id": "Tactics.fromYourGameTag",
+      "path": "src/ui/Tactics.svelte",
+      "lines": "400",
+      "exists": true,
+      "detail": "Trainer shows ONLY a generic tag for personal puzzles: {#if puzzle.source === 'personal'}{t('tactics.fromYourGameTag')}{/if} -> ' · ★ from your game'. puzzle.meta is consumed NOWHERE in the trainer UI (grep confirms: src/ui only reads p.severity/p.san from PlyAnalysis in AnalysisResult/EvalGraph, never Puzzle.meta). TR4 premise CONFIRMED."
+    },
+    {
+      "id": "Tactics.mode",
+      "path": "src/ui/Tactics.svelte",
+      "lines": "29, 133-141, 327-328",
+      "exists": true,
+      "detail": "mode = $state<'mixed'|'personal'|'themed'>('mixed'). Set as a PASSIVE side-effect inside loadNext's fallback cascade; surfaced only as a label ({:else if mode === 'personal'} -> tactics.fromYourGames). No user toggle. TR9 premise CONFIRMED.",
+      "fold": "TR9"
+    },
+    {
+      "id": "PuzzleQuery.source",
+      "path": "src/trainer/PuzzleRepo.ts",
+      "lines": "18, 152-154",
+      "exists": true,
+      "detail": "PuzzleQuery.source?: 'curated' | 'personal' already drives next(): source==='curated' excludes personal, source==='personal' excludes curated, undefined = mixed. The 3-way (curated/personal/mixed) is fully expressible TODAY via {source:'curated'} | {source:'personal'} | {source:undefined}. No schema/repo change needed for TR9."
+    },
+    {
+      "id": "Tactics.loadNext.cascade",
+      "path": "src/ui/Tactics.svelte",
+      "lines": "117-161",
+      "exists": true,
+      "detail": "Cascade: drillThemes (window 400) -> personal (window 600) -> curated (window 250) -> tactics.noMore. A themed drill that exhausts in-zone falls through SILENTLY to personal/curated and flips `mode` from 'themed' to 'personal'/'mixed' with NO message. tactics.noMore (msg key, present) fires only when ALL sources are empty. TR10 premise CONFIRMED.",
+      "fold": "TR10"
+    },
+    {
+      "id": "weaknessSelect / WeaknessSteer (F3 seam)",
+      "path": "src/trainer/weaknessSelect.ts",
+      "exists": false,
+      "detail": "DOES NOT EXIST on disk. F3 (attempt-recording-weakness) is spec V1 but NOT BUILT (no weaknessSelect.ts; decisions.md latest ADR is 0053, F3's ADR-0055 not appended). T2 takes F3 as a CONTRACT: steerFromWeakness(counters,{k,minCount}) -> { themes: string[]|undefined, topTheme?: string } per specs/attempt-recording-weakness-spec.md A1. NOT a STOP: the architecture sequences F3 before T2; this PR's spec depends on F3 landing first and reuses its read in selection."
+    },
+    {
+      "id": "F1 label routing (theme/provenance display)",
+      "path": "src/i18n/gen.ts",
+      "lines": "18-20",
+      "exists": "partial",
+      "detail": "motifLabelOrRaw(motif, locale) EXISTS and is buildable today. F1's generic labelOrRaw(ns,key,locale) + activity.* namespace are DRAFTED, NOT BUILT (grep: 0 hits for labelOrRaw / activity. in src). For theme display in the provenance line, T2 consumes motifLabelOrRaw (already shipped) -> no hard dependency on unbuilt F1; if F1 lands first, switch to labelOrRaw. severity display is a fixed enum -> add severity.* keys to the bilingual catalogue (T2-owned, FR/EN)."
+    },
+    {
+      "id": "recordTacticsAttempt / finish()",
+      "path": "src/ui/Tactics.svelte + src/store/attemptsRepo.ts",
+      "lines": "Tactics 222-271, attemptsRepo 37-58",
+      "exists": true,
+      "detail": "finish() and the atomic recordTacticsAttempt path exist. T2 does NOT touch recording (that is F3/T1 territory) — provenance + toggle + exhaustion are display/selection only. Confirms single-concern boundary."
+    }
+  ]
+}

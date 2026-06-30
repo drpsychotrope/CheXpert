@@ -100,6 +100,13 @@
         {lastMove}
         check={display.inCheck()}
         {onMove}
+        onMoveText={(text) => {
+          if (!guess || guess.done) return false;
+          const r = display.resolveMove(text);
+          if (!r) return false;
+          onMove(r.from, r.to, r.promo ?? 'q');
+          return true;
+        }}
       />
     </div>
     <p class="feedback {feedbackKind}">{feedback}</p>

@@ -1,0 +1,72 @@
+{
+  "pr": "coach-funnel-robustness",
+  "portfolio_id": "C8",
+  "scanned": "2026-06-30",
+  "verdict": "PROCEED",
+  "premise_corrections": {
+    "component_path": {
+      "prompt_claimed": "src/lib/components/*.svelte",
+      "actual": "src/ui/*.svelte",
+      "impact": "path-only; all named files exist, line numbers are approximate"
+    }
+  },
+  "targets": {
+    "Coach.svelte": {
+      "path": "src/ui/Coach.svelte",
+      "exists": true,
+      "probes_array": "line 36 — `const probes: ThemeProbeResult[] = []` (plain, reset via probes.length=0; NOT persisted)",
+      "step_state": "line 21 — `let step = $state<Step>('intro')`; Step union line 20 (intro|ladders|offer-game|game|analysing|result)",
+      "themeIdx_state": "line 27 — `let themeIdx = $state(0)` (assessment cursor)",
+      "startGame_catch": "lines 143-144 — `catch { return finishWithoutGame(); }` (silent game-half drop)",
+      "finishWithoutGame": "line 177 — also wired to the deliberate Skip button (line 229) → indistinguishable from engine failure",
+      "info_slot": "line 42 `let info = $state('')`; rendered at line 234 (game step) — the surface CF8 reuses",
+      "engine_fail_message_today": "NONE — Coach is silent on engine failure (contrast Onboarding which shows a message)",
+      "commit_persists_profile": "lines 181-195 — writes coachProfilePrev + coachProfile, app.persistModel"
+    },
+    "Onboarding.svelte": {
+      "path": "src/ui/Onboarding.svelte",
+      "exists": true,
+      "end_paths_drop_home": [
+        "line 222 — `skipEvaluation()` → `app.go('home')`",
+        "line 322 — `done` step button → `onclick={() => app.go('home')}`"
+      ],
+      "runs_puzzle_ladder": "line 62 — `new PuzzleLadder(app.puzzles, prior)` (SAME class as Coach; NOTE: default config, not COACH_MOTIF_PROBES — a general ladder, shorter)",
+      "engine_fail_message_exists": "lines 124-128 — `gameInfo = t('onboarding.engineFailedSkipping')` (the pattern CF8 mirrors into Coach)",
+      "no_coach_offer": "confirmed — neither terminal path offers coaching"
+    },
+    "Session.svelte": {
+      "path": "src/ui/Session.svelte",
+      "exists": true,
+      "resume_pattern": "lines 54-93 onMount — `if (app.activeSession) { RESUME }` else build fresh; survives unmount via in-memory singleton",
+      "resume_note": "app.activeSession is IN-MEMORY ONLY (NOT persisted across reload) — CF4 must decide persisted-vs-memory for assessment resume"
+    },
+    "coach_entry_points": {
+      "count": 3,
+      "Home.svelte:39": "app.go('coach') — home.personalCoaching",
+      "Insights.svelte:82": "app.go('coach') — insights.coachingAssessment",
+      "Settings.svelte:106": "app.go('coach') — settings.rerunCoach (in a 'Your data' panel, lines 103-108)"
+    },
+    "f5_download_helper": {
+      "spec": "specs/games-store-pgn-io-spec.md",
+      "helper_names": ["downloadPgn(pgn, filename)", "pgnFilename(playedAt, result)"],
+      "planned_file": "src/ui/pgnDownload.ts",
+      "status_on_disk": "NOT BUILT — F5 is drafted V1; the file does not exist yet (verified by grep: zero Blob/createObjectURL/download= in tree)",
+      "f5_deferred_cf10": "specs/games-store-pgn-io-spec.md §0.5 Q-D + §11 — coach profile export explicitly DEFERRED to C8",
+      "consumption_rule": "C8 reuses downloadPgn if F5 has shipped; otherwise extracts the same Blob/object-URL pattern into a generic download helper (no hard build-time dependency)"
+    },
+    "right_moment_signals": {
+      "app.dueReview": "src/state/app.svelte.ts:64 — due SRS cards (puzzle+repertoire), recomputed on boot + view change (the re-engagement signal)",
+      "losing_streak_source": "PlayerModel.opponentByPool[pool].recent: GameOutcome[] (db.ts:57) — rolling outcomes newest-last, capped at WINDOW (AdaptiveOpponent.ts:22-23,46-48); the 'rough patch' signal, already persisted, NO new state needed",
+      "home_surface": "src/ui/Home.svelte — already reads app.dueReview (line 35); natural host for a gentle coach nudge"
+    }
+  },
+  "coach_profile_type": {
+    "file": "src/coach/types.ts",
+    "interface": "CoachProfile (lines 24-33) — plain structured-clone-safe data (assessedAt, puzzleRating, motifs[], dimensions[], strengths[], weaknesses[], source, gameAnalyzed)",
+    "exportability": "trivially JSON-serializable; no engine/Svelte refs"
+  },
+  "model_shape": {
+    "coachProfile_optional": "db.ts:67-68 — coachProfile?/coachProfilePrev? (additive, `?? undefined`, NO DB_VERSION bump pattern)",
+    "additive_doctrine": "db.ts:121-125 — additive field => schemaRev bump + load-path backfill, NO DB_VERSION bump; destructive => bump"
+  }
+}

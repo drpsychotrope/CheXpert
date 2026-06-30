@@ -1,10 +1,21 @@
 <script lang="ts">
   import { app } from '../state/app.svelte';
   import { poolRating } from '../store/playerModel';
-  import { t } from '../i18n';
+  import { shouldOfferCoach } from '../coach/funnel';
+  import { t, tn } from '../i18n';
 
   const model = $derived(app.model);
   const classical = $derived(model ? poolRating(model, 'classical') : null);
+  // T3/TR8: the training-day streak, normalised to a number for the badge below.
+  const dailyStreak = $derived(model?.dailyStreak ?? 0);
+  // P1: unanalysed-games badge — durable re-entry to the play→analysis loop (links to history).
+  const unanalyzed = $derived(app.unanalyzedGames);
+
+  // CO20 (C8, Q-A=c): the rough-patch coaching card — catch the RETURNING user on a losing streak.
+  // The pure `shouldOfferCoach` predicate gates it on a losing streak in the persisted rolling
+  // outcomes AND no fresh profile (staleness guard); the Date.now() boundary lives HERE (the core
+  // takes `now`, AP-CFUNNEL-2). Dismissible + an in-memory cooldown so it never re-nags (AP-CFUNNEL-1).
+  const showRoughPatch = $derived(!app.coachOfferDismissed && shouldOfferCoach(model ?? null, Date.now()));
 </script>
 
 <section class="home">
@@ -25,6 +36,29 @@
       </div>
     </div>
     <p class="note">{t('home.puzzleNote')}</p>
+    <!-- T3/TR8: surface the training-day streak where re-engagement happens, beside the Review
+         badge below. One render site, no new logic — reads model.dailyStreak (/enrich#2). -->
+    {#if dailyStreak > 0}
+      <p class="note">{t('home.streak', { n: dailyStreak })}</p>
+    {/if}
+    {#if unanalyzed > 0}
+      <p class="note">
+        {tn(unanalyzed, 'play.loop.badgeOne', 'play.loop.badgeMany')}
+        <button class="link-inline" onclick={() => app.go('import')}>{t('play.loop.reviewHistory')}</button>
+      </p>
+    {/if}
+    <!-- CO20 (C8): the dismissible rough-patch coaching card. Soft, single-line, opt-in — shown only
+         on a losing streak with no fresh profile (shouldOfferCoach). "Not now" sets an in-memory
+         cooldown so it does not re-nag (AP-CFUNNEL-1). -->
+    {#if showRoughPatch}
+      <div class="rough-patch">
+        <span>{t('home.roughPatch')}</span>
+        <span class="rough-patch-actions">
+          <button class="link-inline" onclick={() => app.go('coach')}>{t('home.roughPatchCta')}</button>
+          <button class="link-inline muted-link" onclick={() => (app.coachOfferDismissed = true)}>{t('home.roughPatchDismiss')}</button>
+        </span>
+      </div>
+    {/if}
   {/if}
 
   <div class="actions">
@@ -55,6 +89,16 @@
   .rating-card .val { font-size: 2rem; font-weight: 700; }
   .rating-card .rd { font-size: 0.8rem; color: var(--muted); }
   .note { font-size: 0.8rem; color: var(--muted); }
+  button.link-inline { background: none; border: none; color: var(--accent); padding: 0; font: inherit; text-decoration: underline; cursor: pointer; }
+  /* CO20 rough-patch card: a soft, dismissible coaching prompt. */
+  .rough-patch {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem 0.9rem;
+    max-width: 420px; margin: 0.75rem auto 0; padding: 0.6rem 0.9rem;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    font-size: 0.85rem;
+  }
+  .rough-patch-actions { display: inline-flex; gap: 0.9rem; }
+  .rough-patch .muted-link { color: var(--muted); }
   .actions { display: flex; flex-direction: column; gap: 0.75rem; max-width: 320px; margin: 1.5rem auto 0; }
   button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
 </style>

@@ -2,11 +2,11 @@
   // Calculation trainer (read-only line entry — ADR-0044, AP-CHESS-54/55). The board is FROZEN at the
   // start position; the user taps their FULL forcing line (arrows + a "My line" list), then Submit grades
   // the whole line via gradeCalcLine and animates the real solution. No board feedback during input.
-  import { onDestroy } from 'svelte';
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
+  import SolutionReveal from './SolutionReveal.svelte';
   import { ChessGame } from '../game/ChessGame';
-  import { gradeCalcLine, firstWrongUserMove, formatSanLine } from '../calc/calc';
+  import { gradeCalcLine, firstWrongUserMove } from '../calc/calc';
   import type { Puzzle } from '../trainer/puzzle';
   import { putAttempt, getAttempt } from '../store/attemptsRepo';
   import { SELF_TAGS, type Confidence, type SelfTag } from '../metacog/metacog';
@@ -16,7 +16,6 @@
   let display = $state(new ChessGame());
   let fen = $state('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
   let orientation = $state<'white' | 'black'>('white');
-  let lastMove = $state<[string, string] | null>(null);
   let feedback = $state('');
   let feedbackKind = $state<'good' | 'bad' | ''>('');
 
@@ -26,9 +25,7 @@
   let arrows = $state<Array<[string, string]>>([]); // one per committed user move
   let pendingFrom = $state<string | null>(null);
   let solved = $state(false);
-  let solutionSan = $state('');
   let startedAt = 0;
-  let revealTimer: ReturnType<typeof setTimeout> | null = null;
 
   const seen = new Set<string>();
   const model = $derived(app.model);
@@ -40,14 +37,8 @@
   let lastAttemptId = $state<string | undefined>(undefined);
   const metacog = $derived(app.settings?.metacogEnabled ?? false);
 
-  function clearRevealTimer() {
-    if (revealTimer) { clearTimeout(revealTimer); revealTimer = null; }
-  }
-  onDestroy(clearRevealTimer);
-
   async function load() {
     if (!model) return;
-    clearRevealTimer();
     const p =
       (await app.puzzles.next({ rating: model.puzzleRating.rating, window: 400, exclude: seen, source: 'personal' })) ??
       (await app.puzzles.next({ rating: model.puzzleRating.rating, window: 300, exclude: seen }));
@@ -57,13 +48,11 @@
     display = new ChessGame(p.fen);
     fen = display.fen;
     orientation = display.turn === 'w' ? 'white' : 'black';
-    lastMove = null;
     phase = 'input';
     userMoves = [];
     arrows = [];
     pendingFrom = null;
     solved = false;
-    solutionSan = '';
     startedAt = Date.now();
     confidence = undefined;
     selfTag = undefined;
@@ -149,34 +138,11 @@
       feedbackKind = 'bad';
     }
     await logAttempt(g.correct);
-    revealSolution();
-  }
-
-  // Step the board through the real solution, building a numbered SAN line.
-  function revealSolution() {
-    if (!puzzle) return;
+    // Hand the reveal to the shared SolutionReveal surface (AP-TEACH-1): switching to the
+    // 'revealed' phase mounts <SolutionReveal autoplay>, which builds the SAN line and steps
+    // the board at 350 ms — byte-equivalent to the inline reveal this replaced.
     phase = 'revealed';
     arrows = [];
-    const moves = puzzle.moves;
-    const sanGame = new ChessGame(puzzle.fen);
-    const san: string[] = [];
-    for (const m of moves) san.push(sanGame.moveUci(m) ?? m);
-    solutionSan = formatSanLine(san);
-
-    const stepGame = new ChessGame(puzzle.fen);
-    fen = stepGame.fen;
-    lastMove = null;
-    let i = 0;
-    const step = () => {
-      if (i >= moves.length) { revealTimer = null; return; }
-      const m = moves[i];
-      stepGame.moveUci(m);
-      fen = stepGame.fen;
-      lastMove = [m.slice(0, 2), m.slice(2, 4)];
-      i += 1;
-      revealTimer = setTimeout(step, 350);
-    };
-    revealTimer = setTimeout(step, 350);
   }
 
   $effect(() => {
@@ -202,20 +168,24 @@
   {/if}
 
   <div class="board-wrap">
-    <Board
-      {fen}
-      {orientation}
-      turnColor={sideToMove()}
-      movableColor={undefined}
-      dests={new Map()}
-      check={phase === 'input' && display.inCheck()}
-      viewOnly={phase === 'revealed'}
-      lastMove={phase === 'revealed' ? lastMove : null}
-      arrows={phase === 'input' ? arrows : []}
-      onSelect={phase === 'input' ? onSelect : undefined}
-      showTurn={phase === 'input'}
-      turnLabel="play"
-    />
+    {#if phase === 'revealed' && puzzle}
+      <!-- Reveal handed to the shared surface (AP-TEACH-1): animated playback + SAN line. -->
+      <SolutionReveal fen={puzzle.fen} moves={puzzle.moves} {orientation} autoplay />
+    {:else}
+      <Board
+        {fen}
+        {orientation}
+        turnColor={sideToMove()}
+        movableColor={undefined}
+        dests={new Map()}
+        check={display.inCheck()}
+        lastMove={null}
+        {arrows}
+        {onSelect}
+        showTurn
+        turnLabel="play"
+      />
+    {/if}
   </div>
 
   {#if phase === 'input'}
@@ -230,10 +200,6 @@
   {/if}
 
   <p class="feedback {feedbackKind}">{feedback}</p>
-
-  {#if phase === 'revealed' && solutionSan}
-    <p class="muted solution">{t('calc.solution', { line: solutionSan })}</p>
-  {/if}
 
   {#if metacog && phase === 'revealed' && !solved}
     <div class="col center metacog" role="group" aria-label={t('calc.whyMissGroup')}>
@@ -262,5 +228,4 @@
   .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   .myline { flex-wrap: wrap; gap: 0.4rem; max-width: 440px; }
   .ply { font-variant-numeric: tabular-nums; font-size: 0.85rem; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 0.1rem 0.45rem; }
-  .solution { font-size: 0.9rem; max-width: 440px; }
 </style>

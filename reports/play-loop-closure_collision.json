@@ -1,0 +1,30 @@
+{
+  "pr": "play-loop-closure",
+  "checked_at": "2026-06-30",
+  "summary": "No code-symbol, i18n-key, or view collisions for the planned P1 additions. One ADR-numbering wrinkle in the portfolio doc (does NOT affect P1, which takes no new ADR).",
+  "symbol_collisions": [
+    {"planned": "getAllGames / getAnalyzedGameIds", "status": "PROVIDED BY F5 (dependency) — P1 imports them, does not define them. Confirmed absent from src/ today (only in F5 spec/reports). No collision; correct build order F5->P1."},
+    {"planned": "unanalysed-set helper (e.g. unanalyzedGameIds / pendingAnalysis selector)", "status": "FREE — grep for unanalyz*/unanalys*/lastUnanalyzed/analyzeQueue/analyseQueue/pendingAnalysis/queueAnalysis => 0 hits in src/. All apparent matches were `runAnalysis(source:'played')` references (unrelated)."},
+    {"planned": "SettingsRecord.lastUnanalyzedGameId? (IF persistence chosen)", "status": "FREE — no such field on SettingsRecord (db.ts:77-95). Additive-optional slot, mirrors opponentStyle?/lastTimeControl?/locale?. No DB_VERSION bump."},
+    {"planned": "batch/queue analysis runner", "status": "FREE — no existing queue. Sequential runner over runAnalysis(source:'played') is new logic; reuse the existing getAnalysis idempotency guard per item."}
+  ],
+  "i18n_key_collisions": [
+    {"namespace": "play.* (and any play.loop.* sub-namespace)", "status": "FREE — new keys (batch label, queue progress, 'N unanalysed' badge, etc.) do not exist in src/i18n/messages/play.ts. Parity by construction (translate.test.ts)."}
+  ],
+  "view_collisions": [
+    {"note": "Q-B recommendation places the affordance on the existing Play game-over screen + a Dashboard badge — NO new top-level View. The View union (app.svelte.ts:12-35) is untouched. Badge precedent: dueReview (App.svelte/Home.svelte)."}
+  ],
+  "adr": {
+    "p1_new_adr": false,
+    "doctrine": "Feature PRs default to NO new ADR unless a real architectural decision. P1 reuses F5's read API + an additive setting (or pure derived read) + a sequential queue — no new architectural primitive. NO new ADR.",
+    "portfolio_numbering_wrinkle": {
+      "observed": "Highest ADR actually present in decisions.md is ADR-0053. ADR-0054..0057 are RESERVED in enhancements-architecture-spec.md §8 (portfolio=0054, F3=0055, F5=0056, F6=0057) but NOT yet appended to decisions.md (those foundation PRs are drafted, not merged).",
+      "internal_inconsistency": "Within the portfolio doc, §8 line 216 lists F5=0056, while the F5 spec header (games-store-pgn-io-spec.md:5) and the portfolio header (line 3) both say ADR-0054. This is a pre-existing doc wrinkle to reconcile at F5 BUILD time; it does not block or affect P1.",
+      "impact_on_P1": "NONE. P1 introduces no ADR. If a future reviewer decides P1 warrants one, the next free number would be >=0058 (per the task's own guidance) AFTER the reserved 0054-0057 land — flag a possible collision at that point."
+    }
+  },
+  "dependency_contract": {
+    "f5_status": "V1 drafted+enriched (portfolio §8). Provides getAllGames(): GameRecord[] and getAnalyzedGameIds(): Set<string>. F5 §11 explicitly names P1 as its follow-up ('persist + auto-queue the last unanalysed game ... Builds on getAllGames'). Boundary clean.",
+    "risk": "P1 must NOT define getAllGames/getAnalyzedGameIds itself (would collide once F5 lands). P1 consumes them. If P1 is built before F5 merges, it should depend on the F5 branch or be sequenced after F5 (build order F5->P1, per portfolio DAG Phase 2)."
+  }
+}

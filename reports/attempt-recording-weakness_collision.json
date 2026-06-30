@@ -1,0 +1,49 @@
+{
+  "pr": "attempt-recording-weakness",
+  "checked_at": "2026-06-30",
+  "purpose": "Detect overlaps/conflicts with other in-flight or shipped specs touching the same surfaces.",
+  "verdict": "NO BLOCKING COLLISION",
+  "shared_surfaces": [
+    {
+      "surface": "src/ui/Coach.svelte onLadderMove",
+      "other_owners": [
+        "specs/coach-mode-spec.md (AP-COACH-8 owner; this PR must respect it)",
+        "C2 Probe engine v2 (architecture) — future, adaptive depth; F3 only adds recording, does not change probe COUNT or depth"
+      ],
+      "conflict": "none — F3 adds attempt/SRS/weakness recording inside onLadderMove without altering ladder flow, probe count, or rating-pool isolation"
+    },
+    {
+      "surface": "src/ui/Tactics.svelte loadNext",
+      "other_owners": [
+        "T2 Personalization & selection (architecture) folds TR4/TR9/TR10 — mode toggle, provenance, exhaustion",
+        "concept-cards / metacognition specs already extended loadNext (leech, conceptSeen, confidence reset)"
+      ],
+      "conflict": "none structurally — F3 inserts ONE additional weakness-steered selection branch ahead of the curated fallback; it is additive and preserves the existing drill>personal>curated order. T2 builds the user-facing mode toggle ON TOP of this read; F3 deliberately ships only the no-drill soft bias (single concern)."
+    },
+    {
+      "surface": "weaknessCounters field (PlayerModel)",
+      "other_owners": [
+        "audit-v2 V2-W10 proposed EITHER deleting weaknessCounters OR rehabilitating it",
+        "runAnalysis.ts / Review.svelte / Tactics.svelte write sites"
+      ],
+      "conflict": "RESOLVED IN FAVOUR OF REHABILITATION. F3 is the rehabilitation path (W10 option b): make it a live read that steers selection + add the coach write site. This SUPERSEDES the 'delete it' option for V2-W10. Record this in the ADR.",
+      "note": "No other open spec deletes the field; safe to make it load-bearing."
+    },
+    {
+      "surface": "src/store/attemptsRepo.ts recordTacticsAttempt",
+      "other_owners": ["audit W11 (atomic 4-store write — the contract F3 reuses)", "repos.test.ts"],
+      "conflict": "none — F3 reuses the existing atomic path; if a coach-probe variant is needed it is additive (a thin wrapper or an explicit no-pool-mutation call), not a signature change to the W11 contract"
+    },
+    {
+      "surface": "PlayerModel schema / DB_VERSION",
+      "other_owners": ["F5, C1 (architecture) also add optional fields; db.ts migration policy"],
+      "conflict": "none — F3 adds NO new field (weaknessCounters and all PuzzleAttemptRecord fields already exist). NO DB_VERSION bump, NO schemaRev bump."
+    },
+    {
+      "surface": "TR3 self-tag -> action",
+      "decision": "DEFERRED to T1 (Trainer feedback core). selfTag is already persisted (db.ts:48, Tactics.svelte:263,275-281) and surfaced (Insights/Calculate), but no FSRS clamp / action loop exists. F3 is recording+selection only; touching the self-tag action loop here would break single-concern.",
+      "conflict": "none — F3 leaves the selfTag write path exactly as is"
+    }
+  ],
+  "anti_pattern_namespace": "AP-ATTEMPT-* (new, unique to this PR; no clash with AP-COACH-*, AP-META-*, AP-CC-*, AP-TC-*)"
+}

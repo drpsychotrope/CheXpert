@@ -1,0 +1,50 @@
+{
+  "pr": "opening-steering-symmetry",
+  "captured": "2026-06-30",
+  "method": "Mirrored OPENING_BOOK rows from src/opening/openingBook.ts and computed per-colour Dimension coverage + a selectOpening simulation in node (reports/ scratchpad). Candidate new lines validated for legality + turn-parity with chess.js (worktree node_modules). Measured, not assumed.",
+  "book_size": { "total_lines": 14, "white_bot": 10, "black_bot": 4 },
+  "black_bot_lines_measured": [
+    { "id": "ruylopez-b", "targets": "openingAccuracy" },
+    { "id": "scandi-b", "targets": "resilience" },
+    { "id": "philidor-b", "targets": "resilience" },
+    { "id": "caro-b", "targets": "timeManagement" }
+  ],
+  "white_bot_lines_measured": [
+    { "id": "italian-w", "targets": "tactics" },
+    { "id": "scotch-w", "targets": "tactics" },
+    { "id": "kingsgambit-w", "targets": "tactics" },
+    { "id": "openSicilian-w", "targets": "tactics" },
+    { "id": "ruylopez-w", "targets": "openingAccuracy" },
+    { "id": "qgd-w", "targets": "openingAccuracy" },
+    { "id": "exchangeFrench-w", "targets": "endgameConversion" },
+    { "id": "exchangeSlav-w", "targets": "endgameConversion" },
+    { "id": "symmEnglish-w", "targets": "endgameConversion" },
+    { "id": "london-w", "targets": "timeManagement" }
+  ],
+  "per_colour_dimension_coverage": {
+    "bot_white__player_black": {
+      "tactics": 4, "openingAccuracy": 2, "endgameConversion": 3, "timeManagement": 1, "resilience": 0,
+      "missing": ["resilience"]
+    },
+    "bot_black__player_white": {
+      "tactics": 0, "openingAccuracy": 1, "endgameConversion": 0, "timeManagement": 1, "resilience": 2,
+      "missing": ["tactics", "endgameConversion"]
+    }
+  },
+  "key_correction_vs_portfolio": "Portfolio PL5 framed the gap as Black-side only. MEASURED reality: the gap is BIDIRECTIONAL. bot=Black (player White) misses {tactics, endgameConversion}; bot=White (player Black) misses {resilience}. Minimal parity therefore needs 2 new Black lines + 1 new White line = 3 new lines (not just 'fill the Black book').",
+  "minimal_coverage_set_validated": [
+    { "id": "sicilian-b", "botColor": "b", "targets": "tactics", "moves": ["e2e4","c7c5","g1f3","d7d6","d2d4"], "legal": true, "bot_book_moves": ["c7c5","d7d6"], "eco_ground": "B50 Sicilian (...d6) prefix in eco.json" },
+    { "id": "exchangeCaro-b", "botColor": "b", "targets": "endgameConversion", "moves": ["e2e4","c7c6","d2d4","d7d5","e4d5","c6d5"], "legal": true, "bot_book_moves": ["c7c6","d7d5","c6d5"], "eco_ground": "B12 Caro-Kann ...d5 prefix in eco.json; symmetric pawn structure -> early simplification, mirrors exchangeFrench-w/exchangeSlav-w rationale" },
+    { "id": "kingsGambitAccepted-w", "botColor": "w", "targets": "resilience", "moves": ["e2e4","e7e5","f2f4","e5f4"], "legal": true, "bot_book_moves": ["e2e4","f2f4"], "eco_ground": "C30 King's Gambit prefix in eco.json; bot sacrifices a pawn so the player (Black) must defend/convert under pressure — mirrors the scandi-b/philidor-b resilience rationale for the other colour" }
+  ],
+  "rejected_alternatives": [
+    { "id": "twoknights-b", "reason": "Also valid for tactics-as-Black, but starts 1.e4 e5 which overlaps the open-game cluster; sicilian-b gives more colour/structure variety and a cleaner eco match. Kept as a documented alternative, not folded." },
+    { "id": "exchangeQGD-b", "reason": "Valid endgameConversion-as-Black alternative (D30/QGD Exchange). exchangeCaro-b preferred: 1.e4 keeps the Black book from being all-1.d4-replies and matches the existing Caro entry naming family." }
+  ],
+  "anchors": {
+    "baseline_tests": "504 tests / 69 test files (portfolio-confirmed; vitest bin not present in this worktree to re-run live — count carried from enhancements-architecture-spec.md §8 which two subagents confirmed; 69 *.test.ts files counted live here)",
+    "svelte_check": "0 errors / 0 warnings across 383 files (portfolio anchor)",
+    "db_version": 4,
+    "test_files_counted_live": 69
+  }
+}

@@ -36,6 +36,26 @@ export function resultToGrade(
   return Grade.Good;
 }
 
+/**
+ * Clamp a solved-attempt grade to no better than Good when the solver reported low
+ * confidence (guess/unsure). A self-flagged lucky solve must not earn a long interval —
+ * it should resurface sooner. (T1, Q-E / TR3.)
+ *
+ * Pure; composes with gradeCard's first-exposure clamp (ADR-0033) since both only ever
+ * downgrade. No-op on a miss (Again is already the floor — and only Easy/Good outrank it
+ * here), and on high confidence ('sure') or an undefined/absent confidence. Never upgrades.
+ *
+ * The `confidence` parameter uses an INLINE `'sure' | 'unsure' | 'guess'` union rather than
+ * importing `Confidence` from `metacog`, so the `srs/` module stays a dependency leaf — it
+ * mirrors db.ts:51's inline union (refiner D7). The caller (Tactics.svelte) holds a
+ * `Confidence`, which is structurally assignable to this union.
+ */
+export function clampForConfidence(grade: Grade, confidence?: 'sure' | 'unsure' | 'guess'): Grade {
+  if (confidence !== 'guess' && confidence !== 'unsure') return grade;
+  // Only the grades that outrank Good need clamping; Hard/Again stay (already ≤ Good).
+  return grade === Grade.Easy ? Grade.Good : grade;
+}
+
 // --- Card <-> record conversion (Dates <-> epoch ms) -----------------------
 
 function cardToRecord(card: Card, base: Pick<SrsCardRecord, 'id' | 'kind' | 'refId' | 'createdAt'>): SrsCardRecord {

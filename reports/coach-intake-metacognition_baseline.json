@@ -1,0 +1,57 @@
+{
+  "pr": "coach-intake-metacognition",
+  "feature": "C5",
+  "captured_at": "2026-06-30",
+  "note": "Empirical anchors, not estimates. Re-verify the starred items at exec time.",
+  "tests": {
+    "approx_test_calls_grepped": 486,
+    "test_files": 69,
+    "portfolio_anchor": "504 tests / 69 files green (per enhancements-architecture-spec §8 — authoritative; the 486 grep undercounts table-driven/it.each).",
+    "command": "npm test"
+  },
+  "static_check": {
+    "svelte_check": "0 errors / 0 warnings across 383 files (portfolio §8 anchor)",
+    "command": "npm run check"
+  },
+  "db": {
+    "DB_VERSION": 4,
+    "loc": "src/store/db.ts:125",
+    "additive_precedents": [
+      "coachProfile?/coachProfilePrev? (db.ts:67-68) — optional, no bump (ADR-0045)",
+      "confidence?/selfTag? on PuzzleAttemptRecord (db.ts:47-48) — optional, no bump (ADR-0037)",
+      "metacogEnabled? on settings (db.ts:89) — optional, no bump (ADR-0037)",
+      "conceptSeen?/visionStats?/variant? — established 'add field, read with ?? default, NO DB_VERSION bump' pattern"
+    ],
+    "c5_db_impact": "ZERO new stores. C5 reuses coachProfile? (extend in-place, additively) + reads existing puzzleAttempts via allAttempts(). NO DB_VERSION bump required."
+  },
+  "reused_cores_pure": {
+    "calibration": {"loc": "src/metacog/metacog.ts:130", "pure": true, "no_date_no_random": true},
+    "buildCoachProgram": {"loc": "src/coach/program.ts:42", "pure": true, "locale_injected": true},
+    "buildCoachProfile": {"loc": "src/coach/diagnostic.ts:45", "pure": true, "locale_injected": true}
+  },
+  "i18n": {
+    "architecture": "bilingual {fr,en} pairs; src/i18n/messages/{coach,generators,...}.ts; gt() for pure cores, t() for components, getLocale() boundary.",
+    "coach_ui_keys_home": "src/i18n/messages/coach.ts (coach.* UI strings)",
+    "core_reason_keys_home": "src/i18n/messages/generators.ts (program.*, metacog.*, selfTag.*, dim.*, motif.* — pure-core readouts)",
+    "existing_calibration_keys": "metacog.sentence, metacog.word{Sure,Unsure,Guess}, metacog.verdict{WellCalibrated,Overconfident,Underconfident,Mixed}, selfTag.*, insights.topCause/topCausePct/selfTagLine — ALL already FR+EN.",
+    "c5_new_keys_must": "every new string lands as {fr,en} in coach.ts (intake UI) or generators.ts (coaching sentence). Bilingual parity gate at §6."
+  },
+  "honesty_anchors": {
+    "AP_CHESS_13_24": "directional, sample-size-labelled, no single grade",
+    "AP_COACH_2": "no coach score/letter grade; low-n labelled; 'where to focus' language",
+    "AP_META_1": "calibration readout is DESCRIPTIVE (fact-sentence + descriptive verdict word), never a grade",
+    "AP_COACH_1": "Insights study-plan output must stay byte-identical (buildStudyPlan untouched)"
+  },
+  "component_test_harness": {
+    "exists": false,
+    "evidence": "zero *.svelte.test.ts; all 504 tests are pure/logic (portfolio §8).",
+    "c5_verification": "pure-core unit tests (the new program/coaching helpers) + static wiring-presence greps + manual/preview. NO component tests."
+  },
+  "adr": {
+    "latest_landed": "ADR-0053 (decisions.md)",
+    "portfolio_reserved": "0054 (portfolio) · 0055 (F3) · 0056 (F5) · 0057 (F6)",
+    "sibling_flags_on_0058": "play-in-game-ux (P2 takeback rating-integrity) AND trainer-feedback-core (T1 alt-move) both flag/reserve 0058 → 0058 is spoken-for.",
+    "c5_first_free_architectural": "0059 (per prompt 'flag >=0059; reserved 0054-0058').",
+    "c5_default": "NO new ADR — C5 is an additive feature extending ADR-0045 (coach) + ADR-0037 (metacog) + ADR-0053 (bilingual). Flag 0059 ONLY if PR-time review elevates goal-weighting to an architectural decision (default: not)."
+  }
+}

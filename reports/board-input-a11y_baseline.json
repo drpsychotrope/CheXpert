@@ -1,0 +1,45 @@
+{
+  "pr": "board-input-a11y",
+  "captured": "2026-06-30",
+  "single_source_component": "src/ui/Board.svelte",
+  "board_consumer_census": {
+    "total_Board_usages": 23,
+    "interactive_already_wired_onMoveText": 3,
+    "interactive_missing_onMoveText": 11,
+    "onSelect_drills_out": 2,
+    "view_only_out": 7,
+    "note": "23 = 3 wired + 11 missing + 2 onSelect + 7 view-only. Vision contributes 1 onSelect + 2 view-only; Coach/Onboarding contribute 2 interactive each."
+  },
+  "existing_a11y_surface": {
+    "keyboard_move_entry": "DONE in Board.svelte (audit v2 P0-04, WCAG 2.1.1) — but only renders when the consumer passes onMoveText",
+    "reduced_motion": "DONE — prefers-reduced-motion respected (Board.svelte:88, WCAG 2.3.3)",
+    "promotion_dialog_aria": "DONE — role=dialog + aria-labels (Board.svelte:225-235)",
+    "kb_error_live_region": "DONE — role=alert aria-live=assertive (Board.svelte:220)",
+    "board_region_role_label": "MISSING — div.cg-board-host has no role/aria-label (the open half of CF9)",
+    "move_navigation_arrows": "ABSENT — left/right ply navigation does not exist anywhere (DEFER — separate concern, Q-B)"
+  },
+  "i18n_baseline": {
+    "file": "src/i18n/messages/common.ts",
+    "existing_board_keys": ["board.youPlay", "board.toMove", "board.kbMove", "board.kbPlaceholder", "board.kbPlay", "board.notLegal", "board.cancelPromotion", "board.choosePromo", "board.promoteTo"],
+    "existing_keys_cover_move_entry": true,
+    "new_keys_needed": ["board.label (aria-label for the interactive board region)"],
+    "parity": "every key is { fr, en }; structural parity test exists (ADR-0053). New key must add both."
+  },
+  "persistence": {
+    "DB_VERSION": "stays 4 — this PR is pure UI wiring + one aria attribute. NO bump, NO migration, NO store. Clean.",
+    "doctrine": "additive-optional N/A (no persisted field touched)"
+  },
+  "purity": {
+    "resolveMove": "pure (no Date/Math.random) — confirmed ChessGame.ts:236",
+    "Board.svelte": "uses window.matchMedia (guarded typeof window) — UI layer, allowed"
+  },
+  "insights_byte_identity": "UNAFFECTED — this PR touches no selection/study-plan logic (AP-COACH-1 not at risk).",
+  "test_stack": {
+    "runner": "vitest 2.1.8 + jsdom 25",
+    "testing_library_svelte": "ABSENT from package.json devDependencies",
+    "svelte_component_tests_existing": "NONE — zero *.svelte.test.ts files in repo",
+    "implication": "Component-mount aria/keyboard tests would require a NEW dev dependency + harness = scope creep. Realistic Phase B: (a) reuse the existing resolveMove unit tests (the pure core, already green); (b) a static wiring assertion that every interactive consumer passes onMoveText; (c) manual/preview keyboard + screen-reader verification in Phase C."
+  },
+  "test_baseline_at_draft": "Per README + F1 baseline: npm test green, svelte-check 0 errors, build green. RE-VERIFY at exec time (§3 gate).",
+  "verdict": "Scope is a thin, additive UI-wiring + single aria upgrade. Low risk, single concern, no persistence. Proceed."
+}

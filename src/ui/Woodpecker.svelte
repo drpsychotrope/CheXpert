@@ -225,6 +225,13 @@
           dests={trainer?.state.status === 'solving' ? display.dests() : new Map()}
           check={display.inCheck()}
           {onMove}
+          onMoveText={(text) => {
+            if (trainer?.state.status !== 'solving') return false;
+            const r = display.resolveMove(text);
+            if (!r) return false;
+            void onMove(r.from, r.to, r.promo ?? 'q');
+            return true;
+          }}
         />
       </div>
       <p class="feedback {feedbackKind}">{feedback}</p>

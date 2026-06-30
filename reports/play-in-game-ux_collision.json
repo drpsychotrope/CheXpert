@@ -1,0 +1,24 @@
+{
+  "pr": "play-in-game-ux",
+  "scan_date": "2026-06-30",
+  "symbol_view_key_collisions": {
+    "move_list_component": "none — no MoveList.svelte / move-list rendering anywhere in src/ui (grep confirmed)",
+    "play.* i18n keys": "the new keys (play.moveList*, play.rematch, play.resignConfirm*, play.takeBack*, play.blunderCheck*, play.takeBackUsed/unrated, settings.takebackInPlay*) do NOT exist in src/i18n/messages/play.ts (grep over existing play.* set, lines 35-122) — all free",
+    "new view / route": "NONE — P2 adds NO view; everything renders inside the existing Play.svelte section + Settings.svelte (one toggle)",
+    "GameRecord field": "if Q-B picks a marker field (e.g. takebackUsed? / unrated?), it does NOT exist on GameRecord today — additive-optional, no collision, no DB bump"
+  },
+  "sibling_pr_boundaries": {
+    "F2_board-input-a11y": "OWNS move text-ENTRY (already wired in Play); F2 §11 D2 DEFERS ply nav to P2. P2 owns move-LIST + optional ply-preview. No overlap on the input wiring.",
+    "F5_games-store-pgn-io": "OWNS getAllGames + the POST-GAME saved-games history list (in Import view) + PGN export/download of saved games. P2's move list is the LIVE in-game ply list (game.history()), a different surface. P2 must NOT add PGN export (F5 owns it) — keeps P2 single-concern.",
+    "P1_loop_closure": "OWNS persist-last-unanalysed + analyse-all. P2 leaves the existing Play-tail 'Analyse this game' untouched.",
+    "P3_opponent_agency": "OWNS bot resign / accept-draw / draw-offer UI / difficulty override. P2's confirm-resign is the PLAYER resigning — distinct from the bot resigning (P3). No overlap."
+  },
+  "insights_byte_identity": {
+    "at_risk": false,
+    "reason": "P2 touches no selection / study-plan / weaknessCounters code. buildStudyPlan + Insights output unaffected (AP-COACH-1 safe). The optional takeback-unrated marker only affects that one game's rating write, not Insights aggregation surfaces."
+  },
+  "adr": {
+    "decision": "reserved 0054 (portfolio), 0055/0056/0057 (F3/F5/F6). Next free for a feature PR ≥ 0058.",
+    "p2_needs_new_adr": "ONLY IF Q-B is ratified as the 'takeback in a rated game → mark it un-counted' rule (a real rating-integrity policy decision) → flag ADR-0058. If takeback is restricted to a non-rated/casual context (no rating policy change), NO new ADR (UX follow-up, mirrors F2/F4 precedent). Recommended default carries the policy → expect 0058."
+  }
+}

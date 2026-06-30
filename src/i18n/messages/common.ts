@@ -69,4 +69,8 @@ export const common: Messages = {
   'board.cancelPromotion': { fr: 'Annuler la promotion', en: 'Cancel promotion' },
   'board.choosePromo': { fr: 'Choisir la pièce de promotion', en: 'Choose promotion piece' },
   'board.promoteTo': { fr: 'Promouvoir en', en: 'Promote to' },
+  // F2 board-input-a11y: region label (split by interactivity) + polite typed-move success status.
+  'board.label': { fr: 'Échiquier — saisissez votre coup dans le champ ci-dessous', en: 'Chess board — type your move in the field below' },
+  'board.labelView': { fr: 'Échiquier (lecture seule)', en: 'Chess board (view only)' },
+  'board.movePlayed': { fr: 'Coup joué', en: 'Move played' },
 };

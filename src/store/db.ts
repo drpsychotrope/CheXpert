@@ -25,12 +25,23 @@ export interface GameRecord {
   botElo: number;
   playedAt: number;
   coached: boolean;
+  /** Set when the player used an in-play takeback (P2/ADR-0058); the game is persisted but its
+   *  rating update is skipped. Additive — absent reads `?? false`. NO DB_VERSION bump. */
+  unrated?: boolean;
   /** Time control this game was played under (absent on legacy records = untimed classical). */
   timeControl?: { initialSec: number; incrementSec: number; category: Category; untimed?: boolean };
   /** Chess960 (ADR-0041): default 'standard'. Additive — no DB_VERSION bump. */
   variant?: 'standard' | 'chess960';
   /** The 960 start FEN, for replay/audit. Present only when variant==='chess960'. */
   startFen?: string;
+  /** Side the human played (F5, ADR-0056). Persisted so re-analysing a game from history attributes
+   *  mistakes to the right colour — the played PGN has no White/Black headers to infer it from.
+   *  Additive optional; legacy records lack it (history derives a fallback). NO DB_VERSION bump. */
+  playerColor?: 'w' | 'b';
+  /** Difficulty mode this game was played under (P3/Q-E, AP-OPPAGENCY-5). Absent = legacy adaptive.
+   *  A non-adaptive (Easier/Harder/Fixed) game is flagged here and does NOT move the adaptive pool or
+   *  the Glicko rating — only adaptive games fold (honesty). Additive optional — NO DB_VERSION bump. */
+  difficultyMode?: import('../engine/opponentAgency').DifficultyMode;
 }
 
 export interface PuzzleAttemptRecord {
@@ -46,6 +57,16 @@ export interface PuzzleAttemptRecord {
   // metacognition: optional, additive — no migration (ADR-0037).
   confidence?: 'sure' | 'unsure' | 'guess'; // self-reported before the reveal; absent on legacy records
   selfTag?: string; // self-diagnosed cause (closed taxonomy key); absent on legacy / when skipped
+  /** True when this attempt came from a coach diagnostic probe (F3, ADR-0055). Provenance tag
+   *  ONLY — probes are graded into FSRS + weaknessCounters but never move the rating pools
+   *  (AP-COACH-8). Additive optional; absent on legacy/normal attempts reads falsy. No `source`
+   *  union change (AP-ATTEMPT-5), NO DB_VERSION bump. */
+  coachProbe?: boolean;
+  /** True when the player took a hint (any tier) on this attempt (T3/TR5, Q-B). A hinted SOLVE
+   *  is graded FSRS ≤ Hard and skips the Glicko gain (rating flat) so a hint can't inflate the
+   *  measurement (AP-TINTEG-1). Provenance tag ONLY. Additive optional; absent on legacy/unaided
+   *  attempts reads falsy. Mirrors `coachProbe?` — NO `source` union change, NO DB_VERSION bump. */
+  usedHint?: boolean;
 }
 
 export interface PlayerModel {
@@ -66,6 +87,15 @@ export interface PlayerModel {
    *  old records lack it and read `undefined`. NO DB_VERSION bump. */
   coachProfile?: import('../coach/types').CoachProfile;
   coachProfilePrev?: import('../coach/types').CoachProfile;
+  /** Day-based training retention (T3/TR8, Q-C/Q-E). Additive optional, backfilled in the load
+   *  path (playerModel.ts) with schemaRev 1→2 — old records read the defaults; NO DB_VERSION bump
+   *  (mirrors `conceptSeen?`). Named `dailyStreak` (NOT bare `streak`, which is Vision's in-drill
+   *  counter — AP-TINTEG-4). `dailyStreak`: consecutive training days; `dailyGoal`: puzzles/day
+   *  target (absent reads as the default 10); `lastTrainedAt`: epoch ms of the last training day
+   *  used to roll the streak. */
+  dailyStreak?: number;
+  dailyGoal?: number;
+  lastTrainedAt?: number;
   onboarded: boolean;
   createdAt: number;
   updatedAt: number;
@@ -90,6 +120,30 @@ export interface SettingsRecord {
   /** UI language (V2-W18, ADR-0053 — supersedes ADR-0052 Q3 mono-locale). Additive; a
    *  legacy/absent value reads as the default 'fr'. No DB_VERSION bump (read-site `?? 'fr'`). */
   locale?: 'fr' | 'en';
+  /** Trainer source preference (T2/TR9): which puzzle source the trainer draws from when no
+   *  dashboard drill is active. Maps 1:1 onto PuzzleQuery.source ('mixed' -> undefined). Additive
+   *  optional; a legacy/absent value reads as the default 'mixed' (read-site `?? 'mixed'`) so a
+   *  fresh/legacy profile still sees its personal puzzles (AP-TPERS-12). NO DB_VERSION bump,
+   *  mirrors `locale?` (precedent ADR-0037/0040/0043/0053). */
+  trainerSource?: 'mixed' | 'personal' | 'curated';
+  /** Opt-in: analyse a played game automatically the moment it finishes (P1, play-loop-closure
+   *  §4.6). When true, ONLY the just-finished game is analysed (never the backlog — heavy, Q-C);
+   *  960 games never auto-run. Additive optional; a legacy/absent value reads as the default false
+   *  (read-site `?? false`). NO DB_VERSION bump (mirrors `metacogEnabled?`/`opponentStyle?`). */
+  autoAnalyzeOnFinish?: boolean;
+  /** Opt-in: allow on-demand takeback during a normal game (P2). Default false (read-site
+   *  `?? false`). A takeback in a rated game marks that game un-counted (ADR-0058). No DB_VERSION
+   *  bump (mirrors `metacogEnabled?`/`autoAnalyzeOnFinish?`). */
+  takebackInPlay?: boolean;
+  /** Play difficulty mode (P3/Q-A/Q-H): {adaptive(default) · easier · harder · fixed}. Restored on
+   *  mount, applied to the bot's targetElo before applyStrength(). Additive optional; a legacy/absent
+   *  value reads as the default 'adaptive' (read-site `?? 'adaptive'`) so a legacy profile plays
+   *  exactly as today (zero regression — AP-OPPAGENCY-1). NO DB_VERSION bump (mirrors `opponentStyle?`). */
+  difficultyMode?: import('../engine/opponentAgency').DifficultyMode;
+  /** The explicit Elo for `difficultyMode === 'fixed'` (P3/Q-A/E4). Seeded from the current pool Elo
+   *  when Fixed is first selected (never blank/NaN). Clamped to [1320,3190] at apply time via
+   *  difficultyTargetElo. Additive optional; absent reads as a sensible pool seed. NO DB_VERSION bump. */
+  fixedElo?: number;
   /** Data-shape revision (audit W13). See PlayerModel.schemaRev. */
   schemaRev?: number;
 }

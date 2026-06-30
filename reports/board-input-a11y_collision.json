@@ -1,0 +1,17 @@
+{
+  "pr": "board-input-a11y",
+  "checked": "2026-06-30",
+  "gh_pr_list": "SKIPPED (offline draft; no network). Collision assessed against the repo working tree + portfolio spec instead.",
+  "portfolio_siblings": {
+    "F1 i18n-label-routing": { "status": "drafted V1 (specs/i18n-label-routing-spec.md), not built", "touches": ["Coach.svelte:260", "Tactics.svelte:399", "Insights.svelte", "src/i18n/messages/generators.ts", "gen.ts (adds labelOrRaw)"], "overlap_with_F2": "Coach.svelte and Tactics.svelte are touched by both, but DIFFERENT regions: F1 edits the program-list / theme TEXT (line ~260/399); F2 edits the <Board> JSX (line 215/237/346). No line collision. Tactics is already-wired in F2 (no F2 edit). Sequencing-independent." },
+    "F3 attempt-recording": { "overlap_with_F2": "none — F3 touches trainer/store logic, not Board markup" },
+    "P2 in-game UX": { "depends_on": "F2", "overlap": "downstream consumer of F2; P2 adds move list / rematch to Play — no conflict, P2 builds after F2" }
+  },
+  "feature_pr_dependents": "P2 (Play in-game UX) declares dep on F2. Landing F2 first unblocks it. No reverse dependency.",
+  "adr_number_collision": {
+    "risk": "enhancements-architecture-spec.md header reserves 'ADR-0054 (to draft)' for the PORTFOLIO architecture decision. If F2 also claims ADR-0054 there is a collision.",
+    "resolution": "F2 follows F1's precedent ('No new ADR — display-only follow-up'). F2 extends the audit-v2 a11y line (ADR-0052 scope / P0-04). If the team decides F2's board-region-aria + consolidation policy warrants its own ADR, it takes the next FREE number AFTER the portfolio ADR — never 0054. See spec §0.5 Q-D."
+  },
+  "working_tree": "clean at draft (git status reports no changes).",
+  "verdict": "No file/line collision with any sibling PR. ADR numbering handled by deferring to F1's no-new-ADR precedent. Safe to draft + build independently."
+}

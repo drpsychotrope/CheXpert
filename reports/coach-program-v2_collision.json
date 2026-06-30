@@ -1,0 +1,28 @@
+{
+  "pr": "coach-program-v2",
+  "checked_at": "2026-06-30",
+  "namespace": {
+    "spec_file": "specs/coach-program-v2-spec.md — DOES NOT EXIST (clean to create)",
+    "AP-CPROG-prefix": "grep AP-CPROG → 0 hits (clean; this PR introduces the AP-CPROG-* family)",
+    "existing_coach_specs": ["specs/coach-mode-spec.md (the original C; ADR-0045)"],
+    "C1_reports_present_no_spec": "reports/coach-profile-persistence_{target_exists,baseline,collision}.json exist but specs/coach-profile-persistence-spec.md does NOT — C1 is mid-draft. C7 is orthogonal to C1 (budget/mastery/loop/opening vs. persistence/trend); no overlap on buildCoachProgram's signature except both append to coach UI."
+  },
+  "adr": {
+    "reserved": { "0054": "portfolio (enhancements-architecture)", "0055": "F3 attempt-recording", "0056": "F5 games-store", "0057": "F6 game-session-controller", "0058": "contested — play-in-game-ux (takeback rating-integrity) is firmest claimant; also flagged by trainer-feedback-core / trainer-integrity / play-opponent-agency as conditional" },
+    "c7_allocation": "If C7 needs a new ADR, first free number is 0059 (per prompt: flag ≥0059). DEFAULT = NO new ADR — C7 reuses ADR-0045 (coach mode) + ADR-0039 (efficacy/session) + ADR-0027 (study-plan/budget) + ADR-0014/0022 (loop). Flag ADR-0059 ONLY if the mastery-criterion model (drill-to-criterion vs fixed minutes) is judged an architectural change to 'what a program step is'. That is the one candidate; do not pre-spend.",
+    "candidate_for_0059": "mastery-based step semantics (CO16) — changes the PlanItem contract conceptually. Flag, don't assume."
+  },
+  "sibling_coordination": {
+    "P4_opening-steering-symmetry": {
+      "status": "V1 (drafted+enriched)",
+      "owns": "OPENING_BOOK per-colour Dimension coverage + selectOpening same-colour fallback + ECO_NAME_FR for 3 new lines",
+      "explicit_handoff": "P4 §2 Out: 'C7 consumes app.steerDimension, which already flows into selectOpening; completing the book makes that path work for either colour for free.' AND P4 §11: 'Coach C7 may later prefer a specific repertoire line per opening weakness; that routing lives in C7, consuming this completed book — not here.'",
+      "c7_constraint": "C7 MUST stay book-agnostic. It does NOT add coach entries to OPENING_BOOK (AP-STEER-5). For CO17, C7 either (a) reuses the existing play-steered path (sets app.steerDimension='openingAccuracy', which selectOpening already biases) and/or (b) derives a concrete ECO opening from the player's analysed games via eco.json. C7 does not duplicate the steering book."
+    }
+  },
+  "byte_identity_risk": {
+    "buildStudyPlan": "C7 does not touch it (AP-COACH-1). Insights study-plan snapshot stays byte-identical.",
+    "PlanItem_shape": "Adding an OPTIONAL field (mastery criterion) to PlanItem is read by buildStudyPlan/buildSession via spread; existing producers omit it → undefined → no behavioural change for Insights/Session. Verify the existing studyPlan + session snapshots remain green."
+  },
+  "verdict": "No blocking collision. Clean spec/AP namespace; ADR default = none (flag 0059 conditionally for mastery semantics); P4 handoff is explicit and one-directional (C7 consumes, never edits, the steering book)."
+}

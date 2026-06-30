@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDb } from '../test/resetDb';
 import { putAttempt, getAttempt, attemptsByPuzzle, allAttempts, recordTacticsAttempt } from './attemptsRepo';
-import { putGame, putImportedGame, getAnalysis } from './gamesRepo';
+import { putGame, putImportedGame, getAnalysis, getAllGames, getAnalyzedGameIds } from './gamesRepo';
+import type { GameAnalysis } from '../analysis/types';
+import type { GameRecord } from './db';
 import { freshPlayerModel } from './playerModel';
 import { resultToGrade } from '../srs/fsrs';
 import { openTrainerDB, type PuzzleAttemptRecord } from './db';
@@ -33,6 +35,73 @@ describe('gamesRepo (W11)', () => {
     expect((await db.get('games', 'g1'))?.result).toBe('win');
     expect((await db.get('importedGames', 'ig1'))?.analyzed).toBe(false);
     expect(await getAnalysis('nope')).toBeUndefined();
+  });
+
+  // P1 (play-loop-closure §5): the batch runner reads GameRecord.playerColor for the correct POV.
+  it('round-trips GameRecord.playerColor; a record without it loads fine (additive, no migration)', async () => {
+    await putGame({ id: 'gw', pgn: '1. e4', result: 'win', botElo: 1500, playedAt: 1, coached: false, playerColor: 'b' });
+    await putGame({ id: 'legacy', pgn: '1. e4', result: 'draw', botElo: 1500, playedAt: 2, coached: false }); // no playerColor
+    const db = await openTrainerDB();
+    expect((await db.get('games', 'gw'))?.playerColor).toBe('b');
+    const legacy = await db.get('games', 'legacy');
+    expect(legacy).toBeTruthy();
+    expect(legacy?.playerColor).toBeUndefined(); // selector's legacy-skip path has data to act on
+  });
+});
+
+// F5 (ADR-0056): the `games` store made readable + a batched analysed-set read.
+const game = (id: string, playedAt: number): GameRecord => ({
+  id, pgn: '1. e4 e5', result: 'win', botElo: 1500, playedAt, coached: false,
+});
+const analysisFor = (gameId: string): GameAnalysis =>
+  ({ gameId, source: 'played', playerColor: 'w', analyzedAt: 1, movetimeMs: 200,
+     plies: [], byPhase: {} as GameAnalysis['byPhase'], acpl: 0, blunders: 0, mistakes: 0,
+     inaccuracies: 0, puzzlesGenerated: 0 });
+
+describe('gamesRepo.getAllGames (F5)', () => {
+  beforeEach(resetDb);
+
+  it('returns [] when no games exist', async () => {
+    expect(await getAllGames()).toEqual([]);
+  });
+
+  it('returns games ordered ascending by playedAt (caller reverses for newest-first)', async () => {
+    // Insert out of chronological order; the playedAt index must sort them.
+    await putGame(game('g-mid', 200));
+    await putGame(game('g-old', 100));
+    await putGame(game('g-new', 300));
+    const all = await getAllGames();
+    expect(all.map((g) => g.id)).toEqual(['g-old', 'g-mid', 'g-new']);
+    // Newest-first (the UI's reverse) is the exact reverse.
+    expect([...all].reverse().map((g) => g.id)).toEqual(['g-new', 'g-mid', 'g-old']);
+  });
+
+  it('reads ONLY the games store — importedGames never leak in (AP-GAMES-8)', async () => {
+    await putGame(game('g1', 1));
+    await putImportedGame({ id: 'ig1', pgn: '1. e4', playerColor: 'w', headers: {}, importedAt: 1, analyzed: false });
+    const all = await getAllGames();
+    expect(all.map((g) => g.id)).toEqual(['g1']);
+  });
+});
+
+describe('gamesRepo.getAnalyzedGameIds (F5)', () => {
+  beforeEach(resetDb);
+
+  it('returns an empty set when nothing is analysed', async () => {
+    const ids = await getAnalyzedGameIds();
+    expect(ids instanceof Set).toBe(true);
+    expect(ids.size).toBe(0);
+  });
+
+  it('contains exactly the ids present in gameAnalyses; excludes games with no analysis', async () => {
+    const db = await openTrainerDB();
+    await putGame(game('g1', 1));
+    await putGame(game('g2', 2)); // played but never analysed
+    await db.put('gameAnalyses', analysisFor('g1'));
+    const ids = await getAnalyzedGameIds();
+    expect(ids.has('g1')).toBe(true);
+    expect(ids.has('g2')).toBe(false);
+    expect(ids.size).toBe(1);
   });
 });
 

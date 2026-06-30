@@ -56,6 +56,13 @@ export const journey: Messages = {
     en: '(rough seed — it sharpens as you play)',
   },
   'onboarding.goToHome': { fr: "Aller à l'accueil →", en: 'Go to home →' },
+  // CO20 (C8): the onboarding-end coaching offer. Gentle, optional — the coach builds on the same
+  // calibration engine that just ran, so this is the natural next step for a motivated new user.
+  'onboarding.coachOfferBody': {
+    fr: 'Envie d’aller plus loin ? Le coaching analyse vos points faibles et propose un programme ciblé.',
+    en: 'Want to go deeper? Coaching reads your weak spots and builds a focused program.',
+  },
+  'onboarding.coachOffer': { fr: 'Faire une évaluation de coaching →', en: 'Get a full coaching read →' },
 
   // ── Session (practice session runner) ──────────────────────────────────────
   'session.title': { fr: 'Session de pratique', en: 'Practice session' },
@@ -85,6 +92,15 @@ export const journey: Messages = {
   'session.launchesHint': {
     fr: 'Lance le vrai trainer. Revenez ici via « Session » dans la navigation pour reprendre cette étape.',
     en: 'Launches the real trainer. Return here via "Session" in the nav to resume this step.',
+  },
+  // ── C7/CO16 mastery criterion + cap on a coach step. {goal}=the criterion text, {cap}=the cap min.
+  // The criterion can only end a step EARLIER; the cap is the hard bound (AP-CPROG-2/3). ──
+  'session.masteryGoal': { fr: 'Objectif : {goal} · plafond {cap} min', en: 'Goal: {goal} · cap {cap} min' },
+  'session.masteryStreak': { fr: '{n} d\'affilée', en: '{n} in a row' },
+  'session.masteryMissRate': { fr: 'taux d\'échec < {pct} %', en: 'miss-rate < {pct}%' },
+  'session.capReached': {
+    fr: 'Plafond de temps atteint — vous pouvez passer à la suite.',
+    en: 'Time cap reached — you can move on.',
   },
   'session.noSession': { fr: 'Aucune session disponible.', en: 'No session available.' },
   'session.backToInsights': { fr: 'Retour au Bilan', en: 'Back to Insights' },
@@ -235,6 +251,8 @@ export const journey: Messages = {
   'review.completeMany': { fr: 'Révision terminée — {n} cartes faites.', en: 'Review complete — {n} cards done.' },
   'review.cardProgress': { fr: 'Carte {index} sur {total} · {reviewed} révisées', en: 'Card {index} of {total} · {reviewed} reviewed' },
   'review.missed': { fr: 'Raté — reprogrammé bientôt.', en: 'Missed — scheduled again soon.' },
+  // T1/TR6: one on-board second try before the miss locks (the miss is still recorded).
+  'review.secondTry': { fr: 'Pas ça — encore un essai.', en: 'Not that — one more try.' },
   'review.solved': { fr: 'Résolu ✔', en: 'Solved ✔' },
   'review.keepGoing': { fr: 'Correct — continuez.', en: 'Correct — keep going.' },
   'review.noFailedPuzzles': {

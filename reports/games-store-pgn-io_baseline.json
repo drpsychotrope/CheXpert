@@ -1,0 +1,43 @@
+{
+  "pr": "games-store-pgn-io",
+  "captured_at": "2026-06-30",
+  "commands": {
+    "test": "npx vitest run",
+    "check": "npx svelte-check --tsconfig ./tsconfig.json"
+  },
+  "tests": {
+    "files_passed": 69,
+    "files_total": 69,
+    "tests_passed": 504,
+    "tests_total": 504,
+    "failures": 0,
+    "duration_s": 31.67,
+    "note": "Green baseline. Any F5 regression is measured against 504/504."
+  },
+  "svelte_check": {
+    "files": 383,
+    "errors": 0,
+    "warnings": 0,
+    "files_with_problems": 0,
+    "note": "Clean. F5 must keep 0/0."
+  },
+  "db": {
+    "DB_VERSION": 4,
+    "policy": "ADDITIVE (new optional field on existing store) → no DB_VERSION bump, bump record schemaRev + backfill. DESTRUCTIVE (drop/rename/reindex) → bump DB_VERSION + upgrade block.",
+    "f5_impact": "ZERO schema change required. getAllGames is a NEW READ over the EXISTING 'games' store via the EXISTING 'playedAt' index. No new store, no new index, no new field → NO DB_VERSION bump (doctrine satisfied; explicitly justified)."
+  },
+  "i18n": {
+    "catalogue": "src/i18n/messages/* merged in src/i18n/messages/index.ts (8 domains: common, play, tactics, coach, analysis, journey, settings, generators)",
+    "parity_test": "src/i18n/translate.test.ts — 'every message has non-empty fr AND en' (structural; Message = Record<Locale,string>) + 'no key collides across domains'",
+    "doctrine": "Every NEW user-facing string in F5 needs fr+en in the SAME Message object → parity test passes by construction. Place new keys under the 'play' domain (Home+Play already there) or a new sub-namespace (e.g. history.*) without creating a new domain file unless warranted.",
+    "f5_new_strings_expected": "history section labels (title, empty state, 'analysed'/'not analysed', open/analyse), PGN export label, PGN import-from-history labels — all bilingual."
+  },
+  "insights_byte_identity": {
+    "owned_by_f5": false,
+    "note": "F5 adds a READ + a new history UI + PGN I/O. It does NOT touch studyPlan/insights selection logic. Insights output must stay byte-identical (AP-COACH-1 family). No F5 change to analysis/studyPlan.ts or weakness selection."
+  },
+  "purity": {
+    "rule": "No Date/Math.random in logic modules; cores take now/locale as params.",
+    "f5_impact": "getAllGames is pure-ish (DB read, no clock). PGN-export filename may want a timestamp — derive from GameRecord.playedAt (already stored), NOT Date.now(), to keep any helper testable."
+  }
+}

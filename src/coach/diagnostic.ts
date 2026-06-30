@@ -49,8 +49,21 @@ export function buildCoachProfile(args: {
   assessedAt: number;
   /** UI locale for the display labels in strengths/weaknesses/detail (V2-W18). */
   locale: Locale;
+  /** Optional timed-block read (C2/CO15). Fills `timeManagement` ONLY when the game didn't measure it
+   *  (sampleSize 0 from the game). The game's own time read takes precedence when present (AP-CPROBE-8:
+   *  additive optional arg, no output reshape; absent → byte-identical to today). */
+  timedDim?: DimensionScore;
+  /** Optional designed-position probe reads (C3). Each is a SINGLE-dimension `DimensionScore`
+   *  (conversion/resilience) extracted from a designed probe game via the same `buildWeaknessProfile`
+   *  path. A probe cell OVERRIDES the matching radar cell — it takes precedence over the (likely "not
+   *  measured") game cell AND the timed cell for that dimension (a designed position is the strongest
+   *  evidence for the axis it was built to test). Honesty: a thin probe arrives with `sampleSize 0`
+   *  (kept "not measured", never fabricated — AP-CDESIGN-3/4). Setting `source.probes = true` (FOLD E2)
+   *  happens ONLY when at least one probe cell is present. Mirrors the additive `timedDim` seam
+   *  (AP-CPROBE-8): absent / empty → output byte-identical to today. */
+  probeDims?: DimensionScore[];
 }): CoachProfile {
-  const { puzzleRating, probes, gameDimensions, assessedAt, locale } = args;
+  const { puzzleRating, probes, gameDimensions, assessedAt, locale, timedDim, probeDims } = args;
 
   // n=0 guard: a theme with no in-band puzzle is dropped, never scored.
   const scored = probes.filter((p) => p.n > 0);
@@ -80,6 +93,28 @@ export function buildCoachProfile(args: {
     dimensions = ALL_DIMS.map((dim) => (dim === 'tactics' ? tacticsDim : placeholderDim(dim, locale)));
   }
 
+  // C2/CO15: fill timeManagement from the timed block ONLY where it is still unmeasured (sampleSize 0).
+  // The game's own time read wins when present (it observed real blunders-under-pressure); the timed
+  // block is the puzzle-side fallback so the axis is no longer n/a from puzzles alone. Additive,
+  // precedence-documented (AP-CPROBE-8); absent timedDim leaves the output byte-identical to today.
+  if (timedDim && timedDim.sampleSize > 0) {
+    dimensions = dimensions.map((d) => (d.dimension === 'timeManagement' && d.sampleSize === 0 ? timedDim : d));
+  }
+
+  // C3: designed-position probe cells override their matching radar cell. A probe is purpose-built to
+  // measure ONE axis (conversion/resilience), so it OUTRANKS the game cell (which for these axes is
+  // usually "not measured" in a short even game) and the timed cell. We override regardless of the
+  // existing cell's sampleSize (unlike timedDim, which only backfills an unmeasured axis): the probe IS
+  // the authoritative read for the axis it tests. A probe that came back "not measured" (sampleSize 0 —
+  // instant resignation / engine failure) is honest evidence that the axis still wasn't measured, so it
+  // legitimately overrides too (it never fabricates a score — AP-CDESIGN-3). Computed BEFORE
+  // strengths/weaknesses so they read the probe cells through the same sampleSize > 0 gate (FOLD E2).
+  const probed = !!probeDims && probeDims.length > 0;
+  if (probed) {
+    const byDim = new Map(probeDims!.map((p) => [p.dimension, p]));
+    dimensions = dimensions.map((d) => byDim.get(d.dimension) ?? d);
+  }
+
   // Strengths / weaknesses. Per-motif covers the tactics granularity, so the dim
   // loop skips 'tactics' to avoid double-counting.
   const sortedMotifs = [...motifs].sort((a, b) => a.delta - b.delta); // weakest first
@@ -99,7 +134,10 @@ export function buildCoachProfile(args: {
     dimensions,
     strengths,
     weaknesses,
-    source: { ladders: motifs.length > 0, game: !!gameDimensions },
+    // `probes` is added ONLY when a designed probe contributed a cell, so a probe-free build stays
+    // `{ ladders, game }` byte-identical (existing toEqual assertions). `game`/`gameAnalyzed` stay tied
+    // to a real analysed game — a probe NEVER masquerades as a full game (AP-CDESIGN-3/9).
+    source: { ladders: motifs.length > 0, game: !!gameDimensions, ...(probed ? { probes: true } : {}) },
     gameAnalyzed: !!gameDimensions,
   };
 }

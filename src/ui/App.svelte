@@ -77,6 +77,7 @@
     if (prevView !== null && prevView !== v) {
       if (app.engine.busy) void app.engine.interrupt();
       void app.refreshDue(Date.now()); // keep the Review badge fresh after grading (audit v2 P1-07)
+      void app.refreshUnanalyzed(); // keep the unanalysed-games badge fresh after a game/analysis (P1)
     }
     prevView = v;
   });

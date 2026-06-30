@@ -18,3 +18,15 @@ export function gtHas(key: string): boolean {
 export function motifLabelOrRaw(motif: string, locale: Locale): string {
   return gtHas('motif.' + motif) ? gt('motif.' + motif, locale) : motif;
 }
+
+/**
+ * Generic display resolver (F1, FOLD I4): a `namespace.key` localized label, or the raw `key`
+ * when no catalogue entry exists. Sibling of `motifLabelOrRaw` (which is `labelOrRaw('motif', …)`).
+ * Display-only — the raw `key` keeps feeding routing/filters unchanged (AP-I18N-1). Consumed by
+ * Coach + Insights for `activity.*`; the raw fallback is for open-vocabulary tails only — a closed
+ * union (e.g. `activity.*`) must have every key, gated by the parity test (AP-I18N-4).
+ */
+export function labelOrRaw(namespace: string, key: string, locale: Locale): string {
+  const full = namespace + '.' + key;
+  return gtHas(full) ? gt(full, locale) : key;
+}

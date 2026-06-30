@@ -1,0 +1,36 @@
+{
+  "pr": "play-loop-closure",
+  "portfolio_id": "P1",
+  "scanned_at": "2026-06-30",
+  "verdict": "ALL CORE TARGETS EXIST — premise CONFIRMED, proceed to draft",
+  "premise": {
+    "claim": "analyzePlayed() is gated on lastGame (component state, cleared on newGame/navigation) so finishing a game + navigating away never analyses it -> no puzzles, no weaknessCounters fold, and the next game's opening-steer silently falls back to neutral.",
+    "verdict": "CONFIRMED empirically",
+    "evidence": [
+      "Play.svelte:456 analyzePlayed() opens with `if (!lastGame || !model) return;` — hard gate on lastGame.",
+      "Play.svelte:81 `let lastGame = $state<{id;pgn}|null>(null)` is COMPONENT state, not persisted.",
+      "Play.svelte:132 newGame() sets `lastGame = null` (also aResult/aStatus reset) — so starting the next game discards the just-finished game's analysis affordance.",
+      "Play.svelte:619 the Analyse button only renders `{#if status==='over' && lastGame && variant!=='chess960'}` — leaving the over screen (navigation unmounts Play; lastGame is component-local) removes the only entry point.",
+      "Steer fallback CONFIRMED: newGame() (Play.svelte:159-168) calls loadAllAnalyses(); if `analyses.length` is 0 -> weakest stays null -> selectOpening(botColor, null, rng) weights every opening 1:1 (openingBook.ts:91 `weakest && o.targets===weakest ? 3 : 1`) = neutral variety; steeringNote(opening, null) returns 'Playing the X' (openingBook.ts:131). So an un-analysed history yields neutral steering — exactly the broken loop."
+    ]
+  },
+  "targets": [
+    {"symbol": "analyzePlayed()", "file": "src/ui/Play.svelte", "line": 456, "exists": true, "note": "Gated on lastGame; runs runAnalysis(source:'played'); idempotent via getAnalysis(lastGame.id) at :461."},
+    {"symbol": "lastGame", "file": "src/ui/Play.svelte", "line": 81, "exists": true, "note": "Component $state, set in finishGame() at :451, cleared in newGame() at :132. Not persisted -> the gap."},
+    {"symbol": "finishGame(outcome)", "file": "src/ui/Play.svelte", "line": 404, "exists": true, "note": "Idempotent via gameFinished flag (:405); writes GameRecord via putGame (:450); sets lastGame (:451); id format `g:${now}` (:430-431)."},
+    {"symbol": "steer fallback path", "file": "src/ui/Play.svelte", "lines": "159-168", "exists": true, "note": "loadAllAnalyses() -> buildWeaknessProfile().weakest -> app.steerDimension override -> selectOpening/steeringNote. Falls back to null (neutral) when no analyses."},
+    {"symbol": "app.steerDimension", "file": "src/state/app.svelte.ts", "line": 61, "exists": true, "note": "Dimension|null; 'consumed once by Play.svelte to override the steer dimension' (coach play-steered step). Consumed+cleared at Play.svelte:166."},
+    {"symbol": "runAnalysis(...)", "file": "src/analysis/runAnalysis.ts", "lines": "39-83", "exists": true, "note": "source:'imported'|'played'; persists gameAnalyses + puzzles + folds weaknessCounters; calls invalidateAnalysesCache() at :64."},
+    {"symbol": "source:'played'", "file": "src/analysis/runAnalysis.ts", "line": 20, "exists": true, "note": "Field on RunAnalysisInput; threaded to analyzeGame."},
+    {"symbol": "getAnalysis(gameId) idempotency guard", "file": "src/store/gamesRepo.ts", "line": 19, "exists": true, "note": "Returns GameAnalysis|undefined; idempotency is CALLER-side (Play.svelte:461 short-circuits if existing). runAnalysis itself is NOT internally idempotent — the caller must guard."},
+    {"symbol": "loadAllAnalyses() + invalidateAnalysesCache()", "file": "src/analysis/runAnalysis.ts", "lines": "88-101", "exists": true, "note": "Module-level analysesCache; invalidated on new analysis (:64) and data wipe. Steering reads this on every newGame()."},
+    {"symbol": "getAllGames()", "file": "src/store/gamesRepo.ts", "exists": false, "note": "PROVIDED BY F5 (dependency). Absent in src/ today — only in specs/games-store-pgn-io-spec.md + its reports. F5 builds first; P1 consumes it as a contract."},
+    {"symbol": "getAnalyzedGameIds()", "file": "src/store/gamesRepo.ts", "exists": false, "note": "PROVIDED BY F5 (FOLD-G1). Absent today. P1 derives 'unanalysed games' = getAll(non-960) minus getAnalyzedGameIds()."},
+    {"symbol": "AnalysisResult.svelte", "file": "src/ui/AnalysisResult.svelte", "exists": true, "note": "Reusable result panel; already consumed by Import + Play tail. P1 reuses for any batch/queue result render."},
+    {"symbol": "Dashboard.svelte", "file": "src/ui/Dashboard.svelte", "exists": true, "note": "Candidate host for the 'N unanalysed' badge (Q-B). Badge precedent: dueReview in App.svelte/Home.svelte."}
+  ],
+  "fold_PL2": {
+    "claim": "in-memory-only analysis -> broken loop",
+    "verdict": "CONFIRMED — the analysis affordance is component-local (lastGame); navigation discards it; persistence layer (gameAnalyses) is only written WHEN analyzePlayed() runs, which requires the manual click while still on the over screen."
+  }
+}

@@ -183,6 +183,15 @@
         dests={dests()}
         {lastMove}
         onMove={onDrillMove}
+        onMoveText={(text) => {
+          if (!drill || drill.done) return false;
+          // No persistent game here: resolve on a scratch position at the drill's current FEN,
+          // exactly as dests()/onDrillMove already construct one.
+          const r = new ChessGame(drill.fen()).resolveMove(text);
+          if (!r) return false;
+          void onDrillMove(r.from, r.to, r.promo ?? 'q');
+          return true;
+        }}
       />
     </div>
     <p class="feedback {drillKind}">{drillFeedback}</p>

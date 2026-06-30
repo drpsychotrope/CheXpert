@@ -1,0 +1,30 @@
+{
+  "pr": "coach-funnel-robustness",
+  "portfolio_id": "C8",
+  "scanned": "2026-06-30",
+  "verdict": "NO COLLISIONS",
+  "new_symbols_checked": {
+    "assessmentProgress": 0,
+    "coachAssessmentProgress": 0,
+    "resumeAssessment": 0,
+    "exportCoachProfile": 0,
+    "downloadCoachProfile": 0,
+    "coachProfileFilename": 0,
+    "surfaceCoach": 0,
+    "coachNudge": 0,
+    "couldntStartEngine": 0
+  },
+  "notes": {
+    "engineFailed_8_hits": "These are Onboarding's existing `onboarding.engineFailedSkipping` key + tests — the PATTERN CF8 mirrors, NOT a collision (C8's new key lives under coach.* e.g. `coach.engineFailed`).",
+    "view_coach_exists": "The 'coach' view is already in the View union (app.svelte.ts:34) and NAV (App.svelte:48). C8 adds NO new view — CO20 surfaces an entry to the EXISTING view, CF10 adds a button inside it / Settings.",
+    "i18n_namespace": "All new strings land in coach.* (src/i18n/messages/coach.ts) + a few home.* additions; no cross-domain key collision (translate.test.ts guard passes)."
+  },
+  "adr_collision": {
+    "reserved_range": "0054 (portfolio), 0055 (F3), 0056 (F5), 0057 (F6), 0058 (P2 takeback rating-integrity — already claimed)",
+    "c8_allocation": "If CF4 resume-persistence is judged architectural, flag ADR-0059 (first free). Default for C8 = NO new ADR (additive/UI; reuse ADR-0045 coach lineage + ADR-0053 i18n + ADR-0054/F5 download primitive). See spec §0.5 Q-B + §7."
+  },
+  "file_collision": {
+    "src/ui/pgnDownload.ts": "planned by F5 (not yet on disk). If F5 ships first, C8 imports its downloadPgn. If C8 builds first or a coach-specific export is cleaner, C8 adds downloadJson/coachProfileExport in the same style — no name clash with F5's PGN-specific exports.",
+    "new_c8_files": "at most one small util (coachProfileExport.ts) + its test; everything else edits existing files (Coach.svelte, Home.svelte, Settings.svelte, coach.ts)."
+  }
+}

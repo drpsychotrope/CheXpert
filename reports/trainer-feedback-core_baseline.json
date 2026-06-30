@@ -1,0 +1,25 @@
+{
+  "pr": "trainer-feedback-core",
+  "feature": "T1",
+  "measured": "2026-06-30",
+  "head": "9296affc0fd5fe9a7f96fc4abe18be833662bd31",
+  "tests": { "passed": 504, "files": 69, "command": "npx vitest run", "result": "504 passed (504) / 69 passed (69)" },
+  "svelte_check": { "files": 383, "errors": 0, "warnings": 0, "command": "npx svelte-check --tsconfig ./tsconfig.json" },
+  "db_version": 4,
+  "schema_revs": { "PlayerModel.schemaRev": 1, "SettingsRecord.schemaRev": 1 },
+  "latest_adr": "0053",
+  "behaviour_today": {
+    "tactics_miss": "board reset to puzzle.fen; t('tactics.wrong')='Not the move — Retry the position, or move on.'; finish(false) grades + increments weaknessCounters; selfTag/confidence chips render IF metacogEnabled but trigger NO action; Retry() = full reset, pure practice.",
+    "review_miss": "board reset to puzzle.fen; t('review.missed'); grade(false); NO metacog UI, NO solution.",
+    "first_wrong_move": "TacticalTrainer.playUserMove -> status='failed' immediately; no second try.",
+    "alt_winning_move": "sameMove rejects any non-promotion deviation as 'wrong'; engine never consulted on the trainer path.",
+    "grade": "resultToGrade(solved,ms): fail->Again, fast->Easy, slow->Hard, else Good; gradeCard first-exposure clamp Easy->Good on State.New (ADR-0033). No confidence-based clamp."
+  },
+  "byte_identity_anchors": [
+    "Insights study-plan snapshot (AP-COACH-1) — buildStudyPlan never reads weaknessCounters/selfTag/confidence; T1 must not perturb it.",
+    "metacog.ts calibration() output — T1 must not change selfTag/confidence semantics or the taxonomy (SELF_TAGS closed set).",
+    "explain.ts EN+FR pins, EvalGraph — untouched (T1 trainer path has no PlyAnalysis).",
+    "fsrs.test.ts resultToGrade + gradeCard first-exposure clamp — the new clamp is additive at the call site; existing tests must stay green."
+  ],
+  "targeted_tests_to_watch": ["TacticalTrainer.test.ts", "fsrs.test.ts", "metacog.test.ts", "store/metacog-schema.test.ts", "concepts.test.ts", "studyPlan.test.ts"]
+}

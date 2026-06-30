@@ -45,6 +45,17 @@ export const IMBALANCE_LIBRARY: Scenario[] = [
     goal: 'Convert the extra pawn: active rook, push the passer, keep your king in front of it.',
     goalFr: 'Convertissez le pion de plus : tour active, poussez le passé, gardez votre roi devant lui.',
   },
+  {
+    // C3 resilience probe seed (the library had no passive/worse position — opp-castle is an ATTACK).
+    // A same-wing 4-vs-3 rook ending: the side to train is a PAWN DOWN and to move, a textbook
+    // theoretical DRAW (clearly worse but holdable — honest "defend", not a lost position). The mirror
+    // of `rook-up`: convert a pawn up there, hold a pawn down here. FEN validated legal + side-to-move
+    // == worse side in scenarios.test.ts.
+    id: 'coach:defend-worse', name: 'Defend a worse rook ending', nameFr: 'Défendre une finale de tours inférieure', category: 'imbalance',
+    fen: 'r5k1/5p1p/4p1p1/8/8/5P1P/6P1/R5K1 w - - 0 1', sideToTrain: 'w',
+    goal: 'Hold the worse side: a pawn down, activate your rook, keep your king near the pawns, and trade into a drawn ending — don\'t panic.',
+    goalFr: 'Tenez le côté inférieur : un pion de moins, activez votre tour, gardez votre roi près des pions et simplifiez vers une finale nulle — ne paniquez pas.',
+  },
 ];
 
 /** Positions from your own recurring leaks (most-impactful first); empty if no analyses.

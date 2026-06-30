@@ -8,11 +8,29 @@ import type { Dimension } from './weakness';
 import { gt } from '../i18n/gen';
 import type { Locale } from '../i18n/translate';
 
+/** Mastery criterion for a coach step (C7/CO16). Optional: study-plan items omit it
+ *  (Insights stays time-boxed); coach items carry it. The step is done when the
+ *  criterion is met OR `minutes` (the cap) elapses — whichever first (Q-B / AP-CPROG-2/3). */
+export interface MasteryCriterion {
+  kind: 'streak' | 'missRate';   // "N correct in a row" | "recent miss-rate below threshold"
+  target: number;                // streak: N (e.g. 4); missRate: fraction 0..1 (e.g. 0.25)
+  /** Stable routing/measurement key (motif key or 'endgame'); never translated (AP-CPROG-8). */
+  motifKey?: string;
+}
+
 export interface PlanItem {
   activity: 'tactics' | 'endgames' | 'repertoire' | 'comeback' | 'vision' | 'sparring' | 'play-steered';
   focus: string;
-  minutes: number;
+  minutes: number;               // for coach steps this is the SAFETY CAP (C7/Q-B); study-plan steps keep it as the block length
   reason: string;
+  /** Additive provenance tag (C5): a step added because the user has a clear STRENGTH (`'leverage'`)
+   *  or because their intake GOAL asked for it (`'goal'`). Absent on every weakness/maintenance step
+   *  AND on every `buildStudyPlan` item — so Insights output stays byte-identical (AP-CINTAKE-8). The
+   *  UI uses it only to render a small tag; routing (`activity`/`focus`) is untouched. */
+  kind?: 'leverage' | 'goal';
+  /** Mastery criterion (C7/CO16) — coach-only, additive-optional. `buildStudyPlan` never sets it,
+   *  so Insights output (and its snapshot) stays byte-identical (AP-CPROG-6). */
+  mastery?: MasteryCriterion;
 }
 
 function activityForLeak(leak: Leak): { activity: PlanItem['activity']; focus: string } {

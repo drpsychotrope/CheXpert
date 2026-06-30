@@ -1,0 +1,48 @@
+{
+  "pr": "coach-output-teaching",
+  "feature": "C6",
+  "captured_at": "2026-06-30",
+  "scope": "feature",
+  "baseline_anchor": {
+    "tests": 504,
+    "test_files": 69,
+    "test_files_verified": true,
+    "test_files_command": "ls src/**/*.test.ts | wc -l => 69",
+    "svelte_check": "0 errors / 0 warnings across 383 files (portfolio §8 anchor)",
+    "DB_VERSION": 4,
+    "DB_VERSION_command": "grep 'export const DB_VERSION' src/store/db.ts => 4",
+    "note": "504 test count is the portfolio §8 anchor (504 tests / 69 files). File count empirically re-confirmed = 69. Build re-runs `npx vitest run` for the exact pass count at exec time."
+  },
+  "behavior_today": {
+    "coach_result_screen": "src/ui/Coach.svelte:248-267 — <Radar dimensions> + strengths/weaknesses bullet lists + program <ol>. NO prose summary, NO game review, NO concept cards, NO leverage/'start here' line.",
+    "coach_game_analysis": "src/ui/Coach.svelte:159-175 — finishGame() runs full runAnalysis(source:'played') (line 164). Only buildWeaknessProfile([analysis]).dimensions is kept (line 172). The `analysis` GameAnalysis (winCurve source, criticalMoments source, blunders) is DISCARDED.",
+    "program_order": "buildCoachProgram is worst-first by motif delta then dim score, but never states which fix matters MOST or its rough payoff (CO9 gap).",
+    "dashboard_biggest_opportunity": "src/ui/Dashboard.svelte:88-93 — profile.weakest single weakest dim + 'Train it now' link. The 'start here' precedent for CO9."
+  },
+  "reuse_surfaces": {
+    "EvalGraph.svelte": "props { analysis: GameAnalysis, selected?, onSelect? }; consumes GameAnalysis directly.",
+    "criticalMoments.ts": "PURE winCurve(analysis) + criticalMoments(analysis,{max,minLoss}); turning points hook.",
+    "explain.ts:explainPly": "PURE explainPly(ply, locale) => {headline, reasons[], better}; Coach 'why' on real PlyAnalysis.",
+    "concepts.ts:cardForThemes": "PURE cardForThemes(themes, cards) => ConceptCard|null; loadConcepts(locale) loads seed.",
+    "ConceptCard.svelte": "props { card: ConceptCard, onClose? }; existing renderer (board mini + idea + examples).",
+    "program.ts:buildCoachProgram": "PURE worst-first template the narrative core mirrors (gt(), Locale, no Date/Math.random).",
+    "i18n gen.ts:gt + generators.ts": "bilingual pure-phrase catalogue; narrative strings live here (new namespace).",
+    "SolutionReveal.svelte": "F4 forward contract (NOT YET BUILT); arbitrary-line replay with source-agnostic why? prop."
+  },
+  "tactics_consumption_pattern": "src/ui/Tactics.svelte: loadConcepts(loc).then(c => card = cardForThemes(puzzle.themes, c)); <ConceptCard {card} />. C6 reuses this pattern keyed off weak motifs instead of a puzzle's themes.",
+  "byte_identity_anchors": [
+    "Insights study-plan snapshot (AP-COACH-1) — C6 must NOT touch buildStudyPlan or its output.",
+    "explainPly EN+FR pins (explain.test.ts) — reuse-only, no change.",
+    "EvalGraph output / winCurve / criticalMoments — reuse-only, no change.",
+    "concepts.test.ts / concepts.seed.test.ts / concepts.fr-parity.test.ts — reuse-only.",
+    "Coach radar/program output for the existing result — additive only; existing elements unchanged."
+  ],
+  "persistence_impact": {
+    "DB_VERSION_bump": false,
+    "new_persisted_fields": "none — the held GameAnalysis lives in Coach component $state for the just-played game; nothing new is written to IndexedDB."
+  },
+  "dependencies": {
+    "hard": ["F4 (teach-explain-surfacing) — SolutionReveal.svelte must ship first; C6 consumes it for review-ply replay via the source-agnostic why? prop, MUST NOT fork it."],
+    "soft": ["F1 (i18n label routing) — recommended-built-first portfolio-wide so new keys inherit routing; C6 adds its own bilingual keys regardless."]
+  }
+}

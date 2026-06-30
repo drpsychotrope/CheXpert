@@ -1,0 +1,22 @@
+{
+  "pr": "i18n-label-routing",
+  "captured": "2026-06-30",
+  "catalogue_coverage": {
+    "file": "src/i18n/messages/generators.ts",
+    "namespaced_label_keys_total": 17,
+    "motif": { "count": 7, "keys": ["fork", "pin", "skewer", "hangingPiece", "discoveredAttack", "mate", "endgame"] },
+    "dim_and_dimShort": { "count": 10, "note": "5 dims × (dim. + dimShort.)" },
+    "activity": { "count": 0, "status": "MISSING — must be created" },
+    "focus": { "count": 0, "status": "MISSING; focus values are mixed key/prose" }
+  },
+  "activity_union": ["tactics", "endgames", "repertoire", "comeback", "vision", "sparring", "play-steered"],
+  "focus_value_set": ["<motif keys>", "endgame conversion", "opening lines", "openingAccuracy", "time", "defend & recover", "mixed"],
+  "theme_vocabulary": "open (Lichess); motif.* covers 7 → uncovered themes leak raw via motifLabelOrRaw fallback",
+  "constraints": {
+    "stable_keys_unchanged": "focus feeds tacticsFilterThemes / routing — translate DISPLAY only",
+    "bilingual_parity": "every new key needs FR+EN (ADR-0053; parity test exists)",
+    "db": "no change (display-only)",
+    "insights_data": "study-plan DATA byte-identical (AP-COACH-1); translating the displayed activity label is allowed"
+  },
+  "test_baseline": "npm test green + svelte-check 0 errors at draft time (per README); re-verify pre-exec"
+}

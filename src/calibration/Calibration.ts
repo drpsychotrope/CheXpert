@@ -103,6 +103,19 @@ export class PuzzleLadder {
     if (this.count >= this.max) return true;
     return this.count >= this.min && this.rating.rd <= 90;
   }
+
+  /** Adaptive depth (C2/CO4): raise this ladder's ceiling by one so it serves one more puzzle.
+   *  The caller (Coach.svelte) gates this on the pure borderlineDepth() rule + a grand cap, so the
+   *  ladder itself stays a dumb min/max counter. Only changes how many LOCAL ladder updates happen;
+   *  no rating-pool mutation (AP-CPROBE-1). */
+  extend(by = 1): void {
+    this.max += by;
+  }
+
+  /** Current ceiling (read-only) — lets the driver report honest progress for a deepened ladder. */
+  get ceiling(): number {
+    return this.max;
+  }
 }
 
 /**

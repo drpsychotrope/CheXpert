@@ -278,6 +278,13 @@
         dests={display.dests()}
         check={display.inCheck()}
         onMove={onLadderMove}
+        onMoveText={(text) => {
+          if (!trainer || !ladder) return false;
+          const r = display.resolveMove(text);
+          if (!r) return false;
+          onLadderMove(r.from, r.to, r.promo ?? 'q');
+          return true;
+        }}
       />
     </div>
     <p class="feedback">{ladderFeedback}</p>
@@ -308,6 +315,13 @@
         dests={!gameThinking && game.turn === gameSide ? game.dests() : new Map()}
         check={gameInCheck}
         onMove={onGameMove}
+        onMoveText={(text) => {
+          if (gameThinking || game.turn !== gameSide) return false;
+          const r = game.resolveMove(text);
+          if (!r) return false;
+          void onGameMove(r.from, r.to, r.promo ?? 'q');
+          return true;
+        }}
       />
     </div>
     {#if gameThinking}<p class="feedback">{t('onboarding.thinking')}</p>{/if}
@@ -319,7 +333,14 @@
       <p>{@html t('onboarding.puzzleRatingDone', { r: resultPuzzleRating })}</p>
       <p>{@html t('onboarding.gameRatingDone', { r: resultGameRating })} <span class="muted">{t('onboarding.roughSeed')}</span></p>
       {#if gameInfo}<p class="muted" style="font-size:0.85rem">{gameInfo}</p>{/if}
-      <button onclick={() => app.go('home')}>{t('onboarding.goToHome')}</button>
+      <!-- CO20 (C8, Q-A=c): the onboarding-end coaching offer — catch the new user with momentum. The
+           same calibration engine the coach builds on just ran; route gently to a full read. Optional,
+           next to "Go home" (non-nagging — AP-CFUNNEL-1). -->
+      <p class="muted" style="font-size:0.85rem">{t('onboarding.coachOfferBody')}</p>
+      <div class="row center">
+        <button onclick={() => app.go('coach')}>{t('onboarding.coachOffer')}</button>
+        <button style="background:transparent;border:1px solid var(--border)" onclick={() => app.go('home')}>{t('onboarding.goToHome')}</button>
+      </div>
     </div>
   {/if}
 </section>

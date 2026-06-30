@@ -19,10 +19,18 @@ export const BUDGET_BOUNDS: BudgetBounds = {
 };
 
 /** Clock-aware bot movetime: scale with the bot's remaining time using a phase-aware moves-left
- *  estimate, clamped per category. Pure. */
-export function botMovetime(remainingMs: number, ply: number, cat: Category, bounds: BudgetBounds = BUDGET_BOUNDS): number {
+ *  estimate, fold in the clock increment (a real opponent uses its increment — P3/Q-F), then clamp
+ *  per category. Pure. `incrementMs` defaults to 0 so existing callers/tests are unchanged; untimed
+ *  and 960 games pass no increment (no clock). */
+export function botMovetime(
+  remainingMs: number,
+  ply: number,
+  cat: Category,
+  bounds: BudgetBounds = BUDGET_BOUNDS,
+  incrementMs = 0,
+): number {
   const movesLeft = Math.max(8, 40 - Math.floor(ply / 2));
-  const raw = remainingMs / movesLeft;
+  const raw = remainingMs / movesLeft + incrementMs;
   const [floor, ceil] = bounds[cat];
   return Math.round(Math.min(ceil, Math.max(floor, raw)));
 }
@@ -47,4 +55,30 @@ export function applyGameResult(
   const nextOpp = recordGame({ targetElo: prevOpp.targetElo, recent: prevOpp.recent }, outcome);
   const nextRating = updateRating(prevRating, [{ opponentRating: botElo, opponentRd: 60, score }]);
   return { nextOpp, nextRating };
+}
+
+/** Rating-integrity policy (P2/ADR-0058): a game counts toward the rating UNLESS it was marked
+ *  un-counted by an in-play takeback. `finishGame` calls this to decide whether to run
+ *  `applyGameResult` + persist the rating. Pure — the single decision authority for the skip so the
+ *  abuse vector (undo a blunder, keep the gain) is closed in one testable place (AP-PLAYUX-3). */
+export function shouldRate(unrated: boolean): boolean {
+  return !unrated;
+}
+
+/** Pure takeback-eligibility core (P2/FOLD A4 + AP-PLAYUX-10). Given how many plies have been played
+ *  and which side the human is, decide whether an in-play takeback is structurally possible — i.e.
+ *  the PLAYER has actually made a move that can be undone, so undoing the bot's reply + that player
+ *  move lands back on the player's turn.
+ *
+ *  The degenerate case this closes: a Black player at ply 1 (the bot has just opened, the player has
+ *  not moved) must NOT be able to "take back" the bot's opening move (that would empty the board with
+ *  the bot still to move). White needs ≥ 2 plies (player move + bot reply); Black needs ≥ 3 (bot
+ *  opener + player move + bot reply). Derived from whose turn it is + how many plies exist, NOT a
+ *  magic constant. The component still ANDs this with the live/turn/analysis gates — this is the
+ *  "has the player moved?" half only. Pure, fully unit-tested. */
+export function canTakeBackInPlay(historyLength: number, playerColor: 'white' | 'black'): boolean {
+  // The player's first move is at ply index 0 (White) or 1 (Black); a takeback also undoes the
+  // bot's reply that follows it, so the minimum history is one ply more than the player's first ply.
+  const minPlies = playerColor === 'white' ? 2 : 3;
+  return historyLength >= minPlies;
 }

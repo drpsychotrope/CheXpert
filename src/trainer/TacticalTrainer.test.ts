@@ -30,10 +30,51 @@ describe('TacticalTrainer (active recall)', () => {
     expect(t.state.status).toBe('solved');
   });
 
-  it('fails the puzzle on a wrong move (no auto-solution)', () => {
+  it('grants one on-board second try on a first wrong move (T1/TR6) and still records the miss', () => {
+    const t = new TacticalTrainer(matePuzzle, 0); // default retries = 1
+    expect(t.playUserMove('g1h1')).toBe('retry');
+    // Honesty (AP-TFEED-2): the miss is recorded even though a retry is granted.
+    expect(t.state.status).toBe('solving');
+    expect(t.state.mistakes).toBe(1);
+    expect(t.state.retriesLeft).toBe(0);
+  });
+
+  it('locks the fail on a SECOND wrong move once the retry is spent', () => {
     const t = new TacticalTrainer(matePuzzle, 0);
+    expect(t.playUserMove('g1h1')).toBe('retry');
+    expect(t.playUserMove('g1f1')).toBe('wrong');
+    expect(t.state.status).toBe('failed');
+    expect(t.state.mistakes).toBe(2);
+  });
+
+  it('after a granted retry, the correct move still solves the puzzle', () => {
+    const t = new TacticalTrainer(matePuzzle, 0);
+    expect(t.playUserMove('g1h1')).toBe('retry'); // board not advanced
+    expect(t.playUserMove('a1a8')).toBe('solved');
+    expect(t.state.status).toBe('solved');
+  });
+
+  it('retries:0 reproduces the pre-T1 instant-fail behaviour', () => {
+    const t = new TacticalTrainer(matePuzzle, 0, 0);
     expect(t.playUserMove('g1h1')).toBe('wrong');
     expect(t.state.status).toBe('failed');
+    expect(t.state.retriesLeft).toBe(0);
+  });
+
+  it('acceptUserMove advances the line + applies the opponent reply like the matched path', () => {
+    // multiPuzzle line: g5f7 (user), h8g8 (opponent auto), f7d6 (user). An accepted alt for the
+    // first user move drives the same bookkeeping: opponent reply applied, then the line continues.
+    const t = new TacticalTrainer(multiPuzzle, 0);
+    expect(t.acceptUserMove('g5f7')).toBe('correct'); // opponent Kg8 auto-played, line continues
+    expect(t.state.userMoveIndex).toBe(2);
+    expect(t.playUserMove('f7d6')).toBe('solved');
+  });
+
+  it('acceptUserMove returns "wrong" (no state change) for an illegal move', () => {
+    const t = new TacticalTrainer(multiPuzzle, 0);
+    expect(t.acceptUserMove('a1a1')).toBe('wrong'); // not a legal move
+    expect(t.state.status).toBe('solving');
+    expect(t.state.userMoveIndex).toBe(0);
   });
 
   it('walks a multi-move line, auto-playing the opponent reply', () => {

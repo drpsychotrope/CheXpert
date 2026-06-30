@@ -1,0 +1,33 @@
+{
+  "pr": "coach-profile-persistence",
+  "checked": "2026-06-30",
+  "anti_pattern_prefix": {
+    "prefix": "AP-CPROF-",
+    "grep": "rg 'AP-CPROF' over repo",
+    "result": "0 matches",
+    "verdict": "FREE — safe to mint AP-CPROF-1..N"
+  },
+  "adr": {
+    "latest_in_decisions_md": "ADR-0053 (bilingual FR/EN switch)",
+    "reserved_in_portfolio_§8": { "0054": "portfolio", "0055": "F3", "0056": "F5", "0057": "F6", "0058": "P2" },
+    "next_free": "0059",
+    "c1_needs_adr": false,
+    "rationale": "C1 is additive-optional surfacing of already-persisted fields; no schema/architecture change. Coach-PR doctrine: NO new ADR unless architectural. Flag >=0059 ONLY if an arbitrage forces an architectural change (none expected).",
+    "decision": "NO new ADR. Extends ADR-0045 (coach mode) by reading what it already writes."
+  },
+  "db_version_collision": {
+    "current": 4,
+    "bump_required": false,
+    "rationale": "coachProfile?/coachProfilePrev?/assessedAt already persist (ADR-0045). C1 adds NO new persisted field — it READS existing ones. Staleness threshold is a UI constant, not persisted. No migration, no schemaRev bump. metacog-schema.test.ts (asserts DB_VERSION===4) stays green."
+  },
+  "report_naming": {
+    "convention": "reports/<pr>_{target_exists,baseline,collision}.json + _{arbitrages,improvements}.md",
+    "precedent": "reports/coach-mode_{baseline,collision,target_exists}.json",
+    "match": true
+  },
+  "spec_filename_collision": {
+    "path": "specs/coach-profile-persistence-spec.md",
+    "exists_before": false,
+    "verdict": "no collision"
+  }
+}

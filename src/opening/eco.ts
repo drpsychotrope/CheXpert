@@ -114,6 +114,10 @@ const ECO_NAME_FR: Record<string, string> = {
   // 1. d4 / 1. e4 generic
   "Queen's Pawn (…e6/…g6)": 'Partie du pion dame (…e6/…g6)',
   "King's Pawn Opening": 'Ouverture du pion roi',
+  // P4 opening-steering book display names (book entries, not eco.json) — localized for parity (AP-STEER-6).
+  'Sicilian Defence (as Black)': 'Défense sicilienne (avec les Noirs)',
+  'Caro-Kann, Exchange (as Black)': "Caro-Kann, variante d'échange (avec les Noirs)",
+  "King's Gambit Accepted": 'Gambit du roi accepté',
 };
 
 /**

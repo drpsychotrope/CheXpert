@@ -22,7 +22,18 @@ export const tactics: Messages = {
   'tactics.wrong': { fr: 'Pas le bon coup — réessayez la position, ou passez.', en: 'Not the move — Retry the position, or move on.' },
   'tactics.solved': { fr: 'Résolu ! ✔', en: 'Solved! ✔' },
   'tactics.keepGoing': { fr: 'Correct — continuez.', en: 'Correct — keep going.' },
-  'tactics.hint': { fr: 'Indice : une pièce forte part de {sq}.', en: 'Hint: a strong piece moves from {sq}.' },
+  // ── T3 progressive hints (TR5, Q-A) — 3 escalating tiers; ANY tier clamps the grade ──
+  // Tier 1 names the motif (least reveal), tier 2 the target square, tier 3 the full move.
+  'tactics.hintMotif': { fr: 'Indice : pensez au motif — {motif}.', en: 'Hint: think about the motif — {motif}.' },
+  'tactics.hintTarget': { fr: 'Indice : une pièce arrive en {sq}.', en: 'Hint: a piece lands on {sq}.' },
+  'tactics.hintMove': { fr: 'Indice : le coup est {move}.', en: 'Hint: the move is {move}.' },
+  // Transparency marker on a hinted solve (the clamp is visible to the player). AP-TINTEG-1.
+  'tactics.hintedTag': { fr: '(indice utilisé)', en: '(hint used)' },
+  // T3/TR8 retention header: day-streak + today's goal progress (descriptive).
+  'tactics.streakLine': { fr: 'Série de {n} jours', en: '{n}-day streak' },
+  'tactics.goalLine': { fr: 'Objectif du jour : {done}/{goal}', en: 'Today: {done}/{goal}' },
+  // T3 impulsivity inline nudge (Q-D): gentle, self-dismissing, after a fast miss. Never blocks.
+  'tactics.fastMiss': { fr: 'Raté en {n} s — ralentissez ?', en: 'Missed in {n}s — slow down?' },
   'tactics.retryFind': { fr: 'Réessayez — trouvez le coup.', en: 'Retry — find the move.' },
   'tactics.leech': { fr: 'Celui-ci vous résiste sans arrêt.', en: 'This one keeps beating you.' },
   'tactics.learnPattern': { fr: 'Apprendre le motif →', en: 'Learn the pattern →' },
@@ -35,6 +46,56 @@ export const tactics: Messages = {
   'tactics.themes': { fr: 'Thèmes : {themes}', en: 'Themes: {themes}' },
   'tactics.themesEmpty': { fr: '—', en: '—' },
   'tactics.fromYourGameTag': { fr: ' · ★ issu de votre partie', en: ' · ★ from your game' },
+
+  // ── T2 personal-puzzle provenance (TR4, Q-A=b) ───────────────────────────
+  // Pre-solve: which move you played + how bad (severity rendered via severity.*). After-solve: the
+  // win/move you left, SAN computed at the call site from moves[0] (AP-TPERS-1/6).
+  'tactics.provenancePre': {
+    fr: 'Coup {move} de votre partie — vous avez joué {played} ({severity}). Trouvez ce que vous avez manqué.',
+    en: 'Move {move} of your game — you played {played} ({severity}). Find what you missed.',
+  },
+  'tactics.provenancePostWin': { fr: 'Le gain que vous avez laissé : {san}.', en: 'The win you left: {san}.' },
+  'tactics.provenancePostMove': { fr: 'Le coup que vous avez manqué : {san}.', en: 'The move you missed: {san}.' },
+
+  // ── T2 source toggle + theme/difficulty picker (TR9, Q-B/Q-C) ────────────
+  'tactics.sourceLabel': { fr: 'Source :', en: 'Source:' },
+  'tactics.sourceMixed': { fr: 'Mixte', en: 'Mixed' },
+  'tactics.sourcePersonal': { fr: 'Mes parties', en: 'From my games' },
+  'tactics.sourceCurated': { fr: 'Sélection', en: 'Curated' },
+  'tactics.themePickerLabel': { fr: 'Thème :', en: 'Theme:' },
+  'tactics.themeAll': { fr: 'Tous', en: 'All' },
+  'tactics.diffLabel': { fr: 'Difficulté :', en: 'Difficulty:' },
+  'tactics.diffEasier': { fr: 'Plus facile', en: 'Easier' },
+  'tactics.diffOnLevel': { fr: 'À mon niveau', en: 'On level' },
+  'tactics.diffHarder': { fr: 'Plus difficile', en: 'Harder' },
+
+  // ── T2 honest theme-exhaustion (TR10, Q-D=c) ─────────────────────────────
+  'tactics.themeExhausted': { fr: 'Plus aucun problème {theme} dans votre fourchette.', en: 'No more {theme} puzzles in your range.' },
+  'tactics.themeExhaustedWidened': {
+    fr: 'Même en élargissant, plus aucun {theme} — passer en mixte ?',
+    en: 'Even widened, no more {theme} — switch to mixed?',
+  },
+  'tactics.widenRange': { fr: 'Élargir la fourchette', en: 'Widen range' },
+  'tactics.switchToMixed': { fr: 'Passer en mixte', en: 'Switch to mixed' },
+
+  // ── SolutionReveal toggle (reveal.*) — Trainer-miss "Show solution" (F4, Q-F) ──
+  // Opt-in (Q-D / AP-TEACH-4): never auto-spoils a Retry. reveal.themeWhy lives in
+  // generators.ts (resolved by the pure missWhy core via gt); calc.solution is reused
+  // for the SAN line. These two are the UI toggle labels (resolved by t in-component).
+  'reveal.showSolution': { fr: 'Voir la solution', en: 'Show solution' },
+  'reveal.hideSolution': { fr: 'Masquer la solution', en: 'Hide solution' },
+
+  // ── T1 trainer-feedback (second try, alt-accept, self-tag reactions) — Q-G ──
+  // Complete per-locale templates (AP-TFEED-5); offers/hints framed honestly, never verdicts.
+  'tactics.secondTry': {
+    fr: 'Pas ça — il vous reste un essai sur l’échiquier.',
+    en: 'Not that — you have one more try on the board.',
+  },
+  'tactics.checkingAlt': { fr: 'Vérification du coup…', en: 'Checking your move…' },
+  'tactics.altAccepted': { fr: 'Coup différent, mais tout aussi gagnant. ✔', en: 'Different move, but equally winning. ✔' },
+  'tactics.tryTimed': { fr: 'Essayer en mode chrono', en: 'Try this timed' },
+  'tactics.offerTimed': { fr: 'Pressé ? Entraînez-vous contre la montre.', en: 'Rushed? Train against the clock.' },
+  'tactics.reactUnfamiliar': { fr: 'Motif peu familier — voici la fiche.', en: "Unfamiliar pattern — here's the card." },
 
   // ── Calculate.svelte (calc.*) ────────────────────────────────────────────
   'calc.title': { fr: 'Calcul', en: 'Calculation' },

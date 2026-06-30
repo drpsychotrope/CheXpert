@@ -1,0 +1,57 @@
+{
+  "pr": "trainer-feedback-core",
+  "feature": "T1",
+  "scan_date": "2026-06-30",
+  "namespace_clean": {
+    "AP-TFEED": "EMPTY — no occurrence anywhere (md/ts). CLEAN per anti-fabrication doctrine; T1 introduces AP-TFEED-1.. fresh.",
+    "trainer-feedback-core_spec": "absent (specs/) — greenfield draft.",
+    "trainer-feedback-core_reports": "absent except the four this scan writes.",
+    "reveal_keys": "no reveal.* i18n keys present (owned by F4; T1 reuses F4's, adds only T1-specific).",
+    "secondTry_alt_keys": "no secondTry/second-try/altWin/alternate/equally keys in tactics.ts — T1 strings are greenfield."
+  },
+  "component_state": {
+    "SolutionReveal.svelte": "DOES NOT EXIST — owned by F4 (drafted not built). T1 consumes it; build order F4->T1."
+  },
+  "db_collision": {
+    "new_persisted_field": "NONE. selfTag? + confidence? already exist on PuzzleAttemptRecord (db.ts:47-48, additive ADR-0037). The grade clamp is a COMPUTATION (call-site wrap of resultToGrade), not a stored field. -> NO DB_VERSION bump, NO schemaRev bump. (Doctrine: additive-optional.)",
+    "alt_move_acceptance": "if a deviated-but-winning move is accepted, the attempt is still recorded as solved -> consider an additive optional provenance flag (e.g. altAccepted?:true) ONLY if needed for honesty/analytics; default: reuse existing fields, no new field (decided in arbitrages Q-A)."
+  },
+  "adr_collision": {
+    "reserved": { "0054": "portfolio (enhancements-architecture)", "0055": "F3", "0056": "F5", "0057": "F6" },
+    "latest_written_in_decisions_md": "0053 (0054-0057 reserved but NOT yet appended).",
+    "T1_plan": "Feature PR -> NO new ADR unless architectural. The engine-eval alt-move acceptance + grade-clamp could be argued decision-worthy; if ratified as architectural, allocate ADR-0058 (first free after reserved block). Default: a decisions.md note referencing ADR-0037 (metacog) + ADR-0010/0033 (FSRS) + F4/F3, NO new ADR."
+  },
+  "premise_corrections": [
+    {
+      "id": "PC-1",
+      "claim_in_prompt": "TR3 self-tag closes loop: selfTag/confidence STORED",
+      "reality": "selfTag/confidence are ALREADY stored AND already captured via UI chips in Tactics (metacog.ts + Tactics.svelte:275-281,336-343). F3 leaves this write path untouched. The ACTUAL gap T1 fills is the REACTION (no action fires today), not the storage or capture. Scope T1 as: wire the 3 reactions onto the existing selfTag/confidence signals.",
+      "impact": "Reframes TR3 from 'store + react' to 'react only'. Smaller, cleaner single concern."
+    },
+    {
+      "id": "PC-2",
+      "claim_in_prompt": "low-confidence/'guess'+solved -> FSRS grade no better than Good",
+      "reality": "'guess' is a CONFIDENCE value (metacog.ts:11 Confidence='sure'|'unsure'|'guess'), NOT a selfTag (SELF_TAGS at metacog.ts:14-21). The clamp reads `confidence`, not `selfTag`. Wording in the spec must say 'confidence in {guess, unsure}' to be correct against the type.",
+      "impact": "Clamp predicate is confidence-based. selfTag drives the OTHER two reactions (unfamiliar-pattern, rushed)."
+    },
+    {
+      "id": "PC-3",
+      "claim_in_prompt": "Tactics + Review both reset board + say only 'wrong' (TR1 applies to both)",
+      "reality": "TRUE for TR1 (both reset + say only wrong) and TR6 (both fail instantly). BUT Review has NO metacog/selfTag UI -> TR3 reactions cannot attach to Review. Split: TR1 + TR6 -> Tactics AND Review; TR3 -> Tactics ONLY.",
+      "impact": "Per-surface scope. Review consumes SolutionReveal + second-try; the self-tag loop stays Tactics-only (matches where the signal exists)."
+    },
+    {
+      "id": "PC-4",
+      "claim_in_prompt": "F4 SolutionReveal / F3 recording are available hooks to reuse",
+      "reality": "Both F4 and F3 are V1-DRAFTED but NOT BUILT (specs exist, code does not). T1 is downstream in the DAG (Phase1, dep F4+F3). At T1 BUILD time F4/F3 must be merged first, else escalate.",
+      "impact": "Hard build-order dependency; flagged in §3 pre-flight. Draft is unblocked (specs are the contracts); build is gated on F4+F3 merge."
+    },
+    {
+      "id": "PC-5",
+      "claim_in_prompt": "engine eval within X cp of mainline for alt-move acceptance",
+      "reality": "EngineClient is per-position async + SERIALIZED (one search at a time) and the worker may be Elo-throttled. Alt-move eval MUST pass fullStrength:true (audit C-1/P0-01) and tolerate latency (the move is provisionally rejected then upgraded async, or a brief 'checking…' state). Cannot be a synchronous sameMove replacement.",
+      "impact": "Alt-move acceptance is an ASYNC enrichment with a fullStrength engine call; behind a flag, default ON for clearly-winning alts (mate or >=mainline within X cp). Spec must handle the async + throttle correctly."
+    }
+  ],
+  "verdict": "PROCEED — premise broadly correct; 5 corrections refine scope. No blocking collision. No DB bump. No new ADR (unless alt-move/clamp ratified architectural -> 0058)."
+}

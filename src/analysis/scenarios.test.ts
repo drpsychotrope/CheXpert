@@ -12,6 +12,14 @@ describe('IMBALANCE_LIBRARY', () => {
       expect(s.goal.length).toBeGreaterThan(0);
     }
   });
+
+  it('includes the C3 coach:defend-worse seed (resilience probe) with bilingual name/goal', () => {
+    const s = IMBALANCE_LIBRARY.find((x) => x.id === 'coach:defend-worse');
+    expect(s).toBeDefined();
+    expect(s!.nameFr).toBeTruthy();
+    expect(s!.goalFr).toBeTruthy();
+    expect(s!.category).toBe('imbalance');
+  });
 });
 
 const PHASE: PhaseStat = { plies: 0, acpl: 0, blunders: 0, mistakes: 0, inaccuracies: 0 };

@@ -1,0 +1,32 @@
+{
+  "pr": "game-session-controller",
+  "scan_date": "2026-06-30",
+  "purpose": "Detect collisions with in-flight foundation PRs, shared files, ADR numbering, and naming.",
+  "adr": {
+    "latest_in_decisions_md": "ADR-0053",
+    "this_pr_adr": "ADR-0054",
+    "note": "decisions.md is append-only; ADR-0054 is the next free number. Architecture spec (enhancements-architecture-spec.md) reserves ADR-0054 for the architecture decomposition itself — CONFIRM numbering at build time. If the architecture ADR lands first, this PR is ADR-0055. Resolve at PR time via session-wrapup; non-blocking for the spec."
+  },
+  "foundation_pr_overlap": {
+    "F1_i18n_label_routing": { "files": "i18n catalogue, gt/motifLabelOrRaw", "collision_with_F6": "NONE — F6 is a behaviour-preserving refactor that adds NO strings (all result/feedback strings already routed via t()). F6 must NOT touch i18n keys.", "risk": "low" },
+    "F2_board_input_a11y": { "files": "Board.svelte consumers (onMoveText/resolveMove)", "collision_with_F6": "POTENTIAL — both touch how the 3 components wire <Board>. F6 keeps each component's view/Board markup; only the loop logic moves out. Sequence so F2 and F6 don't both rewrite the same component's <Board> block in parallel.", "risk": "medium", "mitigation": "F6 leaves <Board> markup + onMoveText untouched in each component (Play already has onMoveText; siblings don't). Do not add onMoveText to siblings in F6 (that is F2)." },
+    "F3_attempt_recording": { "collision_with_F6": "NONE", "risk": "none" },
+    "F4_teach_explain": { "collision_with_F6": "NONE", "risk": "none" },
+    "F5_games_store_pgn": { "files": "gamesRepo, runAnalysis(source:'played')", "collision_with_F6": "LOW — Play's finishGame() persists via putGame; F6 keeps Play's persistence in Play's finishGame adapter, not in the shared core. F5 changes reads, not the write path F6 wraps.", "risk": "low" }
+  },
+  "shared_files_touched_by_F6": [
+    { "path": "src/game/playSession.ts", "change": "ADD stateful controller (or new sibling src/game/gameSession.ts) — existing pure helpers UNCHANGED", "owner_conflict": "none" },
+    { "path": "src/ui/Play.svelte", "change": "REPLACE inline loop with controller calls; keep view, clock rAF, coached UI, persistence adapter", "owner_conflict": "see F2 sequencing" },
+    { "path": "src/ui/Sparring.svelte", "change": "DEFERRED to fast-follow (Q-D) — not migrated in this PR to bound blast radius", "owner_conflict": "none if deferred" },
+    { "path": "src/ui/Comeback.svelte", "change": "DEFERRED to fast-follow (Q-D)", "owner_conflict": "none if deferred" }
+  ],
+  "naming": {
+    "proposed_module": "src/game/gameSession.ts (new) OR extend src/game/playSession.ts",
+    "recommendation": "NEW sibling src/game/gameSession.ts for the stateful controller, leaving playSession.ts as the pure-helper home it is today (W12). Keeps 'pure' vs 'stateful' separation legible and avoids bloating the pure module. The controller imports the pure helpers.",
+    "anti_pattern_prefix": "AP-CTRL-",
+    "collision_check_AP_prefix": "grep for 'AP-CTRL-' in repo = none found; prefix is free."
+  },
+  "db_version": { "impact": "NONE — pure refactor, no schema/persisted-field change. DB_VERSION untouched.", "risk": "none" },
+  "blast_radius_summary": "F6 directly rewrites Play.svelte's internals (well-exercised in production but NOT covered by a component test). The mitigation is extraction into a DOM-free controller core with new parity unit tests BEFORE rewiring Play, plus the existing playSession + board-reactivity tests staying green. Sparring/Comeback migration deferred to a fast-follow (Q-D) so this PR's blast radius is Play-only.",
+  "stop_escalation": null
+}

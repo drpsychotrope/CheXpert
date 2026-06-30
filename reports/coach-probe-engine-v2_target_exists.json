@@ -1,0 +1,68 @@
+{
+  "pr": "coach-probe-engine-v2",
+  "feature": "C2",
+  "scanned_at": "2026-06-30",
+  "head": "9296aff",
+  "premise": "A deeper, less-noisy, a-la-carte coach probe engine. Folds CO4 (adaptive depth), CF6 (endgame sub-types), CF7 (a-la-carte scope), CO7 (radar n/a honesty / game less skippable), CO15 (timed probe).",
+  "verdict": "PROCEED — every reuse hook verified to exist; no STOP. One hard prerequisite (F3) is DRAFTED-NOT-BUILT and must be honored as a contract.",
+  "hooks_verified": [
+    {
+      "hook": "PuzzleLadder (calibration)",
+      "file": "src/calibration/Calibration.ts",
+      "exists": true,
+      "evidence": "class PuzzleLadder; LadderOpts { min?, max?, themes?, phase?: 'opening'|'middlegame'|'endgame', window? } (lines 45-80). next(now) queries repo.next({rating,window,exclude,themes,phase}). report(solved) calls gradeAttempt but the rating stays LOCAL to the ladder — never persisted to puzzleRating. isDone(): count>=max OR (count>=min AND rd<=90).",
+      "implication": "CO4 adaptive depth = vary min/max (and optionally re-arm isDone) per borderline band. AP-COACH-8 already holds (ladder rating is local)."
+    },
+    {
+      "hook": "PuzzleRepo.next({themes,phase,window,exclude,rating,source})",
+      "file": "src/trainer/PuzzleRepo.ts",
+      "exists": true,
+      "evidence": "next(q: PuzzleQuery) lines 142-169. themes matched via p.themes.includes(t) (ANY-of). phase matched via phaseOf(p.fen) heuristic (NOT a stored field). Deterministic pick via hashId — no Math.random. Returns null when pool empty.",
+      "implication": "CF6 endgame sub-types feasible via themes:['rookEndgame'] etc. (theme filter is exact); phase filter is approximate (piece-count heuristic). next() returning null is the graceful fall-through signal."
+    },
+    {
+      "hook": "buildCoachProfile (pure aggregator)",
+      "file": "src/coach/diagnostic.ts",
+      "exists": true,
+      "evidence": "buildCoachProfile({puzzleRating,probes,gameDimensions,assessedAt,locale}) lines 45-105. PURE (no Date/Math.random). n=0 guard drops empty themes (line 56). COACH_MOTIF_PROBES = 6 motifs (line 15); COACH_LADDER_MIN=MAX=2 (lines 21-22). Comment admits +-115 Glicko noise per puzzle.",
+      "implication": "Probe-result aggregation already honest (sampleSize labels, no grade). C2 extends the probe SET (endgame buckets, timed) and the ThemeProbeResult inputs; the pure aggregator stays the single sink."
+    },
+    {
+      "hook": "Clock (Fischer clock core)",
+      "file": "src/clock/Clock.ts",
+      "exists": true,
+      "evidence": "Pure state machine: initClock/startClock/stopClock/tick(elapsedMs)/press/flagged. NO Date.now / performance.now inside — UI feeds elapsed ms (lines 1-62).",
+      "implication": "CO15 timed probe reuses Clock for the time budget; UI owns performance.now() deltas. Pure-core testable."
+    },
+    {
+      "hook": "Radar n/a honesty",
+      "file": "src/ui/Radar.svelte",
+      "exists": true,
+      "evidence": "Unmeasured axes (sampleSize===0) collapse to centre (0.02) and render an 'n/a' tspan (lines 24-54). audit v2 L17 / PR #21.",
+      "implication": "CO7 'radar n/a honesty' ALREADY shipped at the radar level. The real CO7 gap is upstream: the optional game is skippable so 4 dims stay n/a. C2 addresses make-the-game-less-skippable, NOT the radar render."
+    },
+    {
+      "hook": "Coach.svelte probe driver",
+      "file": "src/ui/Coach.svelte",
+      "exists": true,
+      "evidence": "THEMES array (lines 23-26) = 6 motifs + {theme:'endgame', phase:'endgame'}. startThemeLadder builds one PuzzleLadder per THEMES entry (lines 63-74); endgame uses phase:'endgame', themes:undefined => one coarse bucket. onLadderMove reports solved/wrong (lines 87-103). Probe order fixed; all-or-nothing (no scope picker).",
+      "implication": "CF6 = expand the endgame THEMES entry into 2-3 themed entries. CF7 = make THEMES subsettable from a user selection. CO4 = per-entry adaptive min/max. CO15 = add a timed entry. The driver is the single edit surface."
+    },
+    {
+      "hook": "recordTacticsAttempt (F3 recording path)",
+      "file": "src/store/attemptsRepo.ts",
+      "exists": true,
+      "evidence": "recordTacticsAttempt({attempt,puzzle,model,srs,now}) lines 37-58 — ONE atomic tx over puzzleAttempts+puzzles+srsCards+playerModel. resultToGrade(solved,ms) in src/srs/fsrs.ts:28.",
+      "implication": "Q-E: if C2 records probe attempts it consumes THIS path (per F3) with puzzle+model rating fields UNCHANGED and coachProbe:true — never gradeAttempt, never pool mutation."
+    }
+  ],
+  "dependency_state": {
+    "F3_attempt-recording-weakness": {
+      "spec": "specs/attempt-recording-weakness-spec.md (V1)",
+      "built": false,
+      "evidence": "grep 'coachProbe' over src/ returns ZERO matches; the additive PuzzleAttemptRecord.coachProbe? field and the Coach.svelte recording wire-up are not merged.",
+      "consequence": "C2 ◄ F3 (architecture DAG, Phase 2). C2's probe-recording sub-feature is a HARD prerequisite on F3. Either build F3 first, or (if C2 lands first) C2 introduces coachProbe? itself and F3 inherits it. Default: treat F3 as the contract; C2 records THROUGH it."
+    }
+  },
+  "no_stop_rationale": "All five fold targets (CO4/CF6/CF7/CO7/CO15) map to verified hooks. The only premise risk — CF6 endgame sub-type themes not existing — is resolved: the ETL preserves raw Lichess themes verbatim, which DO include rookEndgame/pawnEndgame/etc. The seed fallback lacks them, handled by graceful fall-back + honest reporting (AP-COACH-6)."
+}

@@ -1,15 +1,18 @@
 <script lang="ts">
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
+  import SolutionReveal from './SolutionReveal.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { TacticalTrainer, gradeAttempt } from '../trainer/TacticalTrainer';
+  import { acceptAltMove, type LineEval } from '../trainer/altMove';
   import type { Puzzle } from '../trainer/puzzle';
   import { dueCards, reviewItem, allCards } from '../srs/SrsStore';
   import { resultToGrade, intervalLabel } from '../srs/fsrs';
   import { allAttempts } from '../store/attemptsRepo';
   import { interleave, buildLapseSet } from '../srs/schedule';
   import { createSet, saveSet } from '../woodpecker/woodpecker';
-  import { t, tn } from '../i18n';
+  import { missWhy } from '../concepts/concepts';
+  import { t, tn, getLocale } from '../i18n';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -30,6 +33,13 @@
   let missesMsg = $state('');
   let scheduledCount = $state(0);
   let nextDue = $state('');
+  // F4: opt-in "Show solution" on a miss (Q-D / AP-TEACH-4). Reset per card so it never
+  // carries over; toggled on only when the user taps the button.
+  let showSolution = $state(false);
+  // T1 accept-alternate-winning (Q-A), symmetric with Tactics (default ON, code-level flag).
+  const acceptAltWinning = true;
+  const ALT_EVAL_MOVETIME_MS = 300;
+  let checkingAlt = $state(false);
 
   const model = $derived(app.model);
 
@@ -61,6 +71,8 @@
   async function loadCurrent() {
     feedback = '';
     feedbackKind = '';
+    showSolution = false;
+    checkingAlt = false;
     while (index < queue.length) {
       const p = await findPuzzle(queue[index]);
       if (p) {
@@ -84,16 +96,27 @@
   }
 
   async function onMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
-    if (!trainer || !puzzle || trainer.state.status !== 'solving') return;
+    if (!trainer || !puzzle || trainer.state.status !== 'solving' || checkingAlt) return;
+    const fenBefore = display.fen; // position BEFORE the move, for the alt-move engine check
     const uci = from + to + (display.isPromotion(from, to) ? promo : '');
     const res = trainer.playUserMove(uci);
 
-    if (res === 'wrong') {
-      feedback = t('review.missed');
-      feedbackKind = 'bad';
-      display = new ChessGame(puzzle.fen);
+    if (res === 'retry') {
+      // T1/TR6: one on-board second try; leave the wrong move visible, stay solving. The miss is
+      // already recorded in the trainer (AP-TFEED-2). No metacog UI in Review (PC-3 / out).
+      display = new ChessGame(fenBefore);
+      display.moveUci(uci);
       fen = display.fen;
-      await grade(false);
+      lastMove = [from, to];
+      feedback = t('review.secondTry');
+      feedbackKind = 'bad';
+      return;
+    }
+
+    if (res === 'wrong') {
+      // T1 accept-alternate-winning (Q-A), symmetric with Tactics. Honest fall-through to miss.
+      if (acceptAltWinning && (await tryAcceptAlt(fenBefore, uci, from, to))) return;
+      await commitMiss();
       return;
     }
     display = new ChessGame(trainer.getFen());
@@ -106,6 +129,53 @@
     } else {
       feedback = t('review.keepGoing');
       feedbackKind = 'good';
+    }
+  }
+
+  /** Commit a confirmed miss in Review: feedback, reset board, grade as a fail. */
+  async function commitMiss() {
+    if (!puzzle) return;
+    feedback = t('review.missed');
+    feedbackKind = 'bad';
+    display = new ChessGame(puzzle.fen);
+    fen = display.fen;
+    await grade(false);
+  }
+
+  /**
+   * Accept-alternate-winning engine check (Q-A), mirroring Tactics. Returns true iff the off-line
+   * move was accepted as a solve; false → fall through to the miss path. Honest default = miss on
+   * any null move / engine error / timeout (AP-TFEED-3/6).
+   */
+  async function tryAcceptAlt(fenBefore: string, uci: string, from: string, to: string): Promise<boolean> {
+    if (!trainer || !puzzle) return false;
+    const solver = orientation;
+    checkingAlt = true;
+    feedback = t('tactics.checkingAlt');
+    feedbackKind = '';
+    try {
+      const after = new ChessGame(fenBefore);
+      if (after.moveUci(uci) == null) return false;
+      const best = (await app.engine.analyzeLines(fenBefore, { multipv: 1, movetime: ALT_EVAL_MOVETIME_MS, fullStrength: true }))[0];
+      if (!best) return false;
+      const played = await app.engine.evaluate(after.fen, { movetime: ALT_EVAL_MOVETIME_MS, fullStrength: true });
+      const bestLine: LineEval = { uci: best.uci, whiteCp: best.whiteCp, mate: best.mate };
+      const playedLine: LineEval = { uci, whiteCp: played.whiteCp, mate: played.score.mate };
+      if (!acceptAltMove(solver, bestLine, playedLine)) return false;
+
+      const r = trainer.acceptUserMove(uci);
+      if (r === 'wrong') return false;
+      display = new ChessGame(trainer.getFen());
+      fen = display.fen;
+      lastMove = [from, to];
+      feedback = t('tactics.altAccepted');
+      feedbackKind = 'good';
+      if (r === 'solved') await grade(true); // records a genuine solve (Q-H)
+      return true;
+    } catch {
+      return false;
+    } finally {
+      checkingAlt = false;
     }
   }
 
@@ -202,6 +272,22 @@
       />
     </div>
     <p class="feedback {feedbackKind}">{feedback}</p>
+    {#if trainer.state.status === 'failed' && puzzle}
+      <!-- F4: opt-in "Show solution" on a miss (Q-D), identical to Tactics. Non-blocking;
+           theme-derived pattern hint via missWhy (null when no high-confidence motif). -->
+      <button class="link" onclick={() => (showSolution = !showSolution)}>
+        {showSolution ? t('reveal.hideSolution') : t('reveal.showSolution')}
+      </button>
+      {#if showSolution}
+        <SolutionReveal
+          fen={puzzle.fen}
+          moves={puzzle.moves}
+          {orientation}
+          why={missWhy(puzzle.themes, getLocale())}
+          autoplay
+        />
+      {/if}
+    {/if}
     {#if trainer.state.status !== 'solving'}
       <button onclick={nextCard}>{t('review.next')}</button>
     {/if}
@@ -210,4 +296,5 @@
 
 <style>
   button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  button.link { background: none; border: none; color: var(--accent); padding: 0 0 0 0.4rem; text-decoration: underline; cursor: pointer; }
 </style>

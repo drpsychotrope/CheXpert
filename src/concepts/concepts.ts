@@ -4,6 +4,7 @@
 // src/opening/eco.ts. CURATED static content only — never generated (no LLM).
 
 import { MOTIF_PRECEDENCE } from '../analysis/motif';
+import { gt, gtHas } from '../i18n/gen';
 import type { Locale } from '../i18n/translate';
 
 export interface ConceptExample {
@@ -69,6 +70,42 @@ export function cardForThemes(themes: string[], cards: ConceptCard[]): ConceptCa
     }
   }
   return null;
+}
+
+/**
+ * Pure: the single most-relevant motif FAMILY for a puzzle's themes — the
+ * highest-precedence theme (after alias resolution, via CARD_PRECEDENCE) that names a
+ * known motif family. Returns null when no theme resolves to a family (e.g. only a
+ * low-confidence phase/magnitude fallback tag like `middlegameMistake`/`crushing`).
+ * Reuses the same precedence machinery as cardForThemes so the two cannot desync.
+ */
+export function primaryMotifFamily(themes: string[]): string | null {
+  const families = new Set(themes.map(familyKey));
+  for (const fam of CARD_PRECEDENCE) {
+    if (families.has(fam)) return fam;
+  }
+  return null;
+}
+
+/**
+ * Pure, fact-honest one-line "why" for a trainer miss, in `locale`. Resolves the
+ * puzzle's primary motif family (primaryMotifFamily) and renders the EXISTING bilingual
+ * `motifExpl.*` idiom for it (the same catalogue explain.ts uses — no new prose, only a
+ * mapping; Q-G). Honesty (AP-TEACH-2): returns null when no high-precedence family
+ * resolves OR the family has no idiom — then there is NO asserted reason and the reveal
+ * shows the SAN line only. Theme/motif-derived only; never runs the engine (AP-TEACH-3).
+ * SOURCE-AGNOSTIC contract: the value is just a string for SolutionReveal's `why?` prop.
+ */
+export function missWhy(themes: string[], locale: Locale): string | null {
+  const fam = primaryMotifFamily(themes);
+  if (!fam) return null;
+  const idiomKey = 'motifExpl.' + fam;
+  if (!gtHas(idiomKey)) return null;
+  // FOLD-5: frame as a pattern HINT (a cue, not a verdict), via the complete per-locale
+  // `reveal.themeWhy` template — never glue translated fragments (AP-TEACH-5). The {motif}
+  // slot is the family's localized label (motif.*); the {what} slot the localized idiom.
+  const motif = gtHas('motif.' + fam) ? gt('motif.' + fam, locale) : fam;
+  return gt('reveal.themeWhy', locale, { motif, what: gt(idiomKey, locale) });
 }
 
 // --- runtime loader (bundled JSON; mirrors eco.ts + PuzzleRepo) ---------------

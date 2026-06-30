@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { botMovetime, flagOutcome, applyGameResult, BUDGET_BOUNDS } from './playSession';
+import { botMovetime, flagOutcome, applyGameResult, shouldRate, canTakeBackInPlay, BUDGET_BOUNDS } from './playSession';
 import { defaultRating } from '../rating/glicko2';
 
 describe('playSession (W12)', () => {
@@ -10,6 +10,16 @@ describe('playSession (W12)', () => {
     });
     it('scales with remaining time within bounds', () => {
       expect(botMovetime(60_000, 0, 'classical')).toBe(1500); // 60s / 40 moves, within [200,2000]
+    });
+    it('folds the clock increment into the budget before the per-category clamp (P3/Q-F)', () => {
+      // 60s/40 = 1500ms base; a 3s increment lifts it to 4500ms raw, clamped to the classical ceil 2000.
+      expect(botMovetime(60_000, 0, 'classical', BUDGET_BOUNDS, 3_000)).toBe(BUDGET_BOUNDS.classical[1]);
+      // 12s/40 = 300ms base + 2s increment = 2300ms raw, still clamped to 2000.
+      expect(botMovetime(12_000, 0, 'classical', BUDGET_BOUNDS, 2_000)).toBe(BUDGET_BOUNDS.classical[1]);
+      // Mid-range: 12s/40 = 300ms base + 500ms increment = 800ms, within [200,2000] → not clamped.
+      expect(botMovetime(12_000, 0, 'classical', BUDGET_BOUNDS, 500)).toBe(800);
+      // incrementMs = 0 (default) reproduces the no-increment value exactly.
+      expect(botMovetime(60_000, 0, 'classical', BUDGET_BOUNDS, 0)).toBe(botMovetime(60_000, 0, 'classical'));
     });
   });
 
@@ -35,6 +45,30 @@ describe('playSession (W12)', () => {
       const loss = applyGameResult(r, opp, 'loss', 1500).nextRating.rating;
       expect(win).toBeGreaterThan(r.rating);
       expect(loss).toBeLessThan(r.rating);
+    });
+  });
+
+  describe('shouldRate (P2/ADR-0058 — takeback forfeits the rating)', () => {
+    it('a normal (counted) game rates', () => {
+      expect(shouldRate(false)).toBe(true);
+    });
+    it('an un-counted game (in-play takeback) skips the rating', () => {
+      expect(shouldRate(true)).toBe(false);
+    });
+  });
+
+  describe('canTakeBackInPlay (P2/FOLD A4 + AP-PLAYUX-10 — player must have moved)', () => {
+    it('White: needs the player move + bot reply (≥ 2 plies)', () => {
+      expect(canTakeBackInPlay(0, 'white')).toBe(false); // nothing played
+      expect(canTakeBackInPlay(1, 'white')).toBe(false); // only the player's move, bot hasn't replied
+      expect(canTakeBackInPlay(2, 'white')).toBe(true); // player move + bot reply → undo to player turn
+      expect(canTakeBackInPlay(4, 'white')).toBe(true);
+    });
+    it('Black: must NOT undo the bot opening (≥ 3 plies, not the opener)', () => {
+      expect(canTakeBackInPlay(0, 'black')).toBe(false);
+      expect(canTakeBackInPlay(1, 'black')).toBe(false); // bot just opened — the degenerate case
+      expect(canTakeBackInPlay(2, 'black')).toBe(false); // player has moved but bot hasn't replied yet
+      expect(canTakeBackInPlay(3, 'black')).toBe(true); // bot opener + player move + bot reply
     });
   });
 });
