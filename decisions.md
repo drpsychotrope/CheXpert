@@ -1759,3 +1759,71 @@ goal-weighting helpers/`GOAL_PLAN`/the `goal?` & `kind?` fields/the new i18n key
 not a grade), `specs/coach-intake-metacognition-spec.md` §4/§5/§6/§9, `enhancements-architecture-spec.md`
 §3 (folds CO3 + CO14 + CO18). Follow-ups (§11): C7 refines goal weighting into mastery/efficacy/time-budget
 routing; a metacog one-liner after a coached session (E7 DEFER); a 5th goal = one `GOAL_PLAN` row.
+
+## C6 — coach-output-teaching (no new ADR; reuse under ADR-0040/0021/0045/0052/0053)
+
+The coach computed a rich diagnosis but the **result screen neither communicated nor taught**: it was a
+`<Radar>`, two bare-label bullet lists, and a program `<ol>` — no prose, no game review, no concept
+teaching, no statement of which fix matters most. Worse, `finishGame()` ran the **full**
+`runAnalysis(source:'played')` then kept only `.dimensions` for the radar and **discarded the
+`GameAnalysis`** — the per-ply eval data the `winCurve`/`criticalMoments` selectors + `EvalGraph` + F4's
+`SolutionReveal` all already consume. C6 makes the result **COMMUNICATE + TEACH** by folding four findings
+onto the SAME `CoachProfile`-driven surface: **CO8** a directional prose narrative, **CO1** a concept card
+for the top weak motif, **CO13** the surfaced game review, **CO9** an honest leverage "start here" line.
+
+**New PURE core `src/coach/narrative.ts`** (mirrors `program.ts`/`diagnostic.ts`: no `Date`/`Math.random`/
+engine/store, locale **injected** via `gt`). `rankByLeverage(profile, locale)` ranks weak motifs (`delta
+<= -40`) + weak game dimensions (`score <= 35` with `sampleSize > 0`, skipping the `tactics` aggregate to
+avoid double-counting) by **leverage = severity × frequency** — `severity = min(1, -delta/200)` (motif) /
+`min(1, (50-score)/50)` (dim); `frequency = min(1, n/6)` — sorted worst-first, ties broken by stable key
+(deterministic). **No Elo / % / rating-gain is ever computed** (AP-CTEACH-3): severity/frequency/leverage
+are unitless 0..1 ranking weights only. `buildCoachNarrative(profile, locale)` assembles a 2-4 sentence
+**directional** summary from **complete per-locale catalogue templates** (`coachReview.*`) — never
+concatenated fragments (AP-CTEACH-5: lists join via `coachReview.listJoin`), never a runtime LLM
+(AP-CTEACH-4): names 1-2 strengths, 1-2 weaknesses, the top-leverage focus + a **qualitative non-numeric**
+payoff cue, and a **puzzle-only/directional caveat** when no full game backed the read (FOLD-A8). Nothing
+weak ⇒ a single honest "no clear weakness" line (mirror `program.maintenance`); never throws on empty
+motifs/dimensions (FOLD-A4). **No grade, ever** (AP-CTEACH-2).
+
+**`Coach.svelte` (additive render only):** retains the previously-discarded `analysis` in transient
+`gameAnalysis = $state<GameAnalysis|null>` set in `finishGame()` on success (reset to `null` on (re-)run
+and on the catch path; the history/skip/probe finishers never set it ⇒ no review for those). The result
+block now renders (A4) `coachReview.heading` + the `$derived` narrative sentences + a leverage "start
+here" line reusing `dashboard.biggestOpportunity` tone; (A5) a **"Learn the pattern"** toggle that mounts
+`ConceptCard` for the top weak MOTIF via `loadConcepts(getLocale()).then(c => cardForThemes([topMotif], c))`
+in a locale-tracking `$effect` (mirrors Tactics) — **no card resolves ⇒ no toggle** (honest); (A6) when
+`profile.gameAnalyzed && gameAnalysis`, `<EvalGraph>` + the top 2-3 `criticalMoments({max:3})` as a
+turning-points list where **player vs opponent swings are distinguished** (filled vs hollow + `tpPlayer`/
+`tpOpponent` templates — AP-CTEACH-9), and selecting one mounts **F4 `SolutionReveal`** (`fen=ply.fenBefore`,
+`moves = ply.bestUci ? [ply.bestUci] : []`, `why=explainLine(...)`). The Coach "why" is the **rich
+engine-backed `explainPly`** (the coach game HAS a real `PlyAnalysis`), adapted to `SolutionReveal`'s
+source-agnostic `why?` prop by a thin local `explainLine` joiner — **no fork** of `SolutionReveal`/
+`EvalGraph`/`criticalMoments`/`explainPly`/`cardForThemes` (AP-CTEACH-1; F4 FOLD-4). FOLD-A4 robustness:
+empty `criticalMoments` ⇒ a `coachReview.noSwings` note, `null bestUci` ⇒ `moves=[]`.
+
+**Additive, no persistence:** the `GameAnalysis` is held in component `$state` for the **just-played game
+only** (Q-H) — **no new `CoachProfile` field, no `DB_VERSION` bump** (still 4; AP-CTEACH-6). `commit()` /
+the profile shape are unchanged; `buildStudyPlan`/Insights/`weaknessCounters`/SRS/grades/the radar+program
+algorithms are **untouched** — Insights output byte-identical (AP-CTEACH-7 / AP-COACH-1). New i18n keys:
+**pure-core prose** (`coachReview.narrStrength`/`narrWeak`/`startHere`/`payoffSoft`/`narrNoWeak`/
+`narrPuzzleOnly`/`listJoin`) in `messages/generators.ts`; **component labels** (`coachReview.heading`/
+`learnPattern`/`gameReviewTitle`/`turningPoints`/`tpPlayer`/`tpOpponent`/`replayWhy`/`noSwings`) in
+`messages/coach.ts` — all FR+EN (parity by construction; `motif.*`/`dim.*`/`evalGraph.*`/`calc.solution`
+**reused**, never redefined). **Tests:** `narrative.test.ts` (14 — leverage ordering / sampleSize-0
+exclusion / tactics-skip / `[]` below threshold / deterministic ties; narrative non-empty FR+EN / **FR≠EN**
+/ start-here names the top label / **no-digit** regex both locales / single no-weak line on all-strong &
+empty / **puzzle-only caveat** present↔absent / **list-join** not raw-comma / no-throw on empty).
+**908 tests green** (894 + 14), svelte-check **0/0** (431 files), build green. **Rollback** (§10):
+pure-additive — revert the commit; `narrative.ts`/its test/the new i18n keys/the additive result render/the
+retained-in-`$state` `gameAnalysis` vanish; `commit()`/`CoachProfile`/the DB are untouched, no migration
+ran. Partial rollback is independent: drop A6 (review) and keep A1/A4/A5, or drop A5 (card) and keep the
+rest; A3 (retaining `analysis`) is inert without A6. Records **Q-A..Q-H = a** (templated/no-LLM narrative;
+single concept card; EvalGraph + turning points consuming F4; qualitative no-Elo "start here";
+`coachReview.*` namespace; `src/coach/narrative.ts`; no new ADR; component `$state`). **ADR-0059 reserved**
+(allocate only if the narrative engine is later judged decision-worthy; 0054-0058 in use — do not
+pre-spend). Cross-links: ADR-0040 (concept cards), ADR-0021 (EvalGraph + criticalMoments), ADR-0045 (coach
+mode), ADR-0052/0053 (i18n), F4 (`SolutionReveal`), `specs/coach-output-teaching-spec.md` §4/§5/§6/§9,
+`enhancements-architecture-spec.md` §3 (folds CO8 + CO1 + CO13 + CO9). Follow-ups (§11): C7 (closed-loop
+efficacy — did the review/card help?); historical-game review on the result/Dashboard (needs F5 + a
+selection UI — DEFER); reveal/card usage telemetry (DEFER); richer narrative (prev-profile trend belongs to
+C1; opening-name-aware) — C6 keeps the narrative to the current profile (single concern).

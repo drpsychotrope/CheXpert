@@ -292,4 +292,22 @@ export const coach: Messages = {
     fr: "Vos chances de gain au fil de la partie. Les points sont vos erreurs (pleins) et celles de l'adversaire (creux) — cliquez sur l'un d'eux. Pas de note de « précision » unique : ce sont des repères directionnels.",
     en: 'Your winning chances over the game. Dots are your (filled) and the opponent\'s (hollow) mistakes — click one. No single "accuracy" grade: these are directional pointers.',
   },
+
+  // ── C6 coach-output result surface (coachReview.*) — component labels for the narrative read,
+  // the concept-teaching toggle, and the game-review section. The PROSE sentences live in
+  // generators.ts (pure-core, gt-resolved); these are the surrounding UI chrome. Directional,
+  // no grade (AP-CTEACH-2). Reuses motif.*/dim.*/evalGraph.*/calc.solution — never redefined. ──
+  'coachReview.heading': { fr: 'Votre bilan', en: 'Your read' },
+  'coachReview.learnPattern': { fr: '📖 Apprendre le motif', en: '📖 Learn the pattern' },
+  'coachReview.gameReviewTitle': { fr: 'Revue de la partie', en: 'Game review' },
+  'coachReview.turningPoints': { fr: 'Moments décisifs', en: 'Turning points' },
+  // Turning-point row: who caused the swing (player vs opponent) so a swing is never misattributed
+  // (AP-CTEACH-9). {move}=full-move number, {san}=move, {pct}=win-prob points lost.
+  'coachReview.tpPlayer': { fr: 'Coup {move} {san} — votre erreur (−{pct} %)', en: 'Move {move} {san} — your slip (−{pct}%)' },
+  'coachReview.tpOpponent': { fr: "Coup {move} {san} — erreur de l'adversaire (−{pct} %)", en: "Move {move} {san} — opponent's slip (−{pct}%)" },
+  'coachReview.replayWhy': { fr: 'Pourquoi :', en: 'Why:' },
+  'coachReview.noSwings': {
+    fr: 'Aucun grand revirement dans cette partie — jeu propre des deux côtés.',
+    en: 'No big swings in this game — clean play on both sides.',
+  },
 };

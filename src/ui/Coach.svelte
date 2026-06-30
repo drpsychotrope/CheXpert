@@ -4,6 +4,9 @@
   import Board from './Board.svelte';
   import Radar from './Radar.svelte';
   import TrendList from './TrendList.svelte';
+  import EvalGraph from './EvalGraph.svelte';
+  import SolutionReveal from './SolutionReveal.svelte';
+  import ConceptCard from './ConceptCard.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { PuzzleLadder } from '../calibration/Calibration';
   import { AdaptiveOpponent, initOpponentState } from '../engine/AdaptiveOpponent';
@@ -27,6 +30,10 @@
   import { initTimedProbe, recordTimed, timedDimension, type TimedProbeState } from '../coach/timedProbe';
   import { initClock, startClock, stopClock, tick, flagged, type ClockState } from '../clock/Clock';
   import { buildCoachProgram } from '../coach/program';
+  import { buildCoachNarrative, rankByLeverage } from '../coach/narrative';
+  import { criticalMoments } from '../analysis/criticalMoments';
+  import { explainPly } from '../analysis/explain';
+  import { loadConcepts, cardForThemes, type ConceptCard as ConceptCardData } from '../concepts/concepts';
   import { metacogCoachLine } from '../coach/coaching';
   import { calibration, type MetacogAttempt } from '../metacog/metacog';
   import { allAttempts } from '../store/attemptsRepo';
@@ -134,6 +141,51 @@
 
   let profile = $state<CoachProfile | null>(null);
   let programPreview = $state<ReturnType<typeof buildCoachProgram>>([]);
+
+  // ── C6 coach-output teaching ──────────────────────────────────────────────
+  // The result screen COMMUNICATES + TEACHES (C6). All four surfaces read the SAME profile (and,
+  // for the game review, the GameAnalysis the coach used to compute dimensions but previously
+  // discarded). Nothing here is persisted (Q-H / AP-CTEACH-6): the review is for the just-played
+  // game only, held in transient $state — no new CoachProfile field, no DB_VERSION bump.
+  //
+  // `gameAnalysis`: the full per-ply analysis retained from finishGame() (was thrown away). Feeds
+  // the PURE criticalMoments/winCurve selectors + EvalGraph + F4's SolutionReveal replay. null when
+  // no game was analysed (puzzle/history path or an analysis failure).
+  let gameAnalysis = $state<GameAnalysis | null>(null);
+  // The turning point the user selected in the game review (index into gameAnalysis.plies); null = none.
+  let selectedPly = $state<number | null>(null);
+  // The concept card for the top weak motif (CO1), behind the "Learn the pattern" toggle. null when
+  // no card resolves (honest — cardForThemes returns null for no-card themes), so the toggle hides.
+  let topCard = $state<ConceptCardData | null>(null);
+  let showCard = $state(false);
+
+  // Narrative + leverage are PURE functions of (profile, locale) — recompute reactively so a
+  // FR/EN switch re-localizes them (getLocale() is reactive; ADR-0051/0053). Empty when no profile.
+  const narrative = $derived(profile ? buildCoachNarrative(profile, getLocale()) : []);
+  const ranked = $derived(profile ? rankByLeverage(profile, getLocale()) : []);
+  // The top 2-3 turning points of the just-played game (PURE selector); [] when no game / a clean game.
+  const turningPoints = $derived(gameAnalysis ? criticalMoments(gameAnalysis, { max: 3 }) : []);
+
+  // CO1: load (and re-load on language switch) the concept card for the TOP weak MOTIF focus. Mirrors
+  // Tactics' $effect pattern — reading getLocale() inside tracks the reactive locale so flipping FR/EN
+  // refetches the matching seed. A no-card theme → topCard stays null → the toggle simply won't render.
+  $effect(() => {
+    const loc = getLocale();
+    const topMotif = ranked.find((r) => r.kind === 'motif')?.key;
+    if (!topMotif) { topCard = null; return; }
+    loadConcepts(loc).then((cards) => { topCard = cardForThemes([topMotif], cards); });
+  });
+
+  /** Thin local adapter (FOLD-A5 / F4 FOLD-4): turn explainPly's rich {headline, reasons[]} into the
+   *  single string SolutionReveal's source-agnostic `why?` prop accepts — NO fork of SolutionReveal.
+   *  The Coach's "why" is the engine-backed explainPly (the coach game HAS a real PlyAnalysis). */
+  function explainLine(plyIndex: number): string | null {
+    if (!gameAnalysis) return null;
+    const ply = gameAnalysis.plies[plyIndex];
+    if (!ply) return null;
+    const ex = explainPly(ply, getLocale());
+    return [ex.headline, ...ex.reasons, ex.better].filter(Boolean).join(' ');
+  }
 
   // ── C4 real-data assessment ───────────────────────────────────────────────
   // The coach can build its profile from a recent WINDOW of the user's real analysed games (imported
@@ -540,6 +592,7 @@
     step = 'analysing';
     info = t('coach.analysingGame');
     let gameDimensions: DimensionScore[] | null = null;
+    gameAnalysis = null; // reset on a (re-)run; set below only on a successful analysis
     try {
       const { analysis } = await runAnalysis(app.engine, app.puzzles, {
         gameId: `coach-${Date.now()}`,
@@ -550,6 +603,9 @@
         now: Date.now(),
       });
       gameDimensions = buildWeaknessProfile([analysis], baseline(), getLocale()).dimensions;
+      // C6/CO13: HOLD the just-computed analysis (previously discarded) so the result can render the
+      // EvalGraph + turning points + F4 replay. Transient $state only — never persisted (Q-H).
+      gameAnalysis = analysis;
       // Toy-game provenance (FOLD-C6): a single played game, so the line reads "1 recent game
       // (1 played, 0 imported)" — distinct from the history path's window. Only when the analysis
       // produced dims (else the line stays the single-game text below at render).
@@ -629,6 +685,10 @@
   }
 
   async function commit(gameDimensions: DimensionScore[] | null) {
+    // C6: reset the transient review surface for a fresh result (the history/skip/probe paths never
+    // set gameAnalysis, so it stays null and the game-review section simply doesn't render).
+    selectedPly = null;
+    showCard = false;
     const p = buildCoachProfile({ puzzleRating: baseline(), probes, gameDimensions, assessedAt: Date.now(), locale: getLocale(), timedDim: timedDim ?? undefined, probeDims: probeDims.length ? probeDims.slice() : undefined });
     // C5: persist the chosen intake goal on the profile (additive; `undefined` when skipped). It both
     // softly weights the program AND lets a re-run pre-select the picker.
@@ -837,10 +897,31 @@
       <h3>{t('coach.profileTitle')}</h3>
       <Radar dimensions={profile.dimensions} />
       <p class="muted" style="font-size:0.8rem">{t('coach.directional', { source: provenanceSource })}</p>
+
+      <!-- C6/CO8 + CO9: a DIRECTIONAL prose read (strengths, weaknesses) + the leverage-ranked
+           "start here" focus. PURE templated catalogue phrases (narrative.ts) — no grade, no invented
+           number (AP-CTEACH-2/3); re-localizes on FR/EN switch via the $derived narrative. -->
+      <div class="narrative col" style="width:100%;text-align:left;gap:0.3rem">
+        <h4 style="margin:0">{t('coachReview.heading')}</h4>
+        {#each narrative as line}<p style="margin:0">{line}</p>{/each}
+      </div>
+      {#if ranked.length}
+        <p class="feedback start-here" style="font-size:0.9rem"><b>{t('dashboard.biggestOpportunity')} </b>{ranked[0].label}</p>
+      {/if}
+
       <div class="row" style="gap:1.5rem;align-items:flex-start">
         <div class="col"><b>{t('coach.strengths')}</b>{#each profile.strengths as s}<span>✔ {s}</span>{:else}<span class="muted">—</span>{/each}</div>
         <div class="col"><b>{t('coach.focusOn')}</b>{#each profile.weaknesses as w}<span>△ {w}</span>{:else}<span class="muted">—</span>{/each}</div>
       </div>
+
+      <!-- C6/CO1: a concept card for the TOP weak motif, behind a toggle. Reuses cardForThemes +
+           ConceptCard (ADR-0040; no new content). No card resolved → no toggle (honest). -->
+      {#if topCard}
+        <button class="link learn-toggle" onclick={() => (showCard = !showCard)}>{t('coachReview.learnPattern')}</button>
+        {#if showCard}
+          <ConceptCard card={topCard} onClose={() => (showCard = false)} />
+        {/if}
+      {/if}
       <!-- C5/CO14: ONE descriptive calibration sentence, gated by metacogEnabled + the readout's sample
            floor. If the user's goal is fix-blunders but metacog is OFF, show a gentle enable-hint instead
            of silently dropping the goal's main lever (E2) — never a fabricated line (AP-CINTAKE-4). -->
@@ -862,6 +943,53 @@
       {#if resultTrend && resultTrend.motifs.length}
         <TrendList trend={resultTrend} />
       {/if}
+
+      <!-- C6/CO13: surface the previously-discarded GameAnalysis — EvalGraph + top turning points +
+           per-ply replay via F4's SolutionReveal (consumed, never forked — AP-CTEACH-1). Only when a
+           game was actually analysed (gameAnalyzed + held analysis). Player vs opponent swings are
+           distinguished so the user is never told they blundered when the opponent did (AP-CTEACH-9). -->
+      {#if profile.gameAnalyzed && gameAnalysis}
+        <div class="game-review col" style="width:100%;gap:0.4rem">
+          <h4 style="margin:0.25rem 0 0">{t('coachReview.gameReviewTitle')}</h4>
+          <EvalGraph analysis={gameAnalysis} selected={selectedPly} onSelect={(i) => (selectedPly = i)} />
+          <h5 style="margin:0.25rem 0 0">{t('coachReview.turningPoints')}</h5>
+          {#if turningPoints.length}
+            <ul class="turning-points col" style="list-style:none;padding:0;margin:0;gap:0.3rem;text-align:left">
+              {#each turningPoints as m (m.plyIndex)}
+                <li>
+                  <button
+                    class="tp-row {m.side} {selectedPly === m.plyIndex ? 'sel' : ''}"
+                    onclick={() => (selectedPly = m.plyIndex)}
+                  >
+                    {#if m.side === 'player'}
+                      {t('coachReview.tpPlayer', { move: m.ply.moveNumber, san: m.ply.san, pct: Math.round(m.winProbLoss) })}
+                    {:else}
+                      {t('coachReview.tpOpponent', { move: m.ply.moveNumber, san: m.ply.san, pct: Math.round(m.winProbLoss) })}
+                    {/if}
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="muted" style="font-size:0.85rem">{t('coachReview.noSwings')}</p>
+          {/if}
+
+          {#if selectedPly !== null && gameAnalysis.plies[selectedPly]}
+            {@const ply = gameAnalysis.plies[selectedPly]}
+            <div class="replay col" style="width:100%;gap:0.3rem;border-top:1px solid var(--border);margin-top:0.4rem;padding-top:0.5rem">
+              <p class="muted" style="font-size:0.82rem;margin:0"><b>{t('coachReview.replayWhy')}</b></p>
+              <SolutionReveal
+                fen={ply.fenBefore}
+                moves={ply.bestUci ? [ply.bestUci] : []}
+                orientation={coachSide === 'w' ? 'white' : 'black'}
+                why={explainLine(selectedPly)}
+                autoplay
+              />
+            </div>
+          {/if}
+        </div>
+      {/if}
+
       <div class="row center">
         <button onclick={startCoaching}>{t('coach.startSession')}</button>
         <button style="background:transparent;border:1px solid var(--border)" onclick={() => app.go('home')}>{t('coach.later')}</button>
@@ -909,4 +1037,31 @@
     vertical-align: middle;
   }
   .tag-leverage { border-color: var(--accent, #6aa); color: var(--accent, #6aa); }
+
+  /* C6 coach-output: "Learn the pattern" toggle (mirrors ConceptCard's button.link). */
+  .learn-toggle {
+    background: none;
+    border: none;
+    color: var(--accent, #6aa);
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 0.9rem;
+    align-self: flex-start;
+  }
+
+  /* C6 turning-point rows: filled = player swing, hollow = opponent (mirrors EvalGraph's side
+     semantics) so a swing is never misattributed (AP-CTEACH-9). */
+  .tp-row {
+    width: 100%;
+    text-align: left;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.88rem;
+    cursor: pointer;
+    background: var(--panel-2);
+  }
+  .tp-row.player { border-left: 3px solid var(--bad, #c55); }
+  .tp-row.opponent { border-left: 3px solid var(--border); background: transparent; }
+  .tp-row.sel { outline: 2px solid var(--text); outline-offset: 1px; }
 </style>

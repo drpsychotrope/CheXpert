@@ -275,4 +275,31 @@ export const generators: Messages = {
     fr: 'Indice : le bon coup {what} ({motif}).',
     en: 'Hint: the right move {what} ({motif}).',
   },
+
+  // ── coach-output narrative (C6, narrative.ts buildCoachNarrative) — PURE templated prose
+  // resolved by gt (injected locale). Each value is a COMPLETE per-locale sentence (never
+  // concatenated fragments — AP-CTEACH-5); {areas}/{focus} are pre-joined localized labels.
+  // DIRECTIONAL, no grade (AP-CTEACH-2); no Elo / % payoff number is ever emitted (AP-CTEACH-3). ──
+  'coachReview.narrStrength': { fr: 'Vous êtes solide sur {areas}.', en: "You're solid on {areas}." },
+  'coachReview.narrWeak': { fr: '{areas} demandent du travail.', en: '{areas} need work.' },
+  'coachReview.startHere': {
+    fr: "Commencez par {focus} — c'est là que le travail rapportera le plus.",
+    en: "Start with {focus} — that's where the work will pay off most.",
+  },
+  // Honest, NON-NUMERIC payoff cue folded after startHere (no Elo, no % — AP-CTEACH-3 / FOLD-A8).
+  'coachReview.payoffSoft': {
+    fr: 'Quelques répétitions régulières là-dessus avancent plus vite que de tout éparpiller.',
+    en: 'Small, steady reps there move the needle faster than spreading thin.',
+  },
+  'coachReview.narrNoWeak': {
+    fr: 'Aucune faiblesse nette — gardez vos automatismes affûtés.',
+    en: 'No clear weakness — keep your patterns sharp.',
+  },
+  // Directional caveat when no full game backed the read (FOLD-A8 / AP-CTEACH-2).
+  'coachReview.narrPuzzleOnly': {
+    fr: 'Lecture issue des problèmes seulement — directionnelle, pas une note de partie complète.',
+    en: 'This read is from puzzles only — directional, not a full-game grade.',
+  },
+  // Locale-correct list join so {areas} never glues raw labels with a literal comma (AP-CTEACH-5).
+  'coachReview.listJoin': { fr: '{a} et {b}', en: '{a} and {b}' },
 };
