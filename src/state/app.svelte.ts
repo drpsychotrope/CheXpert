@@ -62,6 +62,11 @@ class AppState {
   /** Due SRS cards (puzzle + repertoire) for the Home/Review badge — the loop's re-engagement
    *  signal in a no-backend app (audit v2 P1-07). Recomputed on boot and each view change. */
   dueReview = $state(0);
+  /** Unanalysed played games (P1, play-loop-closure): the count surfaced as a Dashboard/Home
+   *  badge linking to the played-game history. Derived from the persisted stores so it survives
+   *  navigation (AP-PLAYLOOP-1); == unanalyzedPlayedGames(...).length so it never overstates what a
+   *  batch run would analyse (AP-PLAYLOOP-13). Recomputed on boot + each view change, like dueReview. */
+  unanalyzedGames = $state(0);
 
   readonly engine = new EngineClient();
   readonly puzzles = new PuzzleRepo();
@@ -74,6 +79,7 @@ class AppState {
       setLocaleState(this.settings.locale ?? 'fr');
       await this.puzzles.init();
       await this.refreshDue(now);
+      await this.refreshUnanalyzed();
       // First run → route to onboarding (launch-time skill evaluation).
       this.view = this.model.onboarded ? 'home' : 'onboarding';
     } catch (e) {
@@ -95,6 +101,19 @@ class AppState {
       this.dueReview = p + r;
     } catch {
       /* storage unavailable — leave the badge at 0 */
+    }
+  }
+
+  /** Recompute the unanalysed-played-games count for the Dashboard/Home badge (P1). Pure selector
+   *  over the F5 reads (excludes 960 + color-less legacy records). */
+  async refreshUnanalyzed(): Promise<void> {
+    try {
+      const { getAllGames, getAnalyzedGameIds } = await import('../store/gamesRepo');
+      const { unanalyzedPlayedGames } = await import('../analysis/unanalyzedGames');
+      const [games, analyzed] = await Promise.all([getAllGames(), getAnalyzedGameIds()]);
+      this.unanalyzedGames = unanalyzedPlayedGames(games, analyzed).length;
+    } catch {
+      /* storage unavailable — leave the badge at its last value */
     }
   }
 

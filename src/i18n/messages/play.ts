@@ -126,6 +126,39 @@ export const play: Messages = {
   // Export a played game's PGN (F5, ADR-0056) — Play tail + history rows.
   'play.exportPgn': { fr: 'Exporter le PGN', en: 'Export PGN' },
 
+  // ---- Play→analysis loop closure (play.loop.*) — P1, play-loop-closure-spec ----
+  // "Analyse your N unanalysed games" — N is unanalyzedPlayedGames(...).length (F-P1-3).
+  'play.loop.analyseAllOne': {
+    fr: 'Analyser votre {n} partie non analysée',
+    en: 'Analyse your {n} unanalysed game',
+  },
+  'play.loop.analyseAllMany': {
+    fr: 'Analyser vos {n} parties non analysées',
+    en: 'Analyse your {n} unanalysed games',
+  },
+  // Sequential batch progress (games done / total).
+  'play.loop.queueProgress': {
+    fr: 'Analyse de la partie {done} / {total}…',
+    en: 'Analysing game {done} / {total}…',
+  },
+  'play.loop.cancel': { fr: 'Annuler', en: 'Cancel' },
+  'play.loop.cancelling': { fr: 'Arrêt…', en: 'Stopping…' },
+  // Quiet confirmation after the opt-in auto-run analyses the just-finished game (F-P1-2).
+  'play.loop.autoAnalysed': { fr: 'Analysée ✓', en: 'Analysed ✓' },
+  // Dashboard / Home badge — N unanalysed games (links to the played-game history).
+  'play.loop.badgeOne': { fr: '{n} partie non analysée', en: '{n} unanalysed game' },
+  'play.loop.badgeMany': { fr: '{n} parties non analysées', en: '{n} unanalysed games' },
+  'play.loop.reviewHistory': { fr: "Voir l'historique →", en: 'Review history →' },
+  // Settings: opt-in auto-analyse-on-finish.
+  'play.loop.autoAnalyzeLabel': {
+    fr: 'Analyser automatiquement chaque partie à la fin',
+    en: 'Auto-analyse each game when it finishes',
+  },
+  'play.loop.autoAnalyzeHelp': {
+    fr: "Quand c'est activé, la partie que vous venez de terminer est analysée toute seule (sans clic) — vos erreurs deviennent des problèmes et votre tableau des faiblesses se met à jour. Seule la partie qui vient de se terminer est analysée, jamais tout l'arriéré (lourd pour le moteur). Désactivé par défaut ; les parties Chess960 ne sont jamais analysées.",
+    en: "When on, the game you just finished is analysed on its own (no click) — your mistakes become puzzles and your weakness dashboard updates. Only the just-finished game is analysed, never the whole backlog (heavy for the engine). Off by default; Chess960 games are never analysed.",
+  },
+
   // ---- Played-game history (history.*) — section inside the Import view (F5, ADR-0056) ----
   'history.title': { fr: 'Vos parties jouées', en: 'Your played games' },
   'history.subtitle': {

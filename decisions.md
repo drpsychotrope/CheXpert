@@ -943,6 +943,51 @@ and the static `<title>` (set at load, not reactive). None block use; each is a 
 ADR-0052 (the FR decision this implements + supersedes Q3), ADR-0050/0051 (reactivity), ADR-0037 (additive
 field precedent).
 
+## Note — P1 play-loop closure (feature PR, no ADR)
+**Date:** 2026-06-30 · **Status:** shipped · **Spec:** `specs/play-loop-closure-spec.md`
+
+Closes the play→analysis→steering loop so it fires even when the user never clicks "Analyse this
+game". No new ADR (feature PR: reuses F5's read API + an additive setting + a sequential queue — no
+new architectural primitive; doctrine default for feature PRs).
+
+**The bug.** `analyzePlayed()` was gated on `lastGame`, component-local `$state` cleared on
+`newGame()`/navigation, so once you left the over screen the game was never analysed → no
+`gameAnalyses` row → no personal puzzles → no `weaknessCounters` fold → `loadAllAnalyses()` empty →
+`buildWeaknessProfile().weakest` null → opening steering silently degraded to neutral.
+
+**Fix.** "Which games are unanalysed" is now a **derived fact** over the persisted stores, not a
+transient field (AP-PLAYLOOP-1): a pure `unanalyzedPlayedGames(games, analyzedIds)` selector
+(`src/analysis/unanalyzedGames.ts`) over F5's `getAllGames()` minus `getAnalyzedGameIds()`, excluding
+chess960 (AP-960-4) and legacy color-less records (analysing from the wrong POV is the audit C-3
+failure mode — AP-PLAYLOOP-12), newest-first. A user-initiated **"Analyse your N unanalysed games"**
+(Play over-screen) runs `analyzeBacklog` (`src/analysis/analyzeBacklog.ts`) **one game at a time**
+(single engine worker — sequential, never parallel, AP-PLAYLOOP-2), **cancellable** between games,
+**capped** per run, with a **per-game try/catch** so one failure is counted and the loop continues
+(F-P1-4). Both cores share `analyzeOnePlayedGame` (the `resetVariant`→`getAnalysis` idempotency
+guard→`runAnalysis(source:'played')` sequence; AP-PLAYLOOP-7), also used by the Play-tail single-game
+button (FOLD-F-P1-5) and the opt-in auto-run. A durable Dashboard/Home **"N unanalysed games"** badge
+(`app.unanalyzedGames`, refreshed on boot + view change like `dueReview`) links to F5's history for
+selective analyse. The displayed N is exactly the selector's length so it never overstates what runs
+(F-P1-3 / AP-PLAYLOOP-13).
+
+**Settings.** `SettingsRecord.autoAnalyzeOnFinish?` (opt-in, default off, `?? false`): analyses
+**only the just-finished game** (never the backlog — AP-PLAYLOOP-3), non-blocking; on failure the
+game simply stays counted in the backlog (the count is the failure signal — AP-PLAYLOOP-11).
+
+**Pre-check finding (recorded).** F5 had **already** added `GameRecord.playerColor?` (written by
+`Play.finishGame()`, read by history) and `getAllGames()`/`getAnalyzedGameIds()`. P1 **consumes**
+these — it does not re-add the field or redefine the reads (AP-PLAYLOOP-5). Spec §4.1's "add
+playerColor" was therefore a no-op; only the `SettingsRecord` field is new this PR.
+
+**Doctrine.** Additive-only, **no `DB_VERSION` bump** (stays v4; both touched fields optional, read
+with `??`). Steering math untouched (P4 owns symmetry — AP-PLAYLOOP-9); Insights/study-plan
+byte-identical. Honest framing kept (F-P1-6 / AP-PLAYLOOP-15): analysing makes the data *available*;
+the next game steers **only when a weakness is detected** — a clean game leaves steering neutral, by
+design. Free fix: the single-game/cached-result panel now reads `analysis.puzzlesGenerated` for the
+puzzle count instead of a hard 0 (audit P3-16). Bilingual `play.loop.*` keys (FR+EN). Cross-links:
+F5 (`games`-store reads this consumes), ADR-0022 (one-click played-game review this generalises),
+ADR-0014 (opening steering this feeds), ADR-0006 (one eval per position).
+
 **ADR-0053 follow-up — F1 i18n-label-routing:** display keys (activity/themes) routed through the
 catalogue; routing keys unchanged. Added `activity.*` (7-value `PlanItem.activity` union, FR+EN) +
 common theme sub-tags to `generators.ts`, a generic `labelOrRaw(ns,key,locale)` resolver in `gen.ts`

@@ -34,6 +34,13 @@
     await app.persistSettings();
   }
 
+  // P1 (play-loop-closure §4.6): opt-in auto-analyse of the just-finished game.
+  async function toggleAutoAnalyze() {
+    if (!settings) return;
+    settings.autoAnalyzeOnFinish = !(settings.autoAnalyzeOnFinish ?? false);
+    await app.persistSettings();
+  }
+
   async function toggleNetwork(e: Event) {
     if (!settings) return;
     const wantOn = (e.currentTarget as HTMLInputElement).checked;
@@ -95,6 +102,15 @@
       {t('settings.metacogLabel')}
     </label>
     <p class="muted" style="font-size:0.85rem">{t('settings.metacogHint')}</p>
+  </div>
+
+  <div class="panel col">
+    <h3>{t('home.analyseGame')}</h3>
+    <label class="row" style="flex-direction:row;align-items:center;gap:0.6rem">
+      <input type="checkbox" checked={settings?.autoAnalyzeOnFinish ?? false} onchange={toggleAutoAnalyze} />
+      {t('play.loop.autoAnalyzeLabel')}
+    </label>
+    <p class="muted" style="font-size:0.85rem">{t('play.loop.autoAnalyzeHelp')}</p>
   </div>
 
   <div class="panel col">

@@ -119,6 +119,11 @@ export interface SettingsRecord {
    *  fresh/legacy profile still sees its personal puzzles (AP-TPERS-12). NO DB_VERSION bump,
    *  mirrors `locale?` (precedent ADR-0037/0040/0043/0053). */
   trainerSource?: 'mixed' | 'personal' | 'curated';
+  /** Opt-in: analyse a played game automatically the moment it finishes (P1, play-loop-closure
+   *  §4.6). When true, ONLY the just-finished game is analysed (never the backlog — heavy, Q-C);
+   *  960 games never auto-run. Additive optional; a legacy/absent value reads as the default false
+   *  (read-site `?? false`). NO DB_VERSION bump (mirrors `metacogEnabled?`/`opponentStyle?`). */
+  autoAnalyzeOnFinish?: boolean;
   /** Data-shape revision (audit W13). See PlayerModel.schemaRev. */
   schemaRev?: number;
 }

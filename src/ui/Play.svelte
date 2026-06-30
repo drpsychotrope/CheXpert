@@ -5,7 +5,7 @@
   import { ChessGame } from '../game/ChessGame';
   import { AdaptiveOpponent, initOpponentState, type GameOutcome } from '../engine/AdaptiveOpponent';
   import type { GameRecord } from '../store/db';
-  import { putGame, getAnalysis } from '../store/gamesRepo';
+  import { putGame, getAllGames, getAnalyzedGameIds } from '../store/gamesRepo';
   import { poolRating, poolOpponent } from '../store/playerModel';
   import type { RatingPool } from '../rating/pools';
   import {
@@ -16,7 +16,9 @@
     categoryFor, fmtClock, TIME_CONTROL_PRESETS,
     type Category, type TimeControlPreset,
   } from '../clock/categories';
-  import { loadAllAnalyses, runAnalysis } from '../analysis/runAnalysis';
+  import { loadAllAnalyses } from '../analysis/runAnalysis';
+  import { analyzeOnePlayedGame, analyzeBacklog } from '../analysis/analyzeBacklog';
+  import { unanalyzedPlayedGames } from '../analysis/unanalyzedGames';
   import { buildWeaknessProfile, type Dimension } from '../analysis/weakness';
   import { selectOpening, nextBookMove, steeringNote, type OpeningEntry } from '../opening/openingBook';
   import AnalysisResult from './AnalysisResult.svelte';
@@ -28,7 +30,7 @@
   import { createGameSession, type GameSession } from '../game/gameSession';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import { downloadPgn, pgnFilename } from './pgnDownload';
-  import { t } from '../i18n';
+  import { t, tn } from '../i18n';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   // The DOM-free controller (F6, ADR-0057) owns the move/engine/end loop + the rules-truth game.
@@ -86,11 +88,26 @@
 
   // One-click post-game analysis (ADR-0022): no PGN paste needed.
   let lastGame = $state<{ id: string; pgn: string; playedAt: number; result: 'win' | 'loss' | 'draw' } | null>(null);
+  // The full stored record of the just-finished game — fed to the shared analysis core for the
+  // single-game button + the opt-in auto-run (P1, play-loop-closure §4.6). Its playerColor is in
+  // scope at write so no provenance issue (AP-PLAYLOOP-12).
+  let lastGameRec = $state<GameRecord | null>(null);
   let aStatus = $state<'idle' | 'analyzing' | 'done'>('idle');
   let aResult = $state<GameAnalysis | null>(null);
   let aPuzzles = $state(0);
   let aProgress = $state(0);
   let aTotal = $state(0);
+  // Quiet "analysed ✓" shown when the opt-in auto-run succeeds (no toast clutter; F-P1-2).
+  let autoAnalyzed = $state(false);
+
+  // Loop closure (P1): the unanalysed-backlog count, derived from the persisted stores (F5 reads)
+  // so it survives navigation — NOT a transient field (AP-PLAYLOOP-1). Exactly
+  // unanalyzedPlayedGames(...).length, so the count never overstates what the batch runs
+  // (AP-PLAYLOOP-13). Recomputed on mount, after finishGame, and after a batch run.
+  let backlogN = $state(0);
+  let backlogGames = $state<GameRecord[]>([]);
+  let batchCancelled = $state(false);
+  let batchRunning = $state(false); // true only during a multi-game batch (drives the cancel UI)
 
   // Loop closure: the bot (Black here) opens toward the player's weakest area. The played-UCI list
   // that book steering consults now lives in the controller (F6); `opening` stays here (view).
@@ -101,7 +118,25 @@
   const model = $derived(app.model);
   const coached = $derived(app.settings?.coachedMode ?? false);
   const opponentStyle = $derived(app.settings?.opponentStyle ?? 'human');
+  const autoAnalyzeOnFinish = $derived(app.settings?.autoAnalyzeOnFinish ?? false);
   const live = $derived(status === 'playing' || status === 'thinking');
+
+  // Recompute the unanalysed-backlog count from the persisted stores (F5 reads). Pure selector on
+  // top — excludes 960 + color-less legacy records so the count == what the batch will run.
+  async function refreshBacklog() {
+    try {
+      const [games, analyzed] = await Promise.all([getAllGames(), getAnalyzedGameIds()]);
+      backlogGames = unanalyzedPlayedGames(games, analyzed);
+      backlogN = backlogGames.length;
+    } catch {
+      /* storage unavailable — leave the backlog at its last value */
+    }
+  }
+
+  // Surface the backlog when the view mounts (durable re-entry after navigation).
+  $effect(() => {
+    void refreshBacklog();
+  });
 
   // Restore the last-used time control on mount (spec §4.5).
   $effect(() => {
@@ -132,6 +167,8 @@
     playerColor = variant === 'chess960' ? 'white' : resolveColor(colorChoice);
     result = '';
     lastGame = null;
+    lastGameRec = null;
+    autoAnalyzed = false;
     aResult = null;
     aStatus = 'idle';
     aPuzzles = 0;
@@ -478,46 +515,90 @@
     };
     await putGame(rec);
     lastGame = { id: rec.id, pgn: rec.pgn, playedAt: rec.playedAt, result: rec.result };
+    lastGameRec = rec;
     await app.persistModel(now);
+    await refreshBacklog(); // the just-finished game is now counted until analysed (F-P1-3)
+    // Opt-in: analyse JUST this game on finish (never the backlog — Q-C / AP-PLAYLOOP-3). 960 never
+    // auto-runs (it's not in the backlog and the core resets the variant anyway, AP-960-4).
+    if (autoAnalyzeOnFinish && variant !== 'chess960') void autoAnalyzeFinished();
   }
 
-  /** One-click analysis of the game just played — same pipeline as Import, no paste. */
+  /** Opt-in post-finish hook (F-P1-2): analyse only the just-finished game via the shared core.
+   *  Best-effort + non-blocking — on success show a quiet "analysed ✓"; on failure stay silent and
+   *  leave the game in the visible backlog (the count IS the failure signal — AP-PLAYLOOP-11). */
+  async function autoAnalyzeFinished() {
+    const rec = lastGameRec;
+    if (!rec || !model) return;
+    try {
+      await analyzeOnePlayedGame(app.engine, app.puzzles, model, rec);
+      autoAnalyzed = true;
+      await refreshBacklog();
+    } catch {
+      /* silent — the game stays counted in the backlog for a later user-initiated run */
+    }
+  }
+
+  /** One-click analysis of the game just played — same pipeline as Import, no paste (ADR-0022).
+   *  Reuses the shared single-game core (F-P1-5) so the Play-tail button, the batch loop, and
+   *  auto-run all run the identical idempotent sequence. */
   async function analyzePlayed() {
-    if (!lastGame || !model) return;
+    if (!lastGameRec || !model) return;
     aStatus = 'analyzing';
     aProgress = 0;
+    aTotal = 0;
     try {
-      const existing = await getAnalysis(lastGame.id);
-      if (existing) {
-        aResult = existing;
-        aPuzzles = 0;
-        aStatus = 'done';
-        return;
-      }
-      // Analysis forces full strength per call (the fullStrength flag, audit v2 W1/F4); here we
-      // only clear 960 mode so analysis never runs in 960 (AP-960-4). resetVariant boots if needed.
-      await app.engine.resetVariant();
-
-      const res = await runAnalysis(app.engine, app.puzzles, {
-        gameId: lastGame.id,
-        pgn: lastGame.pgn,
-        playerColor: playerColor[0] as 'w' | 'b',
-        source: 'played',
-        baseRating: Math.round(model.puzzleRating.rating),
-        now: Date.now(),
-        movetimeMs: 200,
+      const analysis = await analyzeOnePlayedGame(app.engine, app.puzzles, model, lastGameRec, {
         onProgress: (d, t) => {
           aProgress = d;
           aTotal = t;
         },
       });
-      aResult = res.analysis;
-      aPuzzles = res.puzzles.length;
+      aResult = analysis;
+      // The persisted count (set by generatePuzzles, BatchAnalyzer stamps it) — correct even on the
+      // idempotent cached-result branch, unlike the old hard 0 (audit P3-16).
+      aPuzzles = analysis.puzzlesGenerated;
       aStatus = 'done';
+      await refreshBacklog();
     } catch (e) {
       result = t('play.analysisFailed') + String(e);
       aStatus = 'idle';
     }
+  }
+
+  /** Clear the unanalysed backlog in one user-initiated, SEQUENTIAL, cancellable, capped run
+   *  (Q-C=b). The displayed N == backlogGames.length == what runs (F-P1-3). */
+  async function analyzeBacklogNow() {
+    if (!model || backlogGames.length === 0) return;
+    batchCancelled = false;
+    batchRunning = true;
+    aStatus = 'analyzing';
+    aProgress = 0;
+    aTotal = backlogGames.length;
+    try {
+      const res = await analyzeBacklog(app.engine, app.puzzles, model, backlogGames, {
+        isCancelled: () => batchCancelled,
+        onGameStart: (_id, done, total) => {
+          aProgress = done; // game-level progress for the bar (one tick per finished game)
+          aTotal = total;
+        },
+        onPositionProgress: () => {
+          /* per-position ticks are noisy across many games; the bar tracks games via onGameStart */
+        },
+      });
+      aResult = res.last;
+      aPuzzles = res.last?.puzzlesGenerated ?? 0;
+      aStatus = res.last ? 'done' : 'idle';
+      await refreshBacklog();
+    } catch (e) {
+      result = t('play.analysisFailed') + String(e);
+      aStatus = 'idle';
+    } finally {
+      batchRunning = false;
+    }
+  }
+
+  function cancelBatch() {
+    batchCancelled = true; // honoured between games by analyzeBacklog (clean stop, never mid-game)
   }
 
   function resign() {
@@ -653,12 +734,23 @@
         {aStatus === 'analyzing' ? t('play.analysing') : aResult ? t('play.reanalyse') : t('play.analyseThisGame')}
       </button>
     {/if}
+    {#if status === 'over' && backlogN > 0}
+      <!-- Loop closure (P1, F-P1-3): N == unanalyzedPlayedGames(...).length == what the batch runs.
+           Sequential, cancellable, capped run over the whole backlog (AP-PLAYLOOP-2/13). -->
+      <button class="ghost" onclick={analyzeBacklogNow} disabled={aStatus === 'analyzing'}>
+        {tn(backlogN, 'play.loop.analyseAllOne', 'play.loop.analyseAllMany')}
+      </button>
+    {/if}
     {#if status === 'over' && lastGame}
       <button class="ghost" onclick={() => lastGame && downloadPgn(lastGame.pgn, pgnFilename(lastGame.playedAt, lastGame.result))}>
         {t('play.exportPgn')}
       </button>
     {/if}
   </div>
+
+  {#if status === 'over' && autoAnalyzed && !aResult}
+    <p class="muted" style="font-size:0.82rem; color:var(--good)">{t('play.loop.autoAnalysed')}</p>
+  {/if}
   {#if status === 'over' && variant === 'chess960'}
     <p class="muted" style="font-size:0.8rem; max-width:440px">
       {t('play.chess960NoAnalysis')}
@@ -667,8 +759,17 @@
 
   {#if aStatus === 'analyzing'}
     <div class="panel" style="max-width:420px">
-      <p>{t('play.analysingPosition', { progress: aProgress, total: aTotal })}</p>
+      {#if batchRunning}
+        <p>{t('play.loop.queueProgress', { done: aProgress, total: aTotal })}</p>
+      {:else}
+        <p>{t('play.analysingPosition', { progress: aProgress, total: aTotal })}</p>
+      {/if}
       <div class="bar"><div class="bar-fill" style="width:{aTotal ? (aProgress / aTotal) * 100 : 0}%"></div></div>
+      {#if batchRunning}
+        <button class="ghost" style="margin-top:0.5rem" onclick={cancelBatch} disabled={batchCancelled}>
+          {batchCancelled ? t('play.loop.cancelling') : t('play.loop.cancel')}
+        </button>
+      {/if}
     </div>
   {/if}
 

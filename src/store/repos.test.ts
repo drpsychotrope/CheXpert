@@ -36,6 +36,17 @@ describe('gamesRepo (W11)', () => {
     expect((await db.get('importedGames', 'ig1'))?.analyzed).toBe(false);
     expect(await getAnalysis('nope')).toBeUndefined();
   });
+
+  // P1 (play-loop-closure §5): the batch runner reads GameRecord.playerColor for the correct POV.
+  it('round-trips GameRecord.playerColor; a record without it loads fine (additive, no migration)', async () => {
+    await putGame({ id: 'gw', pgn: '1. e4', result: 'win', botElo: 1500, playedAt: 1, coached: false, playerColor: 'b' });
+    await putGame({ id: 'legacy', pgn: '1. e4', result: 'draw', botElo: 1500, playedAt: 2, coached: false }); // no playerColor
+    const db = await openTrainerDB();
+    expect((await db.get('games', 'gw'))?.playerColor).toBe('b');
+    const legacy = await db.get('games', 'legacy');
+    expect(legacy).toBeTruthy();
+    expect(legacy?.playerColor).toBeUndefined(); // selector's legacy-skip path has data to act on
+  });
 });
 
 // F5 (ADR-0056): the `games` store made readable + a batched analysed-set read.

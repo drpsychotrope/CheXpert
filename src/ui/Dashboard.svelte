@@ -6,6 +6,10 @@
   import { poolRating } from '../store/playerModel';
   import { t, tn, getLocale } from '../i18n';
 
+  // P1: unanalysed-games badge (durable re-entry to the loop). Links to the played-game history
+  // so the user can analyse selectively before committing to a heavy run (F-P1-1).
+  const unanalyzed = $derived(app.unanalyzedGames);
+
   let profile = $state<WeaknessProfile | null>(null);
   let loading = $state(true);
 
@@ -41,6 +45,13 @@
 
 <section class="col" style="max-width:680px;margin:0 auto">
   <h2>{t('dashboard.title')}</h2>
+
+  {#if unanalyzed > 0}
+    <p class="feedback">
+      {tn(unanalyzed, 'play.loop.badgeOne', 'play.loop.badgeMany')}
+      <button class="link" onclick={() => app.go('import')}>{t('play.loop.reviewHistory')}</button>
+    </p>
+  {/if}
 
   {#if loading}
     <p class="muted">{t('dashboard.loading')}</p>

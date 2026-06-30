@@ -124,7 +124,7 @@ Foundation PRs are mutually independent → **draftable/buildable in parallel**.
 ### Play (dep: F5, F6)
 | PR | Goal | Folds | Dep |
 |---|---|---|---|
-| **P1 · Loop closure** | Persist last-unanalysed game; "analyse all" / auto-queue so steering+puzzles actually fire | PL2 | F5 |
+| **P1 · Loop closure** ✅ shipped | Derived unanalysed-set (F5 reads) + sequential "Analyse all" + opt-in auto-run so steering+puzzles actually fire | PL2 | F5 |
 | **P2 · In-game UX** | Move list, rematch, confirm-resign, takeback + blunder-check | PL3, PL10, PL8, PL7 | F2 |
 | **P3 · Opponent agency & realism** | Difficulty override, adaptation feedback line, bot resign/draw + draw UI, movetime increment | PL4, PL9, PLt | F6 |
 | **P4 · Steering symmetry** | Fill Black-side opening book / color-agnostic steering | PL5 | (CO17 shares book) |

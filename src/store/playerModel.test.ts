@@ -4,6 +4,9 @@ import {
   loadPlayerModel,
   savePlayerModel,
   migratePlayerModel,
+  loadSettings,
+  saveSettings,
+  freshSettings,
   CURRENT_PLAYER_SCHEMA_REV,
   DEFAULT_DAILY_GOAL,
 } from './playerModel';
@@ -98,5 +101,32 @@ describe('PlayerModel T3 retention (additive, schemaRev 1→2, no DB bump — AP
     expect(migrated.dailyStreak).toBe(0);
     expect(migrated.dailyGoal).toBe(DEFAULT_DAILY_GOAL);
     expect(migrated.schemaRev).toBe(2);
+  });
+});
+
+describe('SettingsRecord.autoAnalyzeOnFinish (additive, no DB bump — P1, AP-PLAYLOOP-6)', () => {
+  beforeEach(resetDb);
+
+  it('DB_VERSION stays 4 and freshSettings omits the opt-in field (reads false via ??)', () => {
+    expect(DB_VERSION).toBe(4);
+    expect(freshSettings().autoAnalyzeOnFinish).toBeUndefined();
+    expect(freshSettings().autoAnalyzeOnFinish ?? false).toBe(false);
+  });
+
+  it('persists and reloads autoAnalyzeOnFinish when set', async () => {
+    const s = freshSettings();
+    s.autoAnalyzeOnFinish = true;
+    await saveSettings(s);
+    const loaded = await loadSettings();
+    expect(loaded.autoAnalyzeOnFinish).toBe(true);
+  });
+
+  it('a legacy settings record lacking the field loads fine and reads ?? false', async () => {
+    const db = await openTrainerDB();
+    const legacy = freshSettings() as unknown as Record<string, unknown>;
+    delete legacy.autoAnalyzeOnFinish;
+    await db.put('settings', legacy as never);
+    const loaded = await loadSettings();
+    expect(loaded.autoAnalyzeOnFinish ?? false).toBe(false);
   });
 });

@@ -1,12 +1,14 @@
 <script lang="ts">
   import { app } from '../state/app.svelte';
   import { poolRating } from '../store/playerModel';
-  import { t } from '../i18n';
+  import { t, tn } from '../i18n';
 
   const model = $derived(app.model);
   const classical = $derived(model ? poolRating(model, 'classical') : null);
   // T3/TR8: the training-day streak, normalised to a number for the badge below.
   const dailyStreak = $derived(model?.dailyStreak ?? 0);
+  // P1: unanalysed-games badge — durable re-entry to the play→analysis loop (links to history).
+  const unanalyzed = $derived(app.unanalyzedGames);
 </script>
 
 <section class="home">
@@ -31,6 +33,12 @@
          badge below. One render site, no new logic — reads model.dailyStreak (/enrich#2). -->
     {#if dailyStreak > 0}
       <p class="note">{t('home.streak', { n: dailyStreak })}</p>
+    {/if}
+    {#if unanalyzed > 0}
+      <p class="note">
+        {tn(unanalyzed, 'play.loop.badgeOne', 'play.loop.badgeMany')}
+        <button class="link-inline" onclick={() => app.go('import')}>{t('play.loop.reviewHistory')}</button>
+      </p>
     {/if}
   {/if}
 
@@ -62,6 +70,7 @@
   .rating-card .val { font-size: 2rem; font-weight: 700; }
   .rating-card .rd { font-size: 0.8rem; color: var(--muted); }
   .note { font-size: 0.8rem; color: var(--muted); }
+  button.link-inline { background: none; border: none; color: var(--accent); padding: 0; font: inherit; text-decoration: underline; cursor: pointer; }
   .actions { display: flex; flex-direction: column; gap: 0.75rem; max-width: 320px; margin: 1.5rem auto 0; }
   button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
 </style>
