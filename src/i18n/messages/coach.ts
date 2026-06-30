@@ -53,6 +53,26 @@ export const coach: Messages = {
   'coach.startSession': { fr: '▶ Démarrer la session de coaching', en: '▶ Start coaching session' },
   'coach.later': { fr: 'Plus tard', en: 'Later' },
 
+  // ── C1: saved-profile intro card + progress trend + staleness (coach.*) ───
+  // Surfaces the write-only coachProfile/Prev/assessedAt (ADR-0045). Directional, never a grade
+  // (AP-CPROF-2); staleness is a soft, ignorable nudge (AP-CPROF-3).
+  'coach.savedTitle': { fr: 'Votre dernière évaluation', en: 'Your last assessment' },
+  'coach.lastAssessed': { fr: 'Évalué le {date}', en: 'Assessed on {date}' },
+  'coach.ageSuffix': { fr: ' · il y a {days} j', en: ' · {days}d ago' },
+  'coach.staleNudge': {
+    fr: 'Cette lecture date de plus de {days} jours — une nouvelle évaluation pourrait être utile.',
+    en: 'This read is over {days} days old — a fresh assessment may help.',
+  },
+  'coach.startProgram': { fr: '▶ Reprendre le programme', en: '▶ Start program' },
+  'coach.reassess': { fr: 'Réévaluer', en: 'Re-assess' },
+  'coach.trendTitle': { fr: 'Évolution depuis la dernière fois', en: 'Change since last time' },
+  'coach.trendTactics': { fr: 'Tactique {arrow} ({delta} pts)', en: 'Tactics {arrow} ({delta} pts)' },
+  'coach.trendMotif': { fr: '({delta} pts · {nPrev}→{nCurrent} essais)', en: '({delta} pts · {nPrev}→{nCurrent} tries)' },
+  'coach.trendDisclaimer': {
+    fr: 'Directionnel — ratings absolus par motif, petits échantillons. Pas une note.',
+    en: 'Directional — absolute per-motif ratings, small samples. Not a grade.',
+  },
+
   // ── Dashboard.svelte (dashboard.*) ────────────────────────────────────────
   'dashboard.title': { fr: 'Tableau des faiblesses', en: 'Weakness dashboard' },
   'dashboard.loading': { fr: 'Chargement…', en: 'Loading…' },

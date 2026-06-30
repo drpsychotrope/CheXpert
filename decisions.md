@@ -1560,3 +1560,39 @@ Per-colour × per-dimension coverage is now a test (the union-only assertion mas
 signatures unchanged; no `DB_VERSION` bump; Insights byte-identical (only `Play.svelte` reads the book).
 775 tests green (758 + 17). Cross-links: ADR-0014/AP-CHESS-22, ADR-0053, `specs/opening-steering-symmetry-spec.md`.
 Follow-ups (§11): localize `steeringNote` (F1), coverage CI-lint, C7 opening→repertoire consumes this book.
+
+---
+
+## C1 — coach-profile-persistence (no new ADR; extends ADR-0045)
+
+The coach computed a `CoachProfile` + program and persisted `coachProfile`/`coachProfilePrev`/`assessedAt`
+(ADR-0045) — then **never read any of it back** (`grep coachProfile` returned only the write site + the
+type decl; `assessedAt` stored, read by nothing). Re-entering the coach showed only "Start the assessment",
+the program was discarded on "Plus tard", and there was no trend or staleness signal. C1 stops the coach
+discarding its own output. Resolutions (Q-A..Q-D): **Q-A** = an always-on intro **summary card** (radar +
+strengths/weaknesses + trend) with `Start program` / `Re-assess` — the card **is** the view, so there is no
+dead "View profile" button (enrich FOLD-1 / AP-CPROF-8). **Q-B** = trend on the **absolute** themed
+`MotifScore.rating`, inner-joined on `theme`, **not** the baseline-relative `delta` (which is recomputed vs
+the drifting `puzzleRating` each run and so is NOT cross-run-comparable — the CF5 fix / AP-CPROF-4).
+**Q-C** = a **soft** staleness nudge at `COACH_STALE_DAYS=21` (ignorable; never gates a button — AP-CPROF-3).
+**Q-D** = resume **rebuilds** the program from the saved profile via the pure `buildCoachProgram`
+(reload-safe, deterministic) — **no** persisted `activeSession`, mirroring `startCoaching` (AP-CPROF-6).
+
+**New pure core** `src/coach/coachTrend.ts` (`buildCoachTrend`/`trendDir`/`profileAgeDays`/`isStale`): no
+`Date`/`Math.random` — `now` is injected, stamped once in `Coach.svelte`'s `onMount` (AP-CPROF-1). Trend is
+**directional only** — arrows + absolute rating deltas + both sample sizes, explicit disclaimer, no aggregate
+grade (AP-CPROF-2); low-sample rows (`nPrev≤2 && nCurrent≤2`) flagged by reusing the existing
+`dashboard.lowData` key (enrich FOLD-2 — no new i18n / AP-CPROF-7). Rendered on the intro card **and** the
+result screen via a small `TrendList.svelte`. **Additive, read-only over already-persisted data**: no new
+field, **no `DB_VERSION`/`schemaRev` bump**, no migration; read sites guard `undefined` (legacy model / a
+legacy profile lacking `assessedAt` → no nudge, no crash). `diagnostic.ts`/`program.ts`/`session.ts`/
+`studyPlan.ts`/`db.ts`/`playerModel.ts` untouched — Insights / `buildStudyPlan` byte-identical (AP-COACH-1).
+**Tests:** `coachTrend.test.ts` (18 — inner-join, the CF5 absolute-vs-delta guard, flat band, lowData,
+tactics dim, age/staleness with injected `now`, resume-equivalence) + `coach-profile-wiring.test.ts` (7,
+static seam guard, no component harness). **800 tests green** (775 + 25), svelte-check **0/0** (417 files),
+build green. **Rollback:** revert the commit — `coachTrend.ts`/`TrendList.svelte`/the intro card/the new
+i18n keys vanish; no migration ran, so stored `coachProfile`/`Prev`/`assessedAt` are simply unread again.
+Cross-links: ADR-0045 (coach mode — extended), ADR-0048 (probe depth), ADR-0051 (Svelte 5 reactivity),
+ADR-0053 (bilingual), `specs/coach-profile-persistence-spec.md` §4/§6/§9. Folds CF2/CO2/CF5/CO19 +
+enrich FOLD-1/FOLD-2. Follow-ups: re-probing / à-la-carte scope (C2), blending played history (C4),
+profile export (C8), multi-day calendar scheduling (portfolio §7).

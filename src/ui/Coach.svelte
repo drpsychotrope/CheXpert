@@ -1,7 +1,9 @@
 <script lang="ts">
   import { app } from '../state/app.svelte';
+  import { onMount } from 'svelte';
   import Board from './Board.svelte';
   import Radar from './Radar.svelte';
+  import TrendList from './TrendList.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { PuzzleLadder } from '../calibration/Calibration';
   import { AdaptiveOpponent, initOpponentState } from '../engine/AdaptiveOpponent';
@@ -12,6 +14,7 @@
   import { buildWeaknessProfile, type DimensionScore } from '../analysis/weakness';
   import { buildCoachProfile, COACH_MOTIF_PROBES, COACH_LADDER_MIN, COACH_LADDER_MAX } from '../coach/diagnostic';
   import { buildCoachProgram } from '../coach/program';
+  import { buildCoachTrend, isStale, profileAgeDays, COACH_STALE_DAYS } from '../coach/coachTrend';
   import { buildSession } from '../analysis/session';
   import type { CoachProfile, ThemeProbeResult } from '../coach/types';
   import type { TacticalTrainer } from '../trainer/TacticalTrainer';
@@ -55,6 +58,31 @@
 
   let profile = $state<CoachProfile | null>(null);
   let programPreview = $state<ReturnType<typeof buildCoachProgram>>([]);
+
+  // C1 — surface the already-persisted (write-only, ADR-0045) coach profile on the intro.
+  // `saved`/`savedPrev`/`savedTrend` are $derived off app.model so they re-render when a fresh
+  // assessment commits a new profile (Svelte 5 reactivity; ADR-0051 lesson). `nowMs` is UI-stamped
+  // once on mount — the single Date boundary; the trend/staleness cores stay pure (AP-CPROF-1).
+  const saved = $derived<CoachProfile | undefined>(app.model?.coachProfile);
+  const savedPrev = $derived<CoachProfile | undefined>(app.model?.coachProfilePrev);
+  let nowMs = $state(0);
+  onMount(() => { nowMs = Date.now(); });
+  const savedTrend = $derived(saved ? buildCoachTrend(saved, savedPrev) : null);
+  const savedAgeDays = $derived(saved ? profileAgeDays(saved.assessedAt, nowMs) : null);
+  const savedStale = $derived(saved ? isStale(saved.assessedAt, nowMs) : false);
+  // Result-screen trend: commit() has already shifted coachProfile→coachProfilePrev, so prev is the
+  // run-before-this and `profile` is the new one (correct prev→current direction).
+  const resultTrend = $derived(profile ? buildCoachTrend(profile, app.model?.coachProfilePrev) : null);
+
+  /** Resume WITHOUT re-probing (Q-D / AP-CPROF-6): rebuild the program from the saved profile via the
+   *  pure buildCoachProgram, then wrap it exactly like startCoaching. Reload-safe — derived from the
+   *  persisted profile, not from the in-memory programPreview. No new persisted state (AP-CPROF-5). */
+  function resumeProgram() {
+    if (!saved) return;
+    const plan = buildCoachProgram(saved, 30, getLocale());
+    app.activeSession = { plan: buildSession(plan), current: 0, startedAt: Date.now(), reflection: '' };
+    app.go('session');
+  }
 
   function startLadders() {
     themeIdx = 0;
@@ -258,9 +286,34 @@
   <h2>{t('coach.title')}</h2>
 
   {#if step === 'intro'}
-    <p class="muted">{t('coach.intro')}</p>
-    <button onclick={startLadders} disabled={app.puzzles.size === 0}>{t('coach.startAssessment')}</button>
-    {#if app.puzzles.size === 0}<p class="muted">{t('coach.loadingPuzzles')}</p>{/if}
+    {#if saved}
+      <!-- C1: the always-on card IS the "view" of the saved profile (AP-CPROF-8 — no dead
+           "View profile" button). Only Start program + Re-assess are buttons. -->
+      <div class="panel col center" style="gap:0.5rem;width:100%">
+        <h3>{t('coach.savedTitle')}</h3>
+        <p class="muted" style="font-size:0.82rem">
+          {t('coach.lastAssessed', { date: new Date(saved.assessedAt).toLocaleDateString(getLocale()) })}{#if savedAgeDays !== null}{t('coach.ageSuffix', { days: savedAgeDays })}{/if}
+        </p>
+        {#if savedStale}<p class="feedback">{t('coach.staleNudge', { days: COACH_STALE_DAYS })}</p>{/if}
+        <Radar dimensions={saved.dimensions} />
+        <div class="row" style="gap:1.5rem;align-items:flex-start">
+          <div class="col"><b>{t('coach.strengths')}</b>{#each saved.strengths as s}<span>✔ {s}</span>{:else}<span class="muted">—</span>{/each}</div>
+          <div class="col"><b>{t('coach.focusOn')}</b>{#each saved.weaknesses as w}<span>△ {w}</span>{:else}<span class="muted">—</span>{/each}</div>
+        </div>
+        {#if savedTrend && savedTrend.motifs.length}
+          <TrendList trend={savedTrend} />
+        {/if}
+        <div class="row center">
+          <button onclick={resumeProgram}>{t('coach.startProgram')}</button>
+          <button style="background:transparent;border:1px solid var(--border)" onclick={startLadders} disabled={app.puzzles.size === 0}>{t('coach.reassess')}</button>
+        </div>
+        {#if app.puzzles.size === 0}<p class="muted">{t('coach.loadingPuzzles')}</p>{/if}
+      </div>
+    {:else}
+      <p class="muted">{t('coach.intro')}</p>
+      <button onclick={startLadders} disabled={app.puzzles.size === 0}>{t('coach.startAssessment')}</button>
+      {#if app.puzzles.size === 0}<p class="muted">{t('coach.loadingPuzzles')}</p>{/if}
+    {/if}
 
   {:else if step === 'ladders'}
     <p class="muted">{t('coach.themeProgress', { current: themeIdx + 1, total: THEMES.length })}<b>{t('motif.' + THEMES[themeIdx].theme)}</b>{t('coach.themeProgressSuffix')}</p>
@@ -327,6 +380,9 @@
           <li><b>{labelOrRaw('activity', item.activity, getLocale())}</b> <span class="muted">{t('coach.programItemMeta', { minutes: item.minutes, reason: item.reason })}</span></li>
         {/each}
       </ol>
+      {#if resultTrend && resultTrend.motifs.length}
+        <TrendList trend={resultTrend} />
+      {/if}
       <div class="row center">
         <button onclick={startCoaching}>{t('coach.startSession')}</button>
         <button style="background:transparent;border:1px solid var(--border)" onclick={() => app.go('home')}>{t('coach.later')}</button>
