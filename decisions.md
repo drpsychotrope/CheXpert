@@ -1543,3 +1543,20 @@ opponent), `specs/play-opponent-agency-spec.md` §0.5 / §4 / §9. Follow-ups (�
 (deferred), Sparring/Comeback parity once F6 migrates them, resignation-as-teaching-moment (Play+F4),
 difficulty as a coached program step, tuning `RESIGN_*`/`DRAW_*` curves against F5 telemetry, override-game
 weighting in downstream analysis (E5 — P3 only flags the record).
+
+---
+
+## P4 — opening-steering-symmetry (no new ADR; extends AP-CHESS-22)
+
+The weakness→opening steering (`selectOpening`) was sound but the book was asymmetric (10 White-bot /
+4 Black-bot lines), so some `(botColor, dimension)` pairs had no line — the ~3:1 weighting silently
+collapsed to uniform and `steeringNote` emitted the non-steering "Playing the X." Bidirectional gap:
+Black-bot missed tactics + endgameConversion; White-bot missed resilience. Resolutions (Q-A..Q-D):
+**Q-A=both** — add the minimal coverage lines AND a same-colour empty-pool fail-safe (AP-STEER-3, never
+feed `nextBookMove` a wrong-colour line). **Q-B=3** — `sicilian-b` (tactics), `exchangeCaro-b`
+(endgameConversion), `kingsGambitAccepted-w` (resilience); numeric 10/10 parity rejected as scope creep.
+**Q-C=eco.json-grounded** (B50/B12/C30). **Q-D=extend `ECO_NAME_FR`** with the 3 FR names (parity).
+Per-colour × per-dimension coverage is now a test (the union-only assertion masked the hole). Pure;
+signatures unchanged; no `DB_VERSION` bump; Insights byte-identical (only `Play.svelte` reads the book).
+775 tests green (758 + 17). Cross-links: ADR-0014/AP-CHESS-22, ADR-0053, `specs/opening-steering-symmetry-spec.md`.
+Follow-ups (§11): localize `steeringNote` (F1), coverage CI-lint, C7 opening→repertoire consumes this book.

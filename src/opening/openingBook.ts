@@ -67,6 +67,19 @@ export const OPENING_BOOK: OpeningEntry[] = [
     moves: ['d2d4', 'd7d5', 'c1f4'] },
   { id: 'caro-b', name: 'Caro-Kann', botColor: 'b', targets: 'timeManagement',
     moves: ['e2e4', 'c7c6'] },
+
+  // --- symmetry completion (P4): close per-colour Dimension coverage so steering reaches every
+  // (botColor, dimension) pair and never silently no-ops (AP-STEER-1/2). The book must keep
+  // PER-COLOUR coverage, not just union coverage. eco.json-grounded prefixes (B50, B12, C30). ---
+  // tactics (bot Black): sharp Sicilian → tactical middlegames (mirrors the White tactics cluster).
+  { id: 'sicilian-b', name: 'Sicilian Defence (as Black)', botColor: 'b', targets: 'tactics',
+    moves: ['e2e4', 'c7c5', 'g1f3', 'd7d6', 'd2d4'] },
+  // endgameConversion (bot Black): Exchange Caro-Kann → symmetric structure, reach endgames sooner.
+  { id: 'exchangeCaro-b', name: 'Caro-Kann, Exchange (as Black)', botColor: 'b', targets: 'endgameConversion',
+    moves: ['e2e4', 'c7c6', 'd2d4', 'd7d5', 'e4d5', 'c6d5'] },
+  // resilience (bot White): gambit a pawn so the PLAYER (Black) must defend/convert under pressure.
+  { id: 'kingsGambitAccepted-w', name: "King's Gambit Accepted", botColor: 'w', targets: 'resilience',
+    moves: ['e2e4', 'e7e5', 'f2f4', 'e5f4'] },
 ];
 
 /**
@@ -85,8 +98,10 @@ export function selectOpening(
 ): OpeningEntry {
   const pool = OPENING_BOOK.filter((o) => o.botColor === botColor);
   if (pool.length === 0) {
-    // Fallback: any opening (shouldn't happen — book covers both colours).
-    return OPENING_BOOK[0];
+    // Same-colour fail-safe (AP-STEER-3): never feed nextBookMove a wrong-colour line.
+    // Post-symmetry the book covers both colours for all 5 dims, so this is unreachable for real
+    // input; the uniform-variety path below is the intended degradation for an *unknown* dimension.
+    return OPENING_BOOK.find((o) => o.botColor === botColor) ?? OPENING_BOOK[0];
   }
   const weight = (o: OpeningEntry) => (weakest && o.targets === weakest ? 3 : 1);
   const total = pool.reduce((s, o) => s + weight(o), 0);
