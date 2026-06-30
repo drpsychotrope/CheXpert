@@ -1,0 +1,29 @@
+{
+  "pr": "coach-designed-probes",
+  "checked_at": "2026-06-30",
+  "head": "9296aff",
+  "spec_target": {
+    "path": "specs/coach-designed-probes-spec.md",
+    "exists": false,
+    "verdict": "CLEAN — greenfield spec, no overwrite."
+  },
+  "symbol_collisions": {
+    "designedProbe / DesignedProbe / designed-probe": "NONE in src/ or specs/ (grep clean).",
+    "AP-CDESIGN / AP-CDESIGN-*": "NONE — anti-pattern namespace is free.",
+    "scenarioForFocus": "EXISTS (program.ts:19) — routing-only helper; C3 does NOT collide (it adds its own focus->seed selection; does not redefine scenarioForFocus).",
+    "IMBALANCE_LIBRARY ids": "iqp, opp-castle, bishop-pair, rook-up exist. C3 reuses rook-up; any NEW coach seed must use a fresh id (e.g. 'coach:defend-worse') to avoid clashing with library ids and with scenariosFromWeakness 'weak:*' ids."
+  },
+  "adr_collision": {
+    "next_free_in_decisions": "0054 (decisions.md highest appended = 0053)",
+    "but_reserved": "0054-0058 reserved by unbuilt specs (portfolio/F3/F5/F6/P2). If C3 needs an ADR it must be >=0059.",
+    "expected": "C3 needs NO new ADR (additive-optional, reuses existing contracts)."
+  },
+  "db_collision": {
+    "DB_VERSION": 4,
+    "verdict": "C3 stores nothing new beyond the existing coachProfile.dimensions (a DimensionScore carries the probe outcome). No new store, no DB_VERSION bump. coachProfile is already persisted (additive ? fields)."
+  },
+  "i18n_key_collision": {
+    "namespaces_to_add_under": "scenario.* / program.* (generators.ts, pure-core) + coach.* (coach.ts, component). New keys must be net-new (e.g. coach.probe* , scenario.coachDefendWorse*); none of those exist today.",
+    "verdict": "No key collision; add net-new bilingual pairs."
+  }
+}

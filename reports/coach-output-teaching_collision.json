@@ -1,0 +1,36 @@
+{
+  "pr": "coach-output-teaching",
+  "feature": "C6",
+  "checked_at": "2026-06-30",
+  "parallel_prs": {
+    "open_matching_scope": [],
+    "result": "0 open PRs for coach/teach/narrative scope. No conflict."
+  },
+  "existing_spec": {
+    "coach-output-teaching-spec.md": "absent (this PR creates it)",
+    "any_c6_or_teaching_spec": "none"
+  },
+  "namespace_collisions": {
+    "coachReview.*": "EMPTY (grep found nothing) — CLEAN. New i18n namespace for C6 narrative/review/start-here strings.",
+    "narrative.*": "EMPTY — CLEAN (alternate namespace; coachReview.* preferred for cohesion with the coach surface).",
+    "AP-CTEACH-*": "EMPTY — CLEAN. New anti-pattern prefix for this PR (§9).",
+    "dashboard.biggestOpportunity": "EXISTS + bilingual (generators not needed; it's in messages/coach.ts). May be REUSED for the 'start here' framing or paralleled by coachReview.startHere — decided in Q-D."
+  },
+  "adr": {
+    "in_use_max": 58,
+    "reserved_by_portfolio": "0054 (portfolio), 0055 (F3), 0056 (F5), 0057 (F6); 0058 referenced.",
+    "c6_new_adr": false,
+    "c6_adr_rationale": "C6 is additive UI reuse: concept cards under ADR-0040, EvalGraph/criticalMoments under ADR-0021, coach under ADR-0045, i18n under ADR-0052/0053, narrative-purity mirrors program.ts (ADR-0045 + gt pattern). No new architectural decision. IF one is ever judged warranted at build time, allocate >=0059 (0054-0058 reserved per portfolio); do NOT pre-spend.",
+    "flag_threshold": ">=0059"
+  },
+  "doctrine_gates": {
+    "additive_optional": true,
+    "DB_VERSION_bump": false,
+    "honesty_no_grade": "narrative is directional, no invented Elo, no over-claim (AP-CTEACH-2/3)",
+    "pure_cores": "narrative builder + leverage rank are PURE, locale-injected, no Date/Math.random (mirror program.ts)",
+    "bilingual_FR_EN_parity": "all new strings FR+EN via templated catalogue phrases (gt over generators), NOT free LLM text",
+    "insights_byte_identical": "AP-COACH-1 — buildStudyPlan untouched; narrative does not read/mutate it",
+    "single_concern": "one concern: make the coach RESULT communicate + teach (narrative + cards + review + prioritization are one cohesive output surface)"
+  },
+  "verdict": "CLEAN — proceed to draft."
+}

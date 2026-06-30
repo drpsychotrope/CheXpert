@@ -1,0 +1,51 @@
+{
+  "pr": "game-session-controller",
+  "scan_date": "2026-06-30",
+  "measurement_method": "Read all three components in full; identified the shared move/engine/end loop surface and the per-component divergences. Line counts via wc -l.",
+  "component_sizes_lines": { "Play.svelte": 666, "Sparring.svelte": 173, "Comeback.svelte": 179, "total": 1018 },
+  "duplicated_loop_surface": {
+    "description": "The onMove -> (move + reassign fen + lastMove) -> checkEnd -> engineMove -> (pick + moveUci + reassign fen + lastMove) -> checkEnd loop, plus turnColor(), the ADR-0051 in-check derived + its 4-line comment, illegal-engine-move halt, resign-during-think guard, and the over-state guard.",
+    "shared_functions_reimplemented_in_all_three": [
+      { "fn": "turnColor()", "play": "Play.svelte:255-257", "sparring": "Sparring.svelte:66-68", "comeback": "Comeback.svelte:66-68", "identical": true },
+      { "fn": "inCheck $derived + ADR-0051 comment (4 lines verbatim)", "play": "Play.svelte:259-263", "sparring": "Sparring.svelte:70-74", "comeback": "Comeback.svelte:70-74", "identical": "comment byte-identical across all three" },
+      { "fn": "onMove(from,to,promo)", "play": "Play.svelte:265-282", "sparring": "Sparring.svelte:76-83", "comeback": "Comeback.svelte:76-84", "identical": "same skeleton; Play adds playedUci + coached pre-check" },
+      { "fn": "engineMove()", "play": "Play.svelte:321-372", "sparring": "Sparring.svelte:85-105", "comeback": "Comeback.svelte:86-106", "identical": "same skeleton; Play adds clock budget + book move + style branch + retry; siblings call pickMove(fen,500)" },
+      { "fn": "checkEnd()", "play": "Play.svelte:386-402", "sparring": "Sparring.svelte:107-120", "comeback": "Comeback.svelte:108-121", "identical": "same terminal()->status/result skeleton; Play folds the game (rating/persist), siblings only set result + resultKind" },
+      { "fn": "resign()", "play": "Play.svelte:494-502", "sparring": "Sparring.svelte:122-126", "comeback": "Comeback.svelte:123-127", "identical": "same shape; Play stops clock + finishGame('loss')" },
+      { "fn": "illegal engine move halt", "play": "Play.svelte:346-356", "sparring": "Sparring.svelte:93-97", "comeback": "Comeback.svelte:94-98", "identical": "same 'engine returned illegal -> status=over' guard, comment cross-refs P1-17" },
+      { "fn": "resign-during-think guard ((status as string)==='over')", "play": "Play.svelte:343", "sparring": "Sparring.svelte:90", "comeback": "Comeback.svelte:91", "identical": "same guard; comment cross-refs P1-14" }
+    ],
+    "estimated_duplicated_logic_lines_per_sibling": "~55-70 lines of move/engine/end loop in each of Sparring & Comeback are near-verbatim of each other (the two WEAK copies are ~90% identical to one another); Play is the superset.",
+    "sparring_vs_comeback_diff": "Sparring and Comeback loops differ only in: i18n key prefix (sparring.* vs comeback.*), seed source (Scenario vs ComebackPosition), playerSide source (sideToTrain vs playerColor), and the draw label semantics (drawn/good vs heldDraw/good). The MOVE/ENGINE/END mechanics are otherwise identical."
+  },
+  "capability_matrix": {
+    "clock": { "play": true, "sparring": false, "comeback": false },
+    "human_move_sampling_pickHumanMove": { "play": true, "sparring": false, "comeback": false },
+    "engine_error_retry_retryEngineMove": { "play": true, "sparring": false, "comeback": false },
+    "opening_book_steering": { "play": true, "sparring": false, "comeback": false },
+    "coached_takeback": { "play": true, "sparring": false, "comeback": false },
+    "chess960": { "play": true, "sparring": false, "comeback": false },
+    "rating_pool_fold_persistence": { "play": true, "sparring": false, "comeback": false },
+    "seeds_from_starting_fen": { "play": "START_FEN or 960", "sparring": "Scenario.fen", "comeback": "ComebackPosition.fen" },
+    "illegal_engine_move_halt": { "play": true, "sparring": true, "comeback": true },
+    "resign_during_think_guard": { "play": true, "sparring": true, "comeback": true }
+  },
+  "behaviour_to_preserve_exactly": [
+    "Play: clock budget (botMovetime), pickHumanMove vs pickMove by opponentStyle, retry on engine error, coached takeback, 960 fenForEngine routing, opening book move, rating fold + persist, FIDE 6.9 flag resolution.",
+    "Sparring: untimed, pickMove(fen,500) only (engine style, fixed movetime), NO persistence, resultKind good/bad, draw='drawn'(good).",
+    "Comeback: untimed, pickMove(fen,500) only, NO persistence, resultKind good/bad, draw='heldDraw'(good), idx/next-position flow."
+  ],
+  "tests_present": {
+    "pure_session_helpers": "src/game/playSession.test.ts (botMovetime/flagOutcome/applyGameResult)",
+    "board_reactivity": "src/ui/board-reactivity.test.ts via makeBoardState (ADR-0051 staleness regression) — DOM-free harness pattern",
+    "adaptive_opponent": "src/engine/AdaptiveOpponent.test.ts"
+  },
+  "tests_absent_CRITICAL": {
+    "component_level": "NO test mounts or imports Play.svelte / Sparring.svelte / Comeback.svelte. grep for 'Play.svelte|mount(|render(' in *.test.ts = 0 matches.",
+    "implication": "There is NO existing behaviour test of the triplicated loop at the component level. The parity gate CANNOT lean on existing component tests. The refactor MUST extract the loop into a DOM-free, unit-testable controller core (mirroring playSession.ts + board-reactivity.svelte.ts) so behaviour parity is PROVABLE. This is the single most important design constraint for this PR."
+  },
+  "purity_constraints": {
+    "must_stay_pure": "playSession.ts helpers (no Date/Math.random).",
+    "impure_dependencies": "AdaptiveOpponent.pickHumanMove uses Math.random; clock loop uses performance.now (Play only). The controller core takes these via injection (engine client + a now()/movetime provider) so the core stays testable; the Svelte component supplies the rAF/clock + DOM."
+  }
+}

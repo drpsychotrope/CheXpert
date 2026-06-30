@@ -1,0 +1,34 @@
+{
+  "pr": "coach-funnel-robustness",
+  "portfolio_id": "C8",
+  "measured": "2026-06-30",
+  "tooling": {
+    "tests": { "passed": 504, "files": 69, "command": "npx vitest run", "status": "all green" },
+    "svelte_check": { "errors": 0, "warnings": 0, "files": 383, "source": "portfolio §8 anchor (board-input-a11y/games-store-pgn-io baselines, independently re-confirmed)" },
+    "build": "green (portfolio anchor)"
+  },
+  "db_version": 4,
+  "component_test_harness": {
+    "present": false,
+    "evidence": "zero *.svelte.test.ts in src/ (verified). 504 tests are pure/logic + static wiring (e.g. board-reactivity.test.ts, promotion.test.ts).",
+    "consequence": "C8 verifies via pure-core unit tests + static wiring-presence + manual/preview — NOT component tests"
+  },
+  "insights_byte_identity": {
+    "guard_tests": ["src/analysis/studyPlan.test.ts", "src/analysis/session.test.ts"],
+    "c8_risk": "NONE — C8 touches funnel/resume/engine-message/export only; no selection/studyPlan/fingerprint logic. buildSession/buildStudyPlan/buildWeaknessProfile untouched."
+  },
+  "i18n": {
+    "structure": "src/i18n/messages/*.ts; coach namespace = src/i18n/messages/coach.ts (coach.* keys, FR+EN per entry)",
+    "parity_test": "src/i18n/translate.test.ts — structural (Message = Record<Locale,string>) + cross-domain collision guard",
+    "c8_rule": "every new user-facing string lands FR+EN in coach.ts (and home.* additions in the home namespace); parity passes by construction"
+  },
+  "purity": {
+    "rule": "no Date.now()/Math.random() in logic cores; Date.now() lives only at UI boundary (mirrors Session.svelte header note + F5 pgnFilename)",
+    "c8_application": "any export-filename/timestamp helper takes assessedAt as an argument (pure); DOM/Blob side-effect is feature-detected and lives outside the pure core"
+  },
+  "no_db_version_bump_path": {
+    "feasible": true,
+    "rationale": "CF4 resume can persist to an existing store via an additive optional field (schemaRev bump + load-path backfill) OR stay in-memory like activeSession; CF10 export reads existing coachProfile, writes a client-side file (no schema). CO20/CF8 are pure UI. => NO DB_VERSION bump required.",
+    "decision": "see spec §0.5 Q-B for the resume-persistence sub-decision"
+  }
+}

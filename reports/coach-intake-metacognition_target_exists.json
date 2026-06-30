@@ -1,0 +1,45 @@
+{
+  "pr": "coach-intake-metacognition",
+  "feature": "C5",
+  "scanned_at": "2026-06-30",
+  "question": "Does any symbol already reach the C5 end state (goals/intake step, metacog/calibration coaching in the coach result, strength-leverage program steps)?",
+  "verdict": "PARTIAL — substrate exists, end state does NOT. C5 is additive on top of shipped coach-mode (ADR-0045/0048) + metacog (ADR-0037).",
+  "targets": {
+    "intake_goal_step": {
+      "exists": false,
+      "evidence": "grep -rniE 'coachGoal|intakeStep|goalPicker' src/ → 0 hits. Coach.svelte Step union = 'intro'|'ladders'|'offer-game'|'game'|'analysing'|'result' (Coach.svelte:20); no goal/intake step. app.svelte.ts has only sparringScenarioId + steerDimension signals (lines 59,61); no goal signal.",
+      "conclusion": "Greenfield. Coach infers everything from ~14 puzzles; never asks the user a goal."
+    },
+    "metacog_calibration_coaching_in_coach": {
+      "exists": false,
+      "evidence": "calibration() (metacog.ts:130) is consumed ONLY in Insights.svelte:25 (the Insights screen), not in Coach.svelte. Coach.svelte imports nothing from metacog/ and never reads puzzleAttempts. The rich calibration readout {sentence,verdict,topCause,selfTags} is computed for Insights and ignored by the coach.",
+      "conclusion": "The data exists and is already bilingual; the coach simply never surfaces it. C5 wires the existing pure core into the coach result."
+    },
+    "strength_leverage_program_step": {
+      "exists": false,
+      "evidence": "buildCoachProgram (program.ts:42) emits ONLY weakness-first steps (weakMotifs delta<=-40, weakDims score<=35) + a 'maintenance' fallback when nothing flagged. profile.strengths is computed (diagnostic.ts:87-89) but consumed ONLY as a display checkmark list (Coach.svelte:254 `✔ {s}`); never fed into the program. grep -rniE 'leverageStrength|strengthLeverage' src/ → 0 hits.",
+      "conclusion": "strengths is display-only and never acted on (matches the prompt's verified claim). C5 adds an optional leverage step."
+    }
+  },
+  "reused_symbols_confirmed_present": [
+    {"symbol": "calibration()", "loc": "src/metacog/metacog.ts:130", "shape": "(attempts: MetacogAttempt[], opts?:{minReported?,locale?}) => Calibration{byConfidence,reportedAttempts,taggedMisses,selfTags,readout}", "pure": true},
+    {"symbol": "SELF_TAGS / SelfTag", "loc": "src/metacog/metacog.ts:14-22", "shape": "closed taxonomy incl. 'rushed','miscalculated','missed-opponent-resource','unfamiliar-pattern','wrong-plan','other'"},
+    {"symbol": "CalibrationReadout", "loc": "src/metacog/metacog.ts:58-65", "shape": "{sentence, verdict, topCause:{tag,pct}|null}"},
+    {"symbol": "buildCoachProgram", "loc": "src/coach/program.ts:42", "shape": "(profile, minutes=30, locale='fr') => PlanItem[]  ← NOTE: 3-arg, locale already present (W18/F3)"},
+    {"symbol": "buildCoachProfile", "loc": "src/coach/diagnostic.ts:45", "shape": "({puzzleRating,probes,gameDimensions,assessedAt,locale}) => CoachProfile"},
+    {"symbol": "CoachProfile.strengths/weaknesses", "loc": "src/coach/types.ts:30-31", "shape": "string[] display labels"},
+    {"symbol": "Coach.svelte wizard", "loc": "src/ui/Coach.svelte", "shape": "Step state machine; commit() persists coachProfile→coachProfilePrev (reload-then-write, I-1)"},
+    {"symbol": "allAttempts()", "loc": "src/store/attemptsRepo.ts:25", "shape": "() => Promise<PuzzleAttemptRecord[]>  ← Insights casts to MetacogAttempt[]"},
+    {"symbol": "PuzzleAttemptRecord.confidence/selfTag", "loc": "src/store/db.ts:47-48", "shape": "confidence?:'sure'|'unsure'|'guess'; selfTag?:string  (already persisted)"},
+    {"symbol": "settings.metacogEnabled", "loc": "src/store/db.ts:89", "shape": "boolean? (opt-in gate; default false — ADR-0037)"},
+    {"symbol": "View union", "loc": "src/state/app.svelte.ts:12-34", "includes": "'coach' already present"}
+  ],
+  "pre_v0_corrections": [
+    "buildCoachProgram is (profile, minutes, locale) — 3 args, NOT (profile, minutes). The prompt's 2-arg description is stale; bilingual landed in W18/F3.",
+    "COACH_LADDER_MIN/MAX = 2/2 (≈14 puzzles, matches prompt) — ADR-0048 superseded ADR-0045 Q-D's 3/5.",
+    "program.ts reason strings ALREADY bilingual via injected locale + gt (generators.ts program.* keys). New reasons must follow the same pattern.",
+    "calibration readout already fully bilingual + already rendered in Insights with selfTag.* / metacog.verdict* keys. C5 surfaces the SAME core in the coach — no new metacog math.",
+    "metacog coaching is GATED behind settings.metacogEnabled in Insights; C5 must respect the same gate (no calibration line if the user opted out / has no data)."
+  ],
+  "stop": false
+}

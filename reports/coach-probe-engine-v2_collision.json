@@ -1,0 +1,41 @@
+{
+  "pr": "coach-probe-engine-v2",
+  "feature": "C2",
+  "checked_at": "2026-06-30",
+  "spec_file_collision": {
+    "path": "specs/coach-probe-engine-v2-spec.md",
+    "pre_existing": false,
+    "note": "Greenfield spec — no prior file."
+  },
+  "report_file_collision": {
+    "glob": "reports/coach-probe-engine-v2_*",
+    "pre_existing": false,
+    "note": "Greenfield reports."
+  },
+  "adr": {
+    "latest_in_decisions_md": "ADR-0053",
+    "reserved_by_architecture": "0054 (portfolio cascade); F3=0055, F5=0056, F6=0057 (drafted, not yet appended for unbuilt PRs).",
+    "reserved_band_for_feature_PRs": "0054-0058 reserved; new feature ADRs flag >= 0059.",
+    "c2_adr_decision": "NO new ADR required. C2 is additive-optional, no DB_VERSION bump, no new architectural boundary — it extends the existing coach probe engine (ADR-0045) and consumes F3's recording contract (ADR-0055). If the reviewer deems the a-la-carte scope + timed probe an architectural surface, flag ADR-0059 (first free slot above the reserved band). Default: extend ADR-0045 in prose, no new ADR.",
+    "rationale": "Mirrors F1/F2/F4 which took no new ADR (extend existing). C2 introduces no schema migration and no cross-cutting boundary; the probe-set changes live inside the established coach core."
+  },
+  "anti_pattern_namespace": {
+    "requested": "AP-CPROBE-*",
+    "pre_existing_in_repo": false,
+    "evidence": "grep 'AP-CPROBE' over *.md => 0 matches. Fresh namespace, no collision.",
+    "adjacent_namespaces": ["AP-COACH-1..8 (coach-mode-spec.md)", "AP-ATTEMPT-1..8 (attempt-recording-weakness-spec.md, F3)"],
+    "note": "AP-CPROBE-* is the C2-local namespace; it CITES AP-COACH-2/3/6/8 and AP-ATTEMPT-1/5 rather than redefining them."
+  },
+  "symbol_collisions": {
+    "new_pure_core_proposed": "src/coach/probePlan.ts",
+    "exists": false,
+    "evidence": "no src/coach/probePlan.ts; the coach dir holds diagnostic.ts, program.ts, types.ts.",
+    "new_exports_proposed": ["buildProbePlan", "ProbeSpec", "ProbeKind", "borderlineDepth", "COACH_ENDGAME_BUCKETS", "COACH_BORDERLINE_BAND", "COACH_PROBE_MAX_TOTAL"],
+    "collision": "none — none of these identifiers exist today (verified: COACH_MOTIF_PROBES/COACH_LADDER_MIN/COACH_LADDER_MAX are the only COACH_* exports in diagnostic.ts).",
+    "i18n_keys_proposed": ["motif.rookEndgame", "motif.pawnEndgame", "motif.minorPieceEndgame", "coachProbe.* (scope picker + timed-probe copy)", "dimShort/dim already cover the 5 dims"],
+    "i18n_collision": "motif.endgame exists; motif.rookEndgame/pawnEndgame/minorPieceEndgame are NEW (no collision). coachProbe.* is a fresh key prefix."
+  },
+  "dependency_collision": {
+    "F3": "C2 depends on F3 (coachProbe? field + recordTacticsAttempt probe wiring). F3 is drafted, not built. NOT a file collision but a BUILD-ORDER constraint: build F3 before C2's recording sub-feature, or have C2 introduce coachProbe? (then F3 inherits it). No double-definition risk if built in order."
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "pr": "i18n-label-routing",
+  "scanned": "2026-06-30",
+  "leak_sites": [
+    { "site": "Coach program list", "file": "src/ui/Coach.svelte", "line": 260, "renders": "{item.activity} — {item.focus}", "leak": true, "note": "activity has no catalogue namespace; focus is mixed key/prose" },
+    { "site": "Trainer theme display", "file": "src/ui/Tactics.svelte", "line": 399, "renders": "puzzle.themes.join(', ')", "leak": true, "note": "open-vocabulary Lichess themes; only 7 motif.* keys exist" },
+    { "site": "Insights study-plan item", "file": "src/ui/Insights.svelte", "key": "insights.planItem", "renders": "{minutes}m · {activity}", "leak": "probable", "note": "cross-axis catch (cycle 2); verify the {activity} param is raw at exec" },
+    { "site": "Play opponent-style", "file": "src/ui/Play.svelte", "line": 518, "renders": "play.opponentHuman / play.opponentEngine", "leak": false, "note": "ALREADY translated — dropped from F1 scope (cycle 1)" }
+  ],
+  "resolvers": {
+    "file": "src/i18n/gen.ts",
+    "gt": "line 8 — translate generator key by injected locale",
+    "gtHas": "line 13 — key existence",
+    "motifLabelOrRaw": "line 18 — gt('motif.'+k) or raw fallback (motif namespace ONLY)"
+  },
+  "verdict": "2 of 3 claimed sites confirmed; Play dropped; Insights added. PROCEED with corrected scope."
+}

@@ -1,0 +1,77 @@
+{
+  "pr": "attempt-recording-weakness",
+  "foundation": "F3",
+  "scanned_at": "2026-06-30",
+  "head_commit": "9296aff",
+  "verdict": "PROCEED",
+  "summary": "All targets and reuse hooks EXIST and behave as the architecture spec claims. Both folds (CF1, TR2) are empirically real. No DB_VERSION bump required. AP-COACH-8 and AP-COACH-1 constraints are both satisfiable with the planned design.",
+  "folds": {
+    "CF1": {
+      "claim": "Coach.svelte onLadderMove calls only ladder.report(); the ~14 diagnostic probe attempts are never written to attempts/SRS/weaknessCounters (no attemptsRepo import).",
+      "verified": true,
+      "evidence": {
+        "file": "src/ui/Coach.svelte",
+        "onLadderMove_lines": "87-103",
+        "writes": "ladder.report(true|false) only (lines 92, 96)",
+        "attemptsRepo_import": "ABSENT (imports verified lines 1-18; only loadPlayerModel from store/playerModel)",
+        "probe_count": "COACH_LADDER_MAX=2 per theme x (6 COACH_MOTIF_PROBES + 1 endgame) = ~14 puzzles, scored whether solved or not (diagnostic.ts:15-22)"
+      }
+    },
+    "TR2": {
+      "claim": "weaknessCounters is written but READ nowhere except ?? {} backfill; trainer selection (loadNext) ignores it.",
+      "verified": true,
+      "evidence": {
+        "write_sites": [
+          "src/ui/Tactics.svelte:233 (finish, on miss)",
+          "src/ui/Review.svelte:122 (grade, on miss)",
+          "src/analysis/runAnalysis.ts:74 (fold motif tags)"
+        ],
+        "read_sites": [
+          "src/store/playerModel.ts:77 (migration backfill `r.weaknessCounters ?? {}`)",
+          "src/store/playerModel.ts:26 (freshPlayerModel seed `{}`)"
+        ],
+        "consumed_by_selection": false,
+        "loadNext_lines": "src/ui/Tactics.svelte:117-161 — selection priority is drillThemes -> personal -> curated; NEVER reads model.weaknessCounters",
+        "stale_comment": "runAnalysis.ts:67-68 claims weaknessCounters is 'used by the trainer's personalised selection and the dashboard' — EMPIRICALLY FALSE; no selection or dashboard read exists. Fix the comment in this PR."
+      }
+    }
+  },
+  "reuse_hooks": {
+    "recordTacticsAttempt": {
+      "file": "src/store/attemptsRepo.ts:37-58",
+      "signature": "recordTacticsAttempt(opts: { attempt: PuzzleAttemptRecord; puzzle: Puzzle; model: PlayerModel; srs: { kind: SrsItemKind; refId: string; grade: Grade }; now: number }): Promise<SrsCardRecord>",
+      "side_effects": "ONE atomic IndexedDB tx over ['puzzleAttempts','puzzles','srsCards','playerModel']: writes attempt log, puzzle row (its drifting rating), graded FSRS card, and the supplied player model. Grades FSRS via pure gradeCard/newCard. Returns the new card.",
+      "weaknessCounters_fold": "DOES NOT fold weaknessCounters itself — it persists whatever model the CALLER passes. The caller (Tactics.finish / Review.grade) mutates model.weaknessCounters BEFORE calling and passes $state.snapshot(model). So weaknessCounters is caller-owned, not repo-owned.",
+      "rating_pool_note": "It writes opts.puzzle (the puzzle's own Glicko) and opts.model.puzzleRating. To honor AP-COACH-8, coach probe recording MUST pass the puzzle UNCHANGED and a model whose puzzleRating is UNCHANGED."
+    },
+    "fsrs": {
+      "file": "src/srs/fsrs.ts",
+      "pure": true,
+      "resultToGrade": "resultToGrade(solved, ms, thresholds?) -> Grade (Again/Hard/Good/Easy)",
+      "newCard_gradeCard": "pure; Date passed as `now` epoch ms"
+    },
+    "PuzzleRepo.next": {
+      "file": "src/trainer/PuzzleRepo.ts:142-169",
+      "signature": "next(q: PuzzleQuery): Promise<Puzzle | null>",
+      "themes_param": "PuzzleQuery.themes?: string[] — accept() keeps a puzzle if it has ANY of the listed themes (line 147, OR-semantics)",
+      "selection_internals": "rating-window filter -> sort by |rating-target| -> deterministic id-hash pick among closest <=8 (no Math.random; PURE-ish, uses hashId). Bias point for weakness steering is the `themes` arg, not internal scoring."
+    },
+    "weaknessCounters_increment_sites": "Tactics.svelte:231-235, Review.svelte:122, runAnalysis.ts:71-77 (all guard on miss / player-color motif)",
+    "playerModel": {
+      "file": "src/store/playerModel.ts",
+      "weaknessCounters": "Record<string, number>, seeded {} (line 26), migrated `?? {}` (line 77)",
+      "persistModel": "app.persistModel(now) writes the in-memory model; recordTacticsAttempt writes it inside the atomic tx instead"
+    },
+    "app_state_hooks": {
+      "tacticsFilterThemes": "src/state/app.svelte.ts:46 ($state<string[]|null>) — the existing dashboard 'Drill' filter the trainer already honors first in loadNext",
+      "tacticsTimed": "src/state/app.svelte.ts:48"
+    }
+  },
+  "tac_trainer": {
+    "file": "src/trainer/TacticalTrainer.ts",
+    "playUserMove": "returns 'correct'|'solved'|'wrong'; coach onLadderMove already uses it via PuzzleLadder.next() trainer",
+    "elapsedMs": "elapsedMs(now) available for an ms field on coach probe attempts",
+    "gradeAttempt": "PURE function returning {player, puzzle} Ratings; mutates NOTHING (TacticalTrainer.ts:93-115). The ladder uses it for the ladder's OWN rating only — never persists puzzleRating."
+  },
+  "no_core_premise_wrong": true
+}

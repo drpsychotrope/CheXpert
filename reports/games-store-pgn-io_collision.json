@@ -1,0 +1,72 @@
+{
+  "pr": "games-store-pgn-io",
+  "scanned_at": "2026-06-30",
+  "method": "grep planned new symbols / i18n keys / views against the live tree before reserving them",
+  "verdict": "NO COLLISIONS",
+  "symbols": [
+    {
+      "planned": "getAllGames",
+      "collides": false,
+      "evidence": "grep getAllGames → 0 hits in src/. Free to add to src/store/gamesRepo.ts.",
+      "note": "Sibling reads in the codebase use getAllFromIndex (attemptsRepo.ts:22) and getAll (attemptsRepo.ts:27, runAnalysis.ts:94). getAllGames should mirror: db.getAllFromIndex('games','playedAt') for chronological order."
+    },
+    {
+      "planned": "getRecentGames / gameHistory (alt names considered)",
+      "collides": false,
+      "evidence": "0 hits.",
+      "note": "Single primitive recommended: getAllGames() returning GameRecord[] (smallest API). A 'recent N' variant is YAGNI for V1 — the history list can slice client-side."
+    },
+    {
+      "planned": "exportPgn / downloadPgn (PGN export helper)",
+      "collides": false,
+      "evidence": "grep exportPgn|downloadPgn → 0 hits. No createObjectURL/Blob/download= anywhere.",
+      "note": "Greenfield. A tiny download helper (Blob([pgn],{type:'application/x-chess-pgn'}) → object URL → a.click() → revokeObjectURL) is new surface; filename from GameRecord.playedAt + result, NOT Date.now()."
+    },
+    {
+      "planned": "importFromHistory / re-analyse-from-history",
+      "collides": false,
+      "evidence": "0 hits.",
+      "note": "Re-analysing a played game reuses the EXISTING runAnalysis(source:'played') + getAnalysis-idempotency pattern already in Play.svelte:456-492 — extract or call, don't reinvent."
+    }
+  ],
+  "i18n_keys": [
+    {
+      "planned": "history.* (title, empty, analysed, notAnalysed, open, analyse, exportPgn, playedOn, result*)",
+      "collides": false,
+      "evidence": "grep 'history\\.' → 0 hits in src/i18n. No existing 'history' namespace.",
+      "note": "Add under the 'play' domain file (src/i18n/messages/play.ts already hosts home.* + play.*) OR a small new 'history.' sub-namespace within play.ts. Do NOT create a new domain file (avoids index.ts churn + keeps the collision-test sum simple). Each key carries fr+en → parity test green by construction."
+    },
+    {
+      "planned": "PGN export label keys (play.exportPgn / import.exportPgn)",
+      "collides": false,
+      "evidence": "No export/download keys exist in play.ts or any domain.",
+      "note": "Reuse the existing play.* namespace for the Play-tail export button; import.* for the Import-view history section."
+    }
+  ],
+  "views": [
+    {
+      "planned": "new top-level 'history' view",
+      "collides": false,
+      "recommendation": "DO NOT ADD",
+      "evidence": "View union (src/state/app.svelte.ts) has no 'history'. Adding one needs View-union + App.svelte loaders[] + NAV[] edits = 3 coupled edits + a new lazy chunk.",
+      "default": "Q-A → attach history as a SECTION inside the existing Import.svelte (view 'import', nav.analyse). Zero routing churn, single concern, reachable from Home + nav already."
+    }
+  ],
+  "store_collisions": {
+    "new_store": "none",
+    "new_index": "none",
+    "DB_VERSION_bump": "NONE — F5 is read-only over the existing 'games' store + the existing 'playedAt' index. Doctrine (additive, no bump) satisfied without exception."
+  },
+  "behavioural_collisions": [
+    {
+      "area": "id namespace",
+      "risk": "low",
+      "detail": "Played games: id 'g:<epoch>' (Play.svelte:432). Imported games: id 'import:<W>-<B>-<hash>' (Import.svelte:80), stored in the SEPARATE importedGames store. getAllGames reads ONLY the 'games' store → returns played games, never imported. History of imported games (if wanted) is a SEPARATE read (db importedGames) — keep F5 scoped to PLAYED games (PL1) and DEFER an imported-games history unless trivially folded."
+    },
+    {
+      "area": "960 games in history",
+      "risk": "low",
+      "detail": "GameRecord.variant==='chess960' games ARE written to 'games'. They must show in history but the 'analyse' affordance must stay disabled for them (existing AP-960-4 / Play.svelte:625-629 rationale). History list reuses that guard."
+    }
+  ]
+}

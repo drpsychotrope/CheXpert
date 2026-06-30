@@ -1,0 +1,47 @@
+{
+  "pr": "coach-real-data-assessment",
+  "feature": "C4",
+  "measured_at": "2026-06-30",
+  "tests": {
+    "command": "npx vitest run",
+    "result": "504 passed",
+    "files": "69 passed",
+    "duration_s": 7.39,
+    "raw_tail": "Test Files 69 passed (69) / Tests 504 passed (504)"
+  },
+  "svelte_check": {
+    "command": "npm run check",
+    "result": "0 errors / 0 warnings / 383 files (per enhancements-architecture-spec.md §8 portfolio anchor; not re-run this scan)",
+    "note": "C4 spec is V1-specs-only (no code); check baseline asserted at build time"
+  },
+  "db_version": {
+    "value": 4,
+    "path": "src/store/db.ts:125",
+    "c4_changes_it": false
+  },
+  "adr_state": {
+    "latest_in_decisions_md": "ADR-0053",
+    "reserved_by_portfolio_sec8": {"0054": "portfolio", "0055": "F3", "0056": "F5", "0057": "F6"},
+    "0058": "free (reserved band 0054-0058 per C4 instruction)",
+    "c4_adr_decision": "NONE — C4 consumes existing pure cores additively (no new architectural pattern, no schema change). Mirrors F1/F2/F4 (no new ADR). Instruction: flag >=0059 only if architectural; C4 is not."
+  },
+  "key_hooks_present": {
+    "loadAllAnalyses": "src/analysis/runAnalysis.ts:91 (reads gameAnalyses; imported+played)",
+    "buildWeaknessProfile": "src/analysis/weakness.ts:204 (N-game array signature)",
+    "buildCoachProfile": "src/coach/diagnostic.ts:45 (gameDimensions arg)",
+    "runAnalysis": "src/analysis/runAnalysis.ts:39 (source 'imported'|'played')",
+    "parsePgn/inferPlayerColor": "used in src/ui/Import.svelte:4 (F5 primitive, already wired)",
+    "GameAnalysis.source/analyzedAt": "src/analysis/types.ts:69,71 (pure windowing)"
+  },
+  "coach_current_data_path": {
+    "probes": "Coach.svelte:56-115 — themed PuzzleLadders, ~14 puzzles (COACH_LADDER_MIN/MAX=2)",
+    "game": "Coach.svelte:130-175 — ONE bot game (AdaptiveOpponent), runAnalysis(source:'played', gameId coach-<ts>), buildWeaknessProfile([analysis]).dimensions",
+    "commit": "Coach.svelte:181-195 — buildCoachProfile({gameDimensions}); persists coachProfile + coachProfilePrev",
+    "history_consumed": "NONE (loadAllAnalyses not imported)"
+  },
+  "blast_radius": {
+    "files_touched_estimate": ["src/ui/Coach.svelte (data path + offer-step UI)", "src/coach/diagnostic.ts OR a thin new pure helper (optional)", "src/i18n/messages/coach.ts (labels)"],
+    "insights_risk": "NONE if buildWeaknessProfile/buildStudyPlan unchanged (verify snapshot)",
+    "db_risk": "NONE (no schema change)"
+  }
+}

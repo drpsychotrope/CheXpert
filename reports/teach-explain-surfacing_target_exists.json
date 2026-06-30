@@ -1,0 +1,130 @@
+{
+  "pr": "teach-explain-surfacing",
+  "foundation": "F4",
+  "scannedAt": "2026-06-30",
+  "repoRoot": "D:/Download/Chess/.claude/worktrees/vigorous-hofstadter-7b1751",
+  "branch": "claude/vigorous-hofstadter-7b1751",
+  "verdict": "PROCEED",
+  "summary": "All reuse hooks named in the architecture spec (F4) and the PR brief exist and were read. One brief inaccuracy corrected: explain.ts `uciToSan` is module-PRIVATE (not exported); F4 reuses the exported `explainPly()` (which calls uciToSan internally) and, for UCI->SAN in the new component, reuses the established ChessGame.moveUci + formatSanLine path that Calculate already uses.",
+  "reuseHooks": [
+    {
+      "hook": "Calculate.svelte revealSolution()",
+      "path": "src/ui/Calculate.svelte",
+      "lines": "155-180",
+      "exists": true,
+      "kind": "component-private function",
+      "what": "Steps a fresh ChessGame through puzzle.moves at 350ms/ply, reassigning fen + lastMove; builds a numbered SAN line via formatSanLine. NOT exported — logic is inlined in the component. F4 extracts this into a shared component.",
+      "notes": "Uses a setTimeout chain stored in revealTimer; cleared on onDestroy. Impure (Date.now indirectly via caller, setTimeout) — playback is a UI concern, kept in the component, not a pure core."
+    },
+    {
+      "hook": "formatSanLine()",
+      "path": "src/calc/calc.ts",
+      "lines": "35-42",
+      "exists": true,
+      "exported": true,
+      "kind": "pure function",
+      "what": "Numbers a SAN ply list into '1.Nf3 e5 2.Bc4'. White-first numbering. Pure. Reusable as-is.",
+      "tested": "src/calc/calc.test.ts (9 tests, green)"
+    },
+    {
+      "hook": "explain.ts explainPly()",
+      "path": "src/analysis/explain.ts",
+      "lines": "51-112",
+      "exists": true,
+      "exported": true,
+      "kind": "pure function (bilingual via injected locale)",
+      "what": "Returns { headline, reasons[], better } — a fact-derived bilingual explanation of one analysed ply. Requires a full PlyAnalysis (engine facts). Pure, locale injected.",
+      "tested": "src/analysis/explain.test.ts (10 tests, green incl. fr parity)",
+      "consumerFit": "Coach game-review (has PlyAnalysis from runAnalysis). NOT directly usable for a trainer-miss (a puzzle line has no PlyAnalysis / no engine eval at solve time)."
+    },
+    {
+      "hook": "explain.ts uciToSan()",
+      "path": "src/analysis/explain.ts",
+      "lines": "21-35",
+      "exists": true,
+      "exported": false,
+      "kind": "module-private helper",
+      "what": "UCI->SAN best-effort via chess.js, guarding the promotion field. PRIVATE to explain.ts.",
+      "correction": "PR brief lists `uciToSan` as a reuse hook; it is not exported. F4 does NOT export it (avoids widening surface). The shared reveal component derives SAN via new ChessGame(fen).moveUci(uci) + formatSanLine, exactly as Calculate.revealSolution already does."
+    },
+    {
+      "hook": "EvalGraph.svelte",
+      "path": "src/ui/EvalGraph.svelte",
+      "lines": "1-92",
+      "exists": true,
+      "kind": "component",
+      "props": "{ analysis: GameAnalysis, selected?: number|null, onSelect?: (plyIndex)=>void }",
+      "what": "Inline-SVG clickable win-prob curve with mistake/blunder markers, player vs opponent. No global accuracy grade. Already i18n via t()/fmtPct.",
+      "consumer": "Coach game-review (CO13). DEFERRED in F4 to feature PR C6 (see arbitrage Q-C)."
+    },
+    {
+      "hook": "criticalMoments() / winCurve()",
+      "path": "src/analysis/criticalMoments.ts",
+      "lines": "25-55",
+      "exists": true,
+      "exported": true,
+      "kind": "pure selectors",
+      "what": "winCurve(analysis) -> player-POV win% per ply; criticalMoments(analysis,{max,minLoss}) -> ranked biggest swings (turning points). Pure, deterministic tie-break.",
+      "consumer": "Coach game-review turning points (CO13). DEFERRED to C6."
+    },
+    {
+      "hook": "ConceptCard.svelte + cardForThemes()",
+      "path": "src/ui/ConceptCard.svelte ; src/concepts/concepts.ts",
+      "exists": true,
+      "what": "ConceptCard renders title/idea/worked examples. cardForThemes(themes,cards) resolves the highest-precedence card. Already wired behind Tactics `showLearn` (first-exposure OR leech).",
+      "tested": "src/concepts/concepts.test.ts (5 tests, green)",
+      "consumer": "Already surfaced in Tactics via showLearn. F4 does NOT touch this (arbitrage Q-B: concept card stays behind existing showLearn)."
+    },
+    {
+      "hook": "TacticalTrainer.expectedMove() + solution line (puzzle.moves)",
+      "path": "src/trainer/TacticalTrainer.ts",
+      "lines": "37-40",
+      "exists": true,
+      "exported": true,
+      "what": "expectedMove() returns next expected user UCI; puzzle.moves is the full verified solution line (user/opp alternating). The trainer marks state.status='failed' on a wrong move; puzzle.moves + puzzle.fen are intact afterwards (the instance is not mutated past the wrong move).",
+      "consumerFit": "On a miss, Tactics/Review have puzzle.fen + puzzle.moves in scope -> exactly the inputs Calculate.revealSolution needs. No engine call required (line is pre-verified)."
+    },
+    {
+      "hook": "Tactics.svelte miss path",
+      "path": "src/ui/Tactics.svelte",
+      "lines": "188-220, 367-379",
+      "exists": true,
+      "what": "onMove(): on 'wrong' -> stopTimer, feedback=t('tactics.wrong'), finish(false), then RESETS board to puzzle.fen. Solution is NEVER shown. showLearn link (concept card) already present.",
+      "isProofConsumer": true
+    },
+    {
+      "hook": "Review.svelte miss path",
+      "path": "src/ui/Review.svelte",
+      "lines": "86-110",
+      "exists": true,
+      "what": "onMove(): on 'wrong' -> feedback=t('review.missed'), reset board to puzzle.fen, grade(false). Solution NEVER shown. Same shape as Tactics; second TR1 consumer.",
+      "isProofConsumer": "secondary (in-scope to wire as it is structurally identical; see arbitrage Q-C)"
+    },
+    {
+      "hook": "Coach.svelte finishGame()",
+      "path": "src/ui/Coach.svelte",
+      "lines": "159-175, 248-268",
+      "exists": true,
+      "what": "Computes full runAnalysis() then DISCARDS the GameAnalysis, keeping only .dimensions for the radar. Result step shows ONLY the Radar. This is CO13: the EvalGraph + turning points are computable but never surfaced.",
+      "consumer": "DEFERRED to C6 (arbitrage Q-C). F4 lands the shared component; Coach consumption is C6's job."
+    },
+    {
+      "hook": "i18n catalogue (tactics domain)",
+      "path": "src/i18n/messages/tactics.ts",
+      "exists": true,
+      "what": "Bilingual FR/EN message map. calc.solution already exists ('Solution : {line}' / 'Solution: {line}'). New F4 strings (e.g. a 'Show solution' toggle label, 'why' headers) go here, FR+EN, guarded by translate.test.ts collision test.",
+      "addStringsHere": true
+    },
+    {
+      "hook": "Board.svelte playback props",
+      "path": "src/ui/Board.svelte",
+      "exists": true,
+      "what": "Accepts fen, orientation, viewOnly, lastMove, arrows. Calculate drives the reveal purely by reassigning fen + lastMove with viewOnly=true. The shared component reuses the same prop contract."
+    }
+  ],
+  "premiseCorrections": [
+    "explain.ts uciToSan is NOT exported (brief implied it as a reuse hook) -> reuse explainPly (exported) for the Coach path; derive SAN via ChessGame.moveUci+formatSanLine for the reveal, matching Calculate.",
+    "explainPly requires a full PlyAnalysis (engine eval). A trainer-miss has no PlyAnalysis -> the trainer-miss 'why' is the puzzle's THEME-derived line (puzzle.themes -> motif label), NOT explainPly. explainPly is the Coach game-review path (DEFERRED to C6). This splits the 'why' by consumer exactly as arbitrage Q-B recommends.",
+    "Two trainer-miss consumers exist (Tactics AND Review), not one. Both have identical miss-reset shape. Q-C revisited: wire BOTH as proof consumers (same one-liner each) rather than Tactics only."
+  ]
+}

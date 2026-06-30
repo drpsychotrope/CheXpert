@@ -1,0 +1,25 @@
+{
+  "pr": "play-loop-closure",
+  "captured_at": "2026-06-30",
+  "environment": {"node": "v20.20.2", "os": "win32"},
+  "tests": {"command": "npm test (vitest run)", "result": "504 passed", "files": "69 passed", "failures": 0, "matches_portfolio_anchor": true},
+  "svelte_check": {"command": "npm run check", "errors": 0, "warnings": 0, "files": 383, "matches_portfolio_anchor": true},
+  "db_version": {"value": 4, "file": "src/store/db.ts:125", "p1_bump": "NONE planned — see additive-persistence note"},
+  "component_test_harness": {"svelte_test_files": 0, "note": "Zero *.svelte.test.ts confirmed via find. P1 verifies via pure-core unit tests + static wiring-presence + manual/preview — NOT component tests (portfolio fact held)."},
+  "additive_persistence_feasibility": {
+    "approach": "If P1 persists a 'last unanalysed gameId', the natural home is SettingsRecord (src/store/db.ts:77-95) as an optional field, mirroring the established pattern: opponentStyle?, lastTimeControl?, metacogEnabled?, locale? — every one additive with a read-site `?? default` and NO DB_VERSION bump.",
+    "alternative_no_persistence": "P1 can ALSO derive the unanalysed set purely from F5's getAllGames() + getAnalyzedGameIds() at read time (no new field at all). This is the strongest additive posture: zero schema change. See arbitrage Q-A.",
+    "db_version_bump_needed": false,
+    "justification": "Both candidate designs are additive: either a single optional SettingsRecord field (read `?? null`) OR a pure derived read over existing stores. Neither drops/renames/reindexes a store, so DB_VERSION stays 4 (db.ts:121-124 migration policy: additive => no bump)."
+  },
+  "steering_semantics_baseline": {
+    "selectOpening": "openingBook.ts:81-103 — weights weakest-targeting opening 3:1, else 1:1; null weakest => uniform (neutral variety).",
+    "steeringNote": "openingBook.ts:127-132 — 'Steering toward your weakest area (X)' when matched, else 'Playing the X' (neutral).",
+    "broken_loop_root": "No analyses -> loadAllAnalyses() returns [] -> weakest=null -> neutral opening + neutral note. Closing the loop (any analysed game with a detected weakness) flips this to a steered opening."
+  },
+  "i18n_baseline": {
+    "play_messages_file": "src/i18n/messages/play.ts",
+    "structure": "Home (home.*) + Play (play.*) namespaces; every key a {fr,en} Message; parity enforced structurally by translate.test.ts.",
+    "existing_loop_copy": "play.tip already documents the loop ('After the game, hit Analyse this game ... The bot then steers future openings ...'). New P1 strings (batch/queue affordance, badge) extend play.* (or a play.loop.* sub-namespace), FR+EN by construction."
+  }
+}

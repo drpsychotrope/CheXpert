@@ -1,0 +1,70 @@
+{
+  "pr": "coach-profile-persistence",
+  "feature_id": "C1",
+  "portfolio": "specs/enhancements-architecture-spec.md §3 (Coach stack)",
+  "drafted": "2026-06-30",
+  "scan_method": "read real code, verified every hook EXISTS, captured empirical baseline, no false premise found",
+  "verdict": "ALL PREMISES CONFIRMED — proceed (no STOP)",
+  "targets": {
+    "src/ui/Coach.svelte": {
+      "exists": true,
+      "lines": 269,
+      "role": "the ONLY consumer of CoachProfile; owns the wizard, the result render, and the persistence write",
+      "key_sites": {
+        "intro_step": "lines 207-210 — currently a single 'Start the assessment' button; NO surfacing of any saved profile (the C1 insertion point)",
+        "commit_write": "lines 181-195 — buildCoachProfile -> shift coachProfile->coachProfilePrev, set coachProfile=p, persistModel (WRITE)",
+        "assessedAt_stamp": "line 182 — assessedAt: Date.now() (UI boundary, correct per AP-COACH-3)",
+        "startCoaching": "lines 197-201 — sets app.activeSession from buildSession(programPreview) then app.go('session')",
+        "later_button": "line 265 — onclick={() => app.go('home')} — DISCARDS programPreview (activeSession never set on this path)",
+        "result_render": "lines 248-267 — Radar + strengths/weaknesses + program list (the resume target shape)"
+      }
+    },
+    "src/coach/types.ts": {
+      "exists": true,
+      "lines": 34,
+      "CoachProfile_fields": ["assessedAt:number", "puzzleRating:number", "motifs:MotifScore[]", "dimensions:DimensionScore[]", "strengths:string[]", "weaknesses:string[]", "source:{ladders,game}", "gameAnalyzed:boolean"],
+      "MotifScore_fields": ["theme:string", "rating:number (ABSOLUTE themed Glicko — the CF5 comparability hook)", "baseline:number", "delta:number (rating-baseline, drifts with baseline)", "n:number"]
+    },
+    "src/coach/program.ts": {
+      "exists": true,
+      "buildCoachProgram": "PURE (profile, minutes=30, locale) -> PlanItem[]; rebuilds a program from a CoachProfile with NO engine/ladder/probe — this is the resume hook (rebuild from saved profile, no re-probe)"
+    },
+    "src/coach/diagnostic.ts": {
+      "exists": true,
+      "note": "delta computed vs CURRENT baseline each run (line 61) — confirms CF5 premise; absolute MotifScore.rating is the cross-run-stable field"
+    },
+    "src/store/db.ts": {
+      "exists": true,
+      "coachProfile_decl": "lines 67-68 — coachProfile?/coachProfilePrev? optional, 'NO DB_VERSION bump' documented",
+      "DB_VERSION": 4,
+      "migration_policy": "lines 121-124 — additive optional field => bump record schemaRev + backfill in load path; NO DB_VERSION bump"
+    },
+    "src/store/playerModel.ts": {
+      "exists": true,
+      "load_path": "optional fields read with ?? default (conceptSeen ?? [] etc.); coachProfile/coachProfilePrev are objects read as undefined when absent — no backfill needed (read sites must guard undefined)"
+    },
+    "src/analysis/session.ts": {
+      "exists": true,
+      "buildSession": "PURE (PlanItem[], {includeReview?}) -> SessionPlan — the wrapper startCoaching already uses; reused unchanged for resume"
+    },
+    "src/ui/Session.svelte": {
+      "exists": true,
+      "resume_contract": "onMount: if app.activeSession set -> RESUME (no history rebuild); else rebuild from loadAllAnalyses (AP-COACH-7). Confirms 'Later' path loses the program because activeSession is never set."
+    },
+    "src/ui/Radar.svelte": {
+      "exists": true,
+      "props": "dimensions: DimensionScore[], size?:number — reused as-is to render a saved profile's radar on intro"
+    },
+    "src/i18n/messages/coach.ts": {
+      "exists": true,
+      "namespace": "coach.* — all FR/EN paired; new strings append here (bilingual parity)"
+    }
+  },
+  "reuse_hooks_verified": {
+    "persisted_coachProfile_coachProfilePrev": "EXISTS (db.ts:67-68) — currently write-only",
+    "buildCoachProgram_rebuild_without_reprobe": "EXISTS (program.ts:42) — pure, takes a CoachProfile",
+    "MotifScore.rating_absolute": "EXISTS (types.ts:11) — cross-run-stable themed rating",
+    "Radar": "EXISTS (Radar.svelte) — dimensions prop",
+    "buildSession": "EXISTS (session.ts:41) — wraps PlanItem[] for activeSession"
+  }
+}

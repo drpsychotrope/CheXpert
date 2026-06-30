@@ -1,0 +1,40 @@
+{
+  "pr": "attempt-recording-weakness",
+  "captured_at": "2026-06-30",
+  "head_commit": "9296aff",
+  "db_version": 4,
+  "player_schema_rev": 1,
+  "settings_schema_rev": 1,
+  "latest_adr": "ADR-0053",
+  "next_adr_for_this_pr": "ADR-0055 (ADR-0054 is reserved by enhancements-architecture-spec.md for the portfolio cascade)",
+  "current_behaviour": {
+    "coach_probes": {
+      "count": "~14 (2 per motif x 6 motifs + 2 endgame; diagnostic.ts COACH_LADDER_MIN=MAX=2, COACH_MOTIF_PROBES has 6 entries)",
+      "persistence": "NONE — onLadderMove records only into the in-memory PuzzleLadder rating; no attempts row, no FSRS card, no weaknessCounters increment",
+      "rating_pool_touch": "NONE — ladder rating is local to the PuzzleLadder instance; puzzleRating untouched (correct per AP-COACH-8)"
+    },
+    "weaknessCounters": {
+      "written_on_miss": "Tactics + Review (per puzzle theme), runAnalysis (per played-game motif tag)",
+      "read_for_selection": "NEVER (dead-read)",
+      "read_for_study_plan": "NEVER (buildStudyPlan consumes fingerprint `leaks`, not weaknessCounters)",
+      "read_for_dashboard": "NEVER"
+    },
+    "trainer_selection_loadNext": {
+      "order": "1) app.tacticsFilterThemes (dashboard drill) -> 2) personal puzzles -> 3) curated in rating zone",
+      "no_drill_path": "falls straight to personal then curated; weakness themes never bias it"
+    }
+  },
+  "test_baseline": {
+    "note": "Per ADR-0053 the repo was last green at 500 Vitest, svelte-check 0/0, build green (decisions.md ADR-0053 delivered line). This PR must not regress that. Exact `npm test` count to be re-confirmed at build time; specs deliver no code so no run performed here.",
+    "expected_pre_pr": "svelte-check 0 errors / 0 warnings; ~500 Vitest passing; build green"
+  },
+  "ap_coach_1_guarantee": {
+    "statement": "Insights study-plan output is byte-identical regardless of F3's weaknessCounters writes/reads.",
+    "why_safe": "Insights.svelte:34 calls buildStudyPlan(leaks, weakest, minutes, {locale}). `leaks` come from fingerprint.ts over GameAnalysis plies; `weakest` from the radar/weakness dims. NEITHER reads weaknessCounters. coach/program.ts:3 documents the same byte-identity invariant. F3 touches ONLY weaknessCounters (write coach probes into it; read it for trainer selection) — a store the study-plan never consults.",
+    "regression_guard": "studyPlan.test.ts determinism test already exists (line 38). F3 adds no change to studyPlan.ts or its inputs."
+  },
+  "ap_coach_8_guarantee": {
+    "statement": "Coach diagnostic probes must NOT leak into rating pools (puzzleRating / game pools).",
+    "design": "Coach probe recording will write an attempt row + FSRS card + (optionally) weaknessCounters, but will pass the puzzle row UNCHANGED and a model whose puzzleRating is UNCHANGED to the persistence path. gradeAttempt is NOT called for probes-as-rating; the ladder's own rating stays local and is never persisted to puzzleRating."
+  }
+}

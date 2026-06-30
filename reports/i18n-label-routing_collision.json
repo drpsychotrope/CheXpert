@@ -1,0 +1,9 @@
+{
+  "pr": "i18n-label-routing",
+  "checked": "2026-06-30",
+  "open_prs_matching": [],
+  "merged_prs_matching": [
+    { "num": 31, "title": "V2-W18 — UI bilingue FR/EN + bascule de langue (i18n)", "merged": "2026-06-16", "relation": "ENABLING foundation (the catalogue + gt/translate this PR extends), not a duplicate" }
+  ],
+  "verdict": "No collision. PROCEED. >24h since the enabling merge; F1 is additive on top of it."
+}

@@ -1,0 +1,64 @@
+{
+  "pr": "play-in-game-ux",
+  "portfolio": "P2 of enhancements-architecture-spec.md (§3 Play stack)",
+  "scan_date": "2026-06-30",
+  "verdict": "PASS — all four fold premises verified TRUE against real code; PR is display/UX wiring over existing pure cores, additive-optional, no DB bump required",
+  "dependency": {
+    "F2_board-input-a11y": {
+      "status": "spec V1 (drafted, may not be built yet)",
+      "contract_honored": "P2 does NOT touch move-INPUT wiring; Play already wires onMoveText (Play.svelte:592-598). F2 explicitly DEFERS ply MOVE NAVIGATION (←/→ through plies) to 'the PRs that own a move list (P2 in-game UX)' — board-input-a11y-spec.md §11 D2. So P2 OWNS the move-list rendering + (optional) ply nav, F2 owns move text-entry. No duplication."
+    }
+  },
+  "folds": {
+    "PL3_move_list": {
+      "premise": "Play renders board+clocks+status only; game.history()/game.pgn() already maintained — only display missing",
+      "verified": "TRUE",
+      "evidence": [
+        "Play.svelte renders <Board>, clocks (lines 571-576), feedback/result — NO move list anywhere",
+        "ChessGame.history(): string[] exists (ChessGame.ts:160), SAN array, 960-aware ([...san960] in 960, chess.js history() otherwise)",
+        "ChessGame.pgn() exists (ChessGame.ts:119), used in finishGame (Play.svelte:440)",
+        "grep move-list|movelist|notation across src/ui → only Onboarding/Play/Coach, all calling game.history() for ENGINE BUDGET (history().length), none rendering a move list — greenfield display",
+        "NOTE: Play.onMove (line 265) pushes UCI to playedUci but does NOT store SAN; the move list must read game.history() (SAN) live"
+      ]
+    },
+    "PL10_rematch": {
+      "premise": "no rematch; must reconfigure color+TC+variant; newGame() already reads persisted state",
+      "verified": "TRUE",
+      "evidence": [
+        "Only newGame() exists (Play.svelte:122). After 'over' the only button is 'New game' (line 615) which keeps the CONFIG controls visible — the user must re-pick if they changed nothing, but settings restore TC.",
+        "newGame() reads persisted lastTimeControl via the mount $effect (lines 100-113) and resolves colorChoice via resolveColor(colorChoice) (line 125)",
+        "colorChoice is LOCAL component state defaulting 'white' (line 46) — NOT persisted; variant is local state (line 50)",
+        "settings persisted: coachedMode, opponentStyle, lastTimeControl (db.ts:79/85/87). colorChoice + variant are NOT persisted → a rematch that 'keeps same color+TC+variant' just re-invokes newGame() with the CURRENT in-memory colorChoice/variant (still set from the just-played game) — trivially same-color."
+      ]
+    },
+    "PL8_confirm_resign": {
+      "premise": "resign() fires immediately + writes a rated loss; ConfirmDialog already imported in Play and used for coach take-back",
+      "verified": "TRUE",
+      "evidence": [
+        "resign() (Play.svelte:494) immediately sets status='over', stops clock, sets result, calls finishGame('loss')",
+        "finishGame('loss') (line 404) calls applyGameResult → updateRating (Glicko, RATED) + recordGame, writes a GameRecord via putGame (line 450), persistModel — confirmed a RATED loss with no confirmation",
+        "ConfirmDialog imported (Play.svelte:28) and already instantiated for the coached take-back (lines 648-656) with confirm/cancel handlers — the exact reuse target",
+        "ConfirmDialog.svelte has a `danger` prop (line 14/90) for destructive styling — ideal for confirm-resign"
+      ]
+    },
+    "PL7_takeback_blunder_check": {
+      "premise": "takeback exists only in coached blunder dialog; ChessGame.undo() full incl 960; coachEvalBad() shallow eval exists",
+      "verified": "TRUE",
+      "evidence": [
+        "coachTakeBack() (Play.svelte:292) is the ONLY takeback; reachable ONLY via coachOpen dialog (set in onMove line 278 when coached && coachEvalBad()) — not available in normal play",
+        "ChessGame.undo(): void (ChessGame.ts:289) — full undo, 960 snapshot-restore (history960.pop) and chess.undo() for standard. coachTakeBack already calls game.undo() + fen=game.fen + playedUci.pop()",
+        "coachEvalBad() (Play.svelte:308) — shallow eval depth 8 fullStrength, returns true if cp past ±250 from player POV; catch → false (eval failure never blocks). Reusable behind a button.",
+        "RATING-INTEGRITY: finishGame always RATES + persists; GameRecord has NO rated/unrated or takeback-used field (id,pgn,result,botElo,playedAt,coached,timeControl?,variant?,startFen?) — adding one is additive-optional (mirrors coached?/variant?), NO DB bump"
+      ]
+    }
+  },
+  "reuse_hooks_verified": {
+    "src/game/ChessGame.ts": { "history()": "line 160 OK", "undo()": "line 289 OK", "pgn()": "line 119 OK", "resolveMove()": "line 236 OK (F2 path)" },
+    "src/ui/Play.svelte": { "newGame()": "line 122 OK", "resign()": "line 494 OK", "ConfirmDialog import": "line 28 OK", "ConfirmDialog usage": "lines 648-656 OK", "coachEvalBad": "line 308 OK", "coachTakeBack": "line 292 OK", "finishGame": "line 404 OK", "onMove": "line 265 OK" },
+    "src/ui/ConfirmDialog.svelte": "OK — props open/title/body/confirmLabel/cancelLabel/danger/onConfirm/onCancel; Esc cancels, focus trap+restore, primary autofocus",
+    "src/ui/Settings.svelte": "toggle pattern at lines 17-18/23-24 + checkbox markup 75/84 — canonical for the opt-in takeback setting",
+    "src/i18n/messages/play.ts": "play.* catalogue, FR/EN object-per-key — new P2 keys land here",
+    "src/store/db.ts": "SettingsRecord (line 77) + GameRecord (additive-optional precedent: coachedMode/opponentStyle/lastTimeControl/variant?/startFen?)"
+  },
+  "stop_escalate": "NONE — premise sound, proceed to draft"
+}

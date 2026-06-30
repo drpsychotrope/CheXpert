@@ -1,0 +1,45 @@
+{
+  "pr": "teach-explain-surfacing",
+  "capturedAt": "2026-06-30",
+  "repoRoot": "D:/Download/Chess/.claude/worktrees/vigorous-hofstadter-7b1751",
+  "commands": {
+    "test": "npx vitest run",
+    "checkTargeted": "npx vitest run src/analysis/explain.test.ts src/calc/calc.test.ts src/concepts/concepts.test.ts",
+    "check": "npx svelte-check --tsconfig ./tsconfig.json"
+  },
+  "fullSuite": {
+    "testFiles": 69,
+    "tests": 504,
+    "status": "all passing",
+    "durationApproxSec": 7.2
+  },
+  "targetedSuite": {
+    "files": ["src/analysis/explain.test.ts", "src/calc/calc.test.ts", "src/concepts/concepts.test.ts"],
+    "tests": 24,
+    "status": "all passing"
+  },
+  "svelteCheck": {
+    "files": 383,
+    "errors": 0,
+    "warnings": 0,
+    "filesWithProblems": 0
+  },
+  "behavioralBaseline": {
+    "tacticsOnMiss": "feedback = 'Not the move — Retry the position, or move on.' ; board RESET to puzzle.fen ; lastMove cleared ; solution line NOT shown ; concept-card link shown only if first-exposure OR leech (showLearn).",
+    "reviewOnMiss": "feedback = review.missed ; board RESET to puzzle.fen ; grade(false) ; solution line NOT shown ; no concept card.",
+    "calculateOnSubmit": "phase='revealed' ; revealSolution() animates puzzle.moves at 350ms/ply on a view-only board AND prints t('calc.solution', { line: formatSanLine(san) }). This is the ONLY surface today that shows an animated solution + SAN line.",
+    "coachOnResult": "runAnalysis() computed in finishGame() ; full GameAnalysis discarded (only .dimensions used) ; result step renders ONLY <Radar> ; EvalGraph + criticalMoments NOT surfaced (CO13)."
+  },
+  "byteIdentityRefs": {
+    "insightsStudyPlan": "AP-COACH-1 — Insights/study-plan output must stay byte-identical (F4 must not alter it; F4 does not touch selection/profile).",
+    "explainPlyOutput": "explain.test.ts pins headline/reasons/better in EN+FR. F4 must not change explainPly output (reuse only).",
+    "evalGraphOutput": "EvalGraph not modified in F4 (consumed only by C6 later).",
+    "formatSanLineOutput": "calc.test.ts pins formatSanLine. F4 reuses, does not change."
+  },
+  "doctrineChecks": {
+    "dbVersionBump": "NOT required — F4 is presentational reuse; no new persisted fields.",
+    "pureCores": "No new Date/Math.random in logic. The reveal component owns setTimeout (UI timing), matching Calculate's existing pattern; pure helpers (formatSanLine, theme->label) stay pure.",
+    "bilingual": "Any new user-facing string lands FR+EN in src/i18n/messages/tactics.ts (collision-guarded).",
+    "honesty": "trainer-miss 'why' is theme/motif-derived (no engine claim it doesn't have); no grade introduced."
+  }
+}

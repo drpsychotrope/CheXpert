@@ -1,0 +1,29 @@
+{
+  "pr": "coach-intake-metacognition",
+  "feature": "C5",
+  "scanned_at": "2026-06-30",
+  "method": "grep src/ for the symbols C5 would introduce; check for parallel open work; verify no shipped spec already owns this scope.",
+  "symbol_collisions": {
+    "coachGoal | CoachGoal | goalPicker | intakeStep | coach.*intake": {"hits": 0, "status": "CLEAN"},
+    "leverageStrength | strengthLeverage | leverageStep": {"hits": 0, "status": "CLEAN"},
+    "goalWeight | weightForGoal | program.*goal": {"hits": 0, "status": "CLEAN"},
+    "calibrationLine | metacogCoaching | coachCalibration": {"hits": 0, "status": "CLEAN"}
+  },
+  "namespace_reuse_intentional": {
+    "calibration()": "REUSED as-is from metacog.ts — NOT a collision; C5 imports the existing pure core (same call Insights makes).",
+    "buildCoachProgram": "EXTENDED in-place (add optional goal param + strength-leverage tail) — single owner (program.ts), additive signature.",
+    "CoachProfile": "EXTENDED in-place (additive optional fields: goal?, calibration coaching is derived not stored) — single owner (types.ts).",
+    "coach.* / program.* i18n keys": "EXTENDED with new {fr,en} entries in the same files (coach.ts / generators.ts). No key renamed."
+  },
+  "parallel_work_check": {
+    "open_coach_specs": ["coach-mode-spec.md (SHIPPED, ADR-0045/0048)"],
+    "metacognition_spec": "specs/metacognition-spec.md exists — this is the SHIPPED ADR-0037 self-tag/calibration FEATURE (the data producer). C5 is the CONSUMER (coach surfaces it). NOT a collision; complementary.",
+    "portfolio_position": "C5 in enhancements-architecture-spec §3 (Coach stack), folds CO3+CO14+CO18, dep: metacog+calibration (both shipped). No sibling PR touches the coach program generator (C2=probe engine, C6=output/teaching, C7=program-v2 routing). C7 'Program v2' is the nearest neighbour — see boundary note.",
+    "c5_vs_c7_boundary": "C7 (Program v2) owns time-budget toggle / mastery-based steps / closed-loop efficacy / opening->repertoire routing. C5 owns goal-INTAKE (asking the user) + metacog coaching surface + strength-leverage. The 'soft goal weighting' in C5 (Q-B) must be a thin re-ordering layer that C7 can later refine — C5 does NOT pre-empt C7's mastery/efficacy routing. Documented in spec §0 + AP-CINTAKE."
+  },
+  "insights_byte_identity_risk": {
+    "risk": "C5 reads puzzleAttempts + calibration; could it perturb Insights?",
+    "verdict": "NO. C5 only READS via allAttempts()/calibration() (no writes to puzzleAttempts), and does NOT touch buildStudyPlan. Insights output stays byte-identical (AP-COACH-1). Verify with existing Insights snapshot at §6."
+  },
+  "verdict": "CLEAN. All net-new symbols are unused. All reuses are single-owner additive extensions. No parallel PR contends for the coach program generator. C5 ships additive-optional, no DB_VERSION bump."
+}

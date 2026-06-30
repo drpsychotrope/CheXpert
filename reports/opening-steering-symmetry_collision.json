@@ -1,0 +1,29 @@
+{
+  "pr": "opening-steering-symmetry",
+  "checked": "2026-06-30",
+  "question": "Does the end state (every Dimension reachable for both bot colours + a safe fallback) already exist anywhere, and does completing the book collide with anything that depends on the current asymmetry?",
+  "end_state_absent": true,
+  "evidence": [
+    "selectOpening already filters by botColor and weights by targets===weakest, but the DATA can't satisfy the weighting for uncovered (colour, dimension) pairs — so the intended end state (steering works for both colours) is NOT reached today.",
+    "steeringNote returns the non-steering 'Playing the X.' wording whenever the chosen opening.targets !== weakest, which is exactly what happens on a silent no-op — so the user-facing symptom is already wired; only the DATA + an explicit no-coverage path are missing."
+  ],
+  "silent_no_op_demonstrated": {
+    "scenario": "player White (bot Black), weakest = tactics",
+    "picks_tested": [0, 0.25, 0.5, 0.75, 0.99],
+    "result": "every pick returned a non-tactics Black line (ruylopez-b/scandi-b/philidor-b/caro-b); weighting collapsed to uniform because the weight-3 set was empty; steeringNote emitted 'Playing the X.' (no steering) for all picks",
+    "conclusion": "Steering for tactics (and endgameConversion) is a SILENT no-op when the bot is Black today. Same for resilience when the bot is White. Confirmed by simulation."
+  },
+  "collisions": {
+    "tests": {
+      "src/opening/openingBook.test.ts": "Adding lines does NOT break existing tests: legality test iterates all lines (new lines validated legal); 'covers both colours + all 5 dims' tests the UNION and still passes; selectOpening colour/bias/variety tests use bot='w' tactics (unaffected); nextBookMove uses italian-w/scandi-b by id (unaffected); steeringNote uses italian-w (unaffected). The ~3:1 variety test asserts otherPicks>0 — still true after additions. NO existing assertion contradicts the new rows.",
+      "risk": "LOW. New per-colour-coverage assertions are ADDED, not modifying existing ones."
+    },
+    "insights_byte_identity": "buildStudyPlan / Insights do NOT read OPENING_BOOK or selectOpening (grep: only Play.svelte + docs/plans reference these symbols). Adding opening lines cannot alter Insights output. SAFE (AP-COACH-1 untouched).",
+    "i18n_parity": "New opening names ('Sicilian Defence (as Black)', 'Caro-Kann, Exchange (as Black)', \"King's Gambit Accepted\") are user-visible via steeringNote/Play. FR parity must be added to the ECO_NAME_FR overlay in eco.ts (or steeringNote must localize). Base names already have FR entries ('Défense sicilienne', 'Défense Caro-Kann', 'Gambit du roi') — the '(as Black)'/'Exchange'/'Accepted' qualifiers need FR equivalents. ARBITRAGE Q-D.",
+    "selectOpening_fallback": "Current length-0 fallback returns OPENING_BOOK[0] (italian-w) regardless of requested colour — a latent bug: a wrong-colour entry would feed nextBookMove the wrong side and silently never produce a bot move. After the PR the pool is never empty for a real colour, but the colour-agnostic fallback (Q-A) should return a same-colour entry to make a future gap fail safe, not silently no-op.",
+    "chess960": "Play.svelte:152 sets opening=null for 960 (no book). selectOpening is not called for 960. No collision.",
+    "F6_controller": "game-session-controller-spec.md will relocate the nextBookMove call; it does not change OPENING_BOOK contents or selectOpening signature. Data + fallback changes here are orthogonal and compose with F6."
+  },
+  "db_version_bump": "NONE. No schema, no persistence, no migration. DB_VERSION stays 4.",
+  "adr": "No new ADR expected. P4 completes existing behaviour (AP-CHESS-22 steering) with data + a fallback; it is not architectural. Flag for a NEW ADR only if Q-A is resolved toward a structurally new color-agnostic fallback mechanism (>= 0058, since 0054-0057 are reserved). Default recommendation: extend AP-CHESS-22 rationale inline, no ADR."
+}

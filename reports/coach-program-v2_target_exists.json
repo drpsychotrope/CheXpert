@@ -1,0 +1,77 @@
+{
+  "pr": "coach-program-v2",
+  "feature": "C7",
+  "scanned_at": "2026-06-30",
+  "verdict": "PASS — every premise in the prompt verified against real code; no STOP",
+  "hooks_verified": {
+    "buildCoachProgram": {
+      "path": "src/coach/program.ts:42",
+      "signature": "buildCoachProgram(profile: CoachProfile, minutes = 30, locale: Locale = 'fr'): PlanItem[]",
+      "pure": true,
+      "notes": "No Date/Math.random. Already takes a `minutes` param with default 30 and an injected `locale`. The toggle work is therefore wiring (pass a chosen budget), NOT a core signature change for CO5. Steps are time-boxed {minutes} blocks via take(); no mastery/criterion field today (CO16 is the new shape)."
+    },
+    "coach_30_hardcoded": {
+      "path": "src/ui/Coach.svelte:184",
+      "literal": "programPreview = buildCoachProgram(p, 30, getLocale());",
+      "confirmed": true,
+      "note": "The 30-min budget is hardcoded at the single call-site. Session.svelte:32 also hardcodes `const minutes = 30; // same default budget as Insights`."
+    },
+    "insights_budget_toggle": {
+      "path": "src/ui/Insights.svelte:21,134-138",
+      "state": "let minutes = $state(30);",
+      "options": [15, 30, 60],
+      "keys": ["insights.min15", "insights.min30", "insights.min60"],
+      "confirmed": true,
+      "note": "The toggle pattern to mirror: a <select bind:value={minutes}> with 15/30/60 options; `buildStudyPlan(...,minutes,...)` is $derived so the plan recomputes on change. Coach lacks this entirely."
+    },
+    "efficacy": {
+      "path": "src/analysis/efficacy.ts",
+      "fn": "motifEfficacy(analyses, motifKey, opts): EfficacyReadout",
+      "pure": true,
+      "shape": "EfficacyReadout { motifKey, label, early, recent, deltaPct, enoughData }",
+      "consumed_by": "src/ui/Insights.svelte:10,28-29 (top-3 leaks) — DISCONNECTED from the coach loop",
+      "confirmed": true,
+      "note": "Descriptive before/after miss-rate; deltaPct<0 = improved; honesty caveat insights.didItMoveBody ('Descriptive, not proof'). enoughData gates display. This is the read C7 wires back into the coach program (CO10)."
+    },
+    "openingBook": {
+      "path": "src/opening/openingBook.ts:30",
+      "size": "14 lines (10 White-bot, 4 Black-bot) — per opening-steering-symmetry baseline",
+      "fns": ["selectOpening(botColor, weakest, pick)", "nextBookMove", "steeringNote"],
+      "targets_type": "Dimension (tactics|endgameConversion|openingAccuracy|timeManagement|resilience)",
+      "confirmed": true,
+      "note": "Book is keyed by Dimension, not by ECO opening. There is NO 'most-played opening' index in it. P4 (opening-steering-symmetry, V1) completes per-colour coverage; C7 must stay book-agnostic and consume via the same Dimension key."
+    },
+    "eco": {
+      "path": "src/opening/eco.ts + public/openings/eco.json",
+      "fns": ["nameOpening(uci, table)", "describeOpening", "localizedOpeningName", "ECO_NAME_FR overlay"],
+      "confirmed": true,
+      "note": "eco.json names a played line by longest-prefix UCI match. ECO_NAME_FR gives FR display parity. This is how a 'concrete opening' is identified from played games — but the coach profile today carries NO opening identity (see gaps)."
+    },
+    "repertoire": {
+      "path": "src/repertoire/repertoire.ts + src/repertoire/types.ts",
+      "fns": ["buildLine", "saveLine", "listLines(color?)", "getLine", "RepertoireDrill"],
+      "RepertoireLine": "{ id, color, name, opening?, moves[], san[], createdAt }",
+      "confirmed": true,
+      "note": "Repertoire is a user-built, FSRS-drilled line store. buildCoachProgram step (program.ts:72) routes openingAccuracy → generic activity:'repertoire', focus:'opening lines' — never a specific line/id."
+    },
+    "PlanItem": {
+      "path": "src/analysis/studyPlan.ts:11",
+      "shape": "{ activity: 'tactics'|'endgames'|'repertoire'|'comeback'|'vision'|'sparring'|'play-steered'; focus: string; minutes: number; reason: string }",
+      "confirmed": true,
+      "note": "focus + activity are STABLE ROUTING KEYS (never translated); reason is the bilingual display string. buildSession (session.ts:50) maps PlanItem.activity→SessionStep.kind 1:1 and carries focus through to tacticsRouting/scenarioForFocus/app.steerDimension. Any new field on PlanItem must be additive-optional or it breaks buildStudyPlan/buildSession callers."
+    },
+    "buildStudyPlan": {
+      "path": "src/analysis/studyPlan.ts:37",
+      "confirmed": true,
+      "note": "SEPARATE generator (Insights). AP-COACH-1: buildCoachProgram deliberately does NOT call or mutate it; Insights stays byte-identical. C7 must NOT fork buildStudyPlan and must NOT route to empty modes (AP-COACH-5)."
+    }
+  },
+  "gaps_that_shape_scope": [
+    "CoachProfile (src/coach/types.ts) carries motifs + 5 DimensionScores + strengths/weaknesses, but NO opening identity (no ECO/most-played-opening field). CO17 cannot read a 'weak opening' from the profile today — it must derive it from analysed games (eco.json over the played PGNs) OR route to a generic-but-honest repertoire prompt. This is arbitrage Q-D.",
+    "The coach program is a PREVIEW + a launched Session (buildSession→Session.svelte). The closed loop (CO10) has no persistence hook of its own: efficacy reads from stored analyses (loadAllAnalyses), which already exist. So CO10 = surface the existing efficacy read inside the coach result, descriptively — no new store needed.",
+    "Session.svelte:32 hardcodes minutes=30 independently of Coach.svelte; the budget toggle's chosen value lives in the coach UI and must reach buildSession via the program. Decide whether the toggle drives only the preview or also the launched session (arbitrage Q-A scope)."
+  ],
+  "db_version": 4,
+  "db_bump_needed": false,
+  "db_bump_rationale": "All four folds are computational (budget param already exists; mastery is a new additive-optional PlanItem field read with ?? ; closed loop reads existing analyses; opening routing derives from existing eco.json). No new non-optional persisted field required."
+}

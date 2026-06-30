@@ -1,0 +1,28 @@
+{
+  "pr": "trainer-integrity-retention",
+  "feature": "T3",
+  "measured_at": "2026-06-30",
+  "head": "9296aff",
+  "commands": ["npm test (vitest run)", "npm run check (svelte-check)"],
+  "results": {
+    "tests": { "files": 69, "passed": 504, "failed": 0, "duration_s": 7.07 },
+    "svelte_check": { "files": 383, "errors": 0, "warnings": 0, "files_with_problems": 0 },
+    "build": "not re-run (check+test green; build = check + vite build, gate inherited)"
+  },
+  "schema": { "DB_VERSION": 4, "PlayerModel.schemaRev": 1, "SettingsRecord.schemaRev": 1, "latest_ADR": "0053" },
+  "anchor_match": "EXACT — matches portfolio-wide anchor (§8: 504 tests / 69 files green, svelte-check 0/0 across 383 files, DB_VERSION 4)",
+  "behavioural_baseline_to_preserve": {
+    "hint": "hint() reveals the from-square of the next expected user move; usedHint is NOT tracked; a hinted first-attempt solve grades a CLEAN win (full Glicko gain via gradeAttempt; FSRS Good/Easy via resultToGrade). THIS is the integrity defect T3 fixes.",
+    "session_counters": "solvedThisSession/attemptedThisSession are component-local, reset every mount; no persistence of training days / streak / daily goal.",
+    "movetime": "ms recorded per attempt; consumed ONLY by resultToGrade for the FSRS grade — no aggregate avg / fast+wrong pattern surfaced.",
+    "study_plan": "buildStudyPlan output is the AP-COACH-1 byte-identity invariant — it consumes leaks + weakest dimension, NEVER attempt ms or streak; T3 must not perturb it.",
+    "dueReview": "app.dueReview (boot + view-change) is the existing retention/re-engagement count (Home/Review badge)."
+  },
+  "doctrine_targets": {
+    "no_db_version_bump": "Retention fields (dailyStreak?, dailyGoal?, lastTrainedAt?) + usedHint? are additive-optional; mirror conceptSeen?/visionStats?/coachProfile? — NO DB_VERSION bump (bump schemaRev, backfill in load path).",
+    "pure_cores": "Streak/clamp/impulsivity logic injects now (and a day-boundary fn) — no Date.now / Math.random in the cores (unit-testable per portfolio note: 'streak/clamp logic IS unit-testable').",
+    "bilingual": "Every new user-facing string ships FR+EN via the catalogue (ADR-0053).",
+    "honesty": "Impulsivity readout is descriptive (a fact sentence + descriptive word), NOT a grade — mirrors metacog AP-META-1.",
+    "no_component_test_harness": "0 *.svelte.test.ts; 504 tests are pure/logic. Verify T3 via pure-core unit tests (clamp + streak + impulsivity) + static wiring-presence + manual/preview — NOT component tests."
+  }
+}

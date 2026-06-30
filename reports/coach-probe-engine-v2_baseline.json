@@ -1,0 +1,54 @@
+{
+  "pr": "coach-probe-engine-v2",
+  "feature": "C2",
+  "measured_at": "2026-06-30",
+  "head": "9296aff",
+  "tests": {
+    "command": "npx vitest run",
+    "files_passed": 69,
+    "files_total": 69,
+    "tests_passed": 504,
+    "tests_total": 504,
+    "status": "green",
+    "note": "Anchor matches the portfolio baseline (504/69). C2 must not regress; new pure-core tests add to this count."
+  },
+  "harness": {
+    "svelte_component_test_harness": false,
+    "evidence": "find src -name '*.svelte.test.ts' => 0. All 504 tests are pure/logic. C2 (a component-touching PR) verifies via pure-core unit tests + static wiring-presence + manual/preview — NOT component tests.",
+    "svelte_check_claimed": "0 errors / 0 warnings across 383 files (portfolio anchor §8). Re-run in Phase C as the gate."
+  },
+  "db": {
+    "DB_VERSION": 4,
+    "evidence": "src/store/db.ts:125 `export const DB_VERSION = 4;`",
+    "schema_pattern": "Additive-optional fields ride existing version (conceptSeen?, visionStats?, coachProfile? all additive — ADR-0040/0043/0045). C2 adds NO required field => NO DB_VERSION bump.",
+    "coachProbe_field_present": false,
+    "coachProbe_note": "F3's additive PuzzleAttemptRecord.coachProbe? is NOT yet in src/ (F3 drafted, not built)."
+  },
+  "coach_probe_engine_today": {
+    "probe_set": "6 geometric motifs (fork,pin,skewer,hangingPiece,discoveredAttack,mate) + 1 endgame = 7 ladders",
+    "puzzles_per_motif": 2,
+    "approx_total_puzzles": "~14 (COACH_LADDER_MIN=MAX=2)",
+    "noise": "diagnostic.ts comment: a 1/1 ladder swung +-115 Glicko per result; 2 probes halve it. Still low-n.",
+    "depth": "FLAT 2 per theme (no adaptivity to borderline deltas).",
+    "endgame_granularity": "ONE coarse bucket via phase:'endgame', themes:undefined (Coach.svelte:72).",
+    "scope": "all-or-nothing — THEMES array fixed, no user subset; probe order fixed.",
+    "timed_probe": "none — timeManagement only assessable from the optional game (game-derived dimension).",
+    "radar_na": "Radar collapses sampleSize:0 axes to centre + 'n/a' (ALREADY shipped). 4 of 5 dims show n/a when the game is skipped.",
+    "persistence": "probes write NOTHING (no attempt row / FSRS card / weaknessCounters) — this is F3's gap, inherited here."
+  },
+  "puzzle_data": {
+    "production_set": "public/puzzles/puzzles.json — MISSING in repo (gitignored; built by scripts/fetch-puzzles.mjs or build-puzzle-subset.mjs from the Lichess CC0 CSV).",
+    "seed_fallback": "public/puzzles/seed-puzzles.json — 150 puzzles, themes ONLY {mate:150, mateIn1:150, backRankMate:67}. ZERO fork/pin/skewer/endgame themes.",
+    "etl_theme_handling": "scripts/lib/puzzle-etl.mjs:97 keeps the raw Lichess Themes column verbatim (themes: Themes.trim().split). Lichess themes DO include endgame sub-types: rookEndgame, pawnEndgame, knightEndgame, bishopEndgame, queenEndgame, queenRookEndgame, plus endgame.",
+    "implication": "CF6 endgame buckets are feasible in PRODUCTION (themes exist) but the seed fallback has none => C2 MUST fall back gracefully (n=0 buckets dropped by buildCoachProfile's existing guard) and report the data dependency honestly (AP-COACH-6)."
+  },
+  "invariants_to_hold": {
+    "AP-COACH-1": "buildStudyPlan consumes leaks + weakest radar dim — never probe internals. C2 changes the probe set, not the study plan. studyPlan determinism test stays green.",
+    "AP-COACH-2": "No single grade; per-motif low-n labelled. C2 ADDS sample-size labels (timed n, endgame bucket n).",
+    "AP-COACH-3": "diagnostic.ts/program.ts/new cores stay pure (no Date/Math.random).",
+    "AP-COACH-6": "Only confident motifs probed. Endgame sub-buckets use REAL Lichess theme keys, not invented ones; missing data => bucket dropped, not faked.",
+    "AP-COACH-8": "No diagnostic -> rating-pool leak. Ladder rating stays local; timed/endgame probes never touch puzzleRating or the puzzle's own Glicko.",
+    "bilingual_parity": "Every new user-facing string (endgame bucket labels, scope picker, timed-probe copy) ships FR+EN via the catalogue (ADR-0053).",
+    "insights_byte_identity": "AP-COACH-1 above — verified by the existing snapshot/determinism test."
+  }
+}

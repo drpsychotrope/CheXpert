@@ -1,0 +1,27 @@
+{
+  "pr": "coach-real-data-assessment",
+  "feature": "C4",
+  "scanned_at": "2026-06-30",
+  "method": "grep over src/ for proposed C4 symbols, i18n keys, and step/view names; ANTI-FABRICATION — empty result = CLEAN, not a finding to grow.",
+  "symbol_collisions": {
+    "buildCoachProfileFromHistory": "ABSENT — clean",
+    "assessFromHistory": "ABSENT — clean",
+    "coachHistory / blendHistory / importForAssessment": "ABSENT — clean",
+    "HISTORY_WINDOW / coachSampleWindow / COACH_HISTORY_WINDOW": "ABSENT — clean",
+    "selectAssessmentGames / windowAnalyses": "ABSENT — clean",
+    "note": "C4 deliberately introduces a MINIMAL surface (ideally just a windowing helper + a UI source-choice step). No proposed symbol collides."
+  },
+  "i18n_key_collisions": {
+    "namespace_checked": "src/i18n/messages/coach.ts",
+    "coach.useHistory / coach.fromHistory / coach.assessSource*": "ABSENT — clean",
+    "coach.gamesFromHistory / coach.sampleNote / coach.importMore": "ABSENT — clean",
+    "existing_neighbors_to_extend": ["coach.assessmentDone", "coach.offerGameBody", "coach.sourceLadders", "coach.sourceNoData", "coach.sourceGameSuffix"],
+    "note": "C4 adds keys under the coach.* namespace; existing source* labels describe the profile provenance line and can be EXTENDED (new variant for history-derived) without collision."
+  },
+  "step_view_collisions": {
+    "coach_Step_union": "['intro','ladders','offer-game','game','analysing','result'] (Coach.svelte:20)",
+    "proposed_new_step": "an OPTIONAL source-choice variant folded into the existing 'offer-game' step (recommended) OR a new 'offer-source' step — neither name collides; 'offer-source' is ABSENT",
+    "App_View_union": "C4 adds NO top-level view (stays inside Coach); no View-union/NAV churn"
+  },
+  "verdict": "CLEAN — no collisions. C4 surface is additive and minimal."
+}

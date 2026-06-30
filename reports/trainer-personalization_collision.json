@@ -1,0 +1,40 @@
+{
+  "pr": "trainer-personalization",
+  "feature": "T2",
+  "checked_at": "2026-06-30",
+  "verdict": "NO BLOCKING COLLISION. One ordering dependency (F3) and three soft overlaps with sibling trainer PRs, all reconcilable.",
+  "dependencies": [
+    {
+      "on": "F3 (attempt-recording-weakness)",
+      "kind": "hard ordering (contract)",
+      "status": "drafted V1, NOT built",
+      "detail": "T2's weakness-steered MIX in the selection cascade reuses F3's steerFromWeakness / WeaknessSteer. F3 also makes weaknessCounters a live read (A3 inserts a steered branch in loadNext between personal and curated). T2 builds the user-facing toggle ON TOP of that branch. Resolution: build F3 first (architecture DAG Phase 0 -> Phase 2). If T2 is built before F3 lands, the 'Mixed (weakness-steered)' option degrades gracefully to plain mixed (source:undefined) — spec gates the steered call behind 'typeof steerFromWeakness === function'-style presence, i.e. behind F3."
+    }
+  ],
+  "sibling_overlaps": [
+    {
+      "with": "T1 (feedback core: show solution+why on miss; self-tag; second-try)",
+      "surface": "Tactics.svelte feedback region + loadNext",
+      "risk": "low",
+      "detail": "T1 owns the MISS path (solution reveal + why). T2 owns the SOLVE path after-solve provenance ('the win you left') + the PRE-puzzle provenance line + the mode toggle/picker + exhaustion msg. Distinct moments. Shared file but non-overlapping blocks. Land order-independent; if both touch loadNext, the steered branch (F3/T1-adjacent) and the source-toggle branch (T2) compose."
+    },
+    {
+      "with": "T3 (integrity & retention: usedHint+clamp, streak/daily goal)",
+      "surface": "Tactics.svelte header + finish()",
+      "risk": "low",
+      "detail": "T3 owns recording integrity + retention header. T2 does not touch finish()/recording. No conflict."
+    },
+    {
+      "with": "F1 (i18n label routing)",
+      "surface": "theme display helper",
+      "risk": "none",
+      "detail": "T2 consumes motifLabelOrRaw (shipped). If F1's labelOrRaw lands first, T2 prefers it. Either way T2 adds severity.* keys (its own). No collision."
+    }
+  ],
+  "shared_files_writers": {
+    "src/ui/Tactics.svelte": ["T1", "T2", "T3"],
+    "src/i18n/messages/tactics.ts": ["T1", "T2", "T3", "F1"],
+    "src/state/app.svelte.ts": ["T2 (optional source pref, if not in SettingsRecord)"]
+  },
+  "study_plan_safety": "buildStudyPlan reads neither weaknessCounters nor puzzle.meta nor `mode`; T2 is display+selection only. AP-COACH-1 cannot be violated by T2. Mechanical guard: studyPlan determinism test."
+}

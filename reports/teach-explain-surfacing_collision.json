@@ -1,0 +1,48 @@
+{
+  "pr": "teach-explain-surfacing",
+  "capturedAt": "2026-06-30",
+  "purpose": "Verify the F4 names/numbers/keys we intend to introduce do not collide with existing identifiers.",
+  "adr": {
+    "latestInRepo": "ADR-0053",
+    "next": "ADR-0054",
+    "f4UsesNewAdr": false,
+    "rationale": "F4 is reuse/extraction under existing doctrine (ADR-0040 teach-before-test, ADR-0044 reveal, ADR-0021 eval graph, ADR-0052/0053 bilingual). No new architectural decision is forced. If the reveal-extraction is judged decision-worthy at build time, allocate ADR-0054 then; spec does not pre-spend it."
+  },
+  "antiPatternPrefix": {
+    "prefix": "AP-TEACH-",
+    "existingCount": 0,
+    "grepResult": "no AP-TEACH-* found anywhere in repo",
+    "firstAvailable": "AP-TEACH-1",
+    "note": "AP-CHESS-* runs to 67 (max). AP-COACH-*, AP-META-* also exist. AP-TEACH- is a fresh namespace for this PR."
+  },
+  "newComponent": {
+    "proposedName": "SolutionReveal.svelte",
+    "path": "src/ui/SolutionReveal.svelte",
+    "collision": "NONE — no file named SolutionReveal.svelte exists. Existing related: Calculate.svelte, ConceptCard.svelte, EvalGraph.svelte, Board.svelte.",
+    "exists": false
+  },
+  "newI18nKeys": {
+    "namespace": "tactics.ts (calc.* / tactics.* domain)",
+    "existingRelated": {
+      "calc.solution": "PRESENT ('Solution : {line}' / 'Solution: {line}') — REUSED by the shared component for the SAN line; not redefined.",
+      "tactics.wrong": "PRESENT — unchanged.",
+      "review.missed": "PRESENT — unchanged."
+    },
+    "proposedNewKeys": [
+      "reveal.showSolution (toggle label, e.g. 'Show solution' / 'Voir la solution')",
+      "reveal.hideSolution (optional collapse label)",
+      "reveal.why (header for the why line, e.g. 'Why:' / 'Pourquoi :')",
+      "reveal.themeIdiom (theme-derived why template, {motif})"
+    ],
+    "collisionCheck": "None of reveal.* keys exist today (grep). They are collision-guarded by translate.test.ts (the silent-overwrite guard). Exact key names are an arbitrage (Q-D); listed here as candidates only.",
+    "parity": "Each new key MUST carry FR+EN (structural in Message type)."
+  },
+  "exportSurfaceChanges": {
+    "explainPly": "no change (already exported)",
+    "uciToSan": "remains PRIVATE (not exported) — see target_exists correction",
+    "formatSanLine": "no change (already exported, reused)",
+    "winCurve/criticalMoments": "no change (reused only in C6, not F4)",
+    "newExports": "SolutionReveal.svelte (component) is the only new public surface F4 adds."
+  },
+  "verdict": "No blocking collisions. Component name free, AP-TEACH namespace free, ADR not over-allocated, i18n keys free and parity-guarded."
+}

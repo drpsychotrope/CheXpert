@@ -1,0 +1,55 @@
+{
+  "pr": "board-input-a11y",
+  "portfolio": "F2 of enhancements-architecture-spec.md",
+  "scanned": "2026-06-30",
+  "verdict": "PROCEED with CORRECTED + NARROWED scope. Core premise 'boards are mouse-only / lack keyboard entry app-wide' is PARTIALLY FALSE: the Board component, the resolveMove core, and 3 consumers already ship keyboard/text move entry (audit v2 P0-04 / W4). The real, narrower gap: (1) the board REGION has no role/aria-label; (2) 9 interactive consumers (11 board instances) still do not pass onMoveText. NOT a STOP — the F2 goal 'across ALL Board consumers' is genuinely unmet.",
+  "already_shipped": {
+    "Board.onMoveText_prop": { "file": "src/ui/Board.svelte", "line": 45, "status": "EXISTS — typed prop (text)=>boolean" },
+    "Board.keyboard_form": { "file": "src/ui/Board.svelte", "lines": "112-124, 206-222", "status": "EXISTS — input+submit, gated on onMoveText && !viewOnly" },
+    "Board.aria_live_error": { "file": "src/ui/Board.svelte", "line": 220, "status": "EXISTS — role=alert aria-live=assertive + aria-describedby" },
+    "ChessGame.resolveMove": { "file": "src/game/ChessGame.ts", "line": 236, "status": "EXISTS — SAN/UCI/coordinate/castling/promotion, variant-aware, non-mutating", "tests": "src/game/chessGame960.test.ts:213-235 (6 cases)" },
+    "consumers_already_wired": [
+      { "file": "src/ui/Tactics.svelte", "line": 357, "via": "display.resolveMove" },
+      { "file": "src/ui/Review.svelte", "line": 195, "via": "display.resolveMove" },
+      { "file": "src/ui/Play.svelte", "line": 592, "via": "game.resolveMove" }
+    ]
+  },
+  "real_gaps": {
+    "board_region_aria": { "site": "src/ui/Board.svelte div.cg-board-host (line 198)", "status": "MISSING role/aria-label on the interactive board region; only kb-input + promo dialog have aria", "fix": "add role + localized aria-label on the board host (single source → all consumers inherit)" },
+    "interactive_consumers_missing_onMoveText": [
+      { "file": "src/ui/Coach.svelte", "line": 215, "board": "ladders probe", "interactive": true, "note": "CF9 — confirmed exactly as stated" },
+      { "file": "src/ui/Coach.svelte", "line": 237, "board": "calibration game", "interactive": true, "note": "CF9 — confirmed" },
+      { "file": "src/ui/Comeback.svelte", "line": 153, "interactive": true },
+      { "file": "src/ui/Sparring.svelte", "line": 146, "interactive": true },
+      { "file": "src/ui/Endgames.svelte", "line": 185, "interactive": true },
+      { "file": "src/ui/GuessMove.svelte", "line": 92, "interactive": true },
+      { "file": "src/ui/AnalysisBoard.svelte", "line": 104, "interactive": true },
+      { "file": "src/ui/Repertoire.svelte", "line": 178, "board": "drill", "interactive": true },
+      { "file": "src/ui/Woodpecker.svelte", "line": 218, "interactive": true },
+      { "file": "src/ui/Onboarding.svelte", "line": 273, "board": "ladder", "interactive": true },
+      { "file": "src/ui/Onboarding.svelte", "line": 303, "board": "calibration game", "interactive": true }
+    ]
+  },
+  "out_of_scope": {
+    "onSelect_drills": [
+      { "file": "src/ui/Calculate.svelte", "line": 205, "reason": "tap-to-build line via onSelect (ADR-0044); movableColor=undefined, no from/to onMove — not a text-move surface" },
+      { "file": "src/ui/Vision.svelte", "line": 239, "reason": "coordinate drill via onSelect (ADR-0043)" }
+    ],
+    "view_only_boards": [
+      { "file": "src/ui/AnalysisResult.svelte", "line": 96 },
+      { "file": "src/ui/WhenToThink.svelte", "line": 100 },
+      { "file": "src/ui/ConceptCard.svelte", "line": 35, "note": "mini illustration board" },
+      { "file": "src/ui/Vision.svelte", "lines": "249, 301", "note": "blind / falling-piece view boards" }
+    ],
+    "note": "view-only + onSelect boards are gated out by the existing {#if onMoveText && !viewOnly} guard in Board.svelte — wiring onMoveText there would be wrong/no-op."
+  },
+  "reuse_hooks_verified": {
+    "Board.svelte props/events": "VERIFIED — onMove, onMoveText, onSelect, viewOnly, movableColor present",
+    "display.resolveMove + onMoveText pattern (Tactics)": "VERIFIED — Tactics.svelte:357-363 is the canonical copy-target",
+    "ChessGame move API": "VERIFIED — move(from,to,promo), moveUci, resolveMove, isPromotion, dests all present"
+  },
+  "dependency_check": {
+    "F1 labelOrRaw helper": "NOT present in gen.ts (only gt/gtHas/motifLabelOrRaw). F1 is DRAFTED (V1 spec) not built. F2 does NOT need labelOrRaw — its strings are plain reactive t() UI strings. NO hard dependency on F1.",
+    "ADR-0054 collision": "enhancements-architecture-spec.md reserves ADR-0054 for itself ('to draft'). F2 should follow F1's precedent (no new ADR; extend the audit-v2 a11y line) to avoid a number collision — see arbitrage Q-D."
+  }
+}

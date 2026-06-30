@@ -1,0 +1,22 @@
+{
+  "pr": "coach-profile-persistence",
+  "captured": "2026-06-30",
+  "git_head": "9296affc0fd5fe9a7f96fc4abe18be833662bd31",
+  "branch": "claude/vigorous-hofstadter-7b1751",
+  "commands": {
+    "tests": "npx vitest run",
+    "svelte_check": "npx svelte-check --tsconfig ./tsconfig.json"
+  },
+  "results": {
+    "tests": { "files_passed": 69, "files_total": 69, "tests_passed": 504, "tests_total": 504, "status": "green", "duration_s": 7.65 },
+    "svelte_check": { "files": 383, "errors": 0, "warnings": 0, "files_with_problems": 0, "status": "clean" },
+    "db_version": 4
+  },
+  "anchor_match": "EXACT — matches the portfolio anchor (504 tests/69 files, svelte-check 0/0 across 383 files, DB_VERSION 4)",
+  "coach_test_files_in_scope": [
+    "src/coach/diagnostic.test.ts",
+    "src/coach/program.test.ts"
+  ],
+  "no_svelte_component_harness": "confirmed — zero *.svelte.test.ts; the 504 are pure/logic. Coach.svelte logic must be verified via pure-core unit tests + static wiring-presence + manual/preview, NOT component tests (portfolio §8).",
+  "regression_guard": "post-build expectation: tests >= 504 (new pure-core tests added, none removed), svelte-check still 0/0, DB_VERSION still 4"
+}

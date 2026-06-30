@@ -1,0 +1,27 @@
+{
+  "pr": "trainer-personalization",
+  "feature": "T2",
+  "measured_at": "2026-06-30",
+  "head": "9296aff",
+  "tests": { "files": 69, "passed": 504, "failed": 0, "command": "npx vitest run" },
+  "svelte_check": { "files": 383, "errors": 0, "warnings": 0, "files_with_problems": 0, "command": "npx svelte-check --output machine" },
+  "build": "green (per ADR-0053 delivery; not re-run this scan — test+check are the gates)",
+  "db_version": 4,
+  "schema_revs": { "PlayerModel.schemaRev": 1, "SettingsRecord.schemaRev": 1 },
+  "latest_adr_in_decisions_md": "ADR-0053",
+  "reserved_adrs_per_portfolio": "0054 (portfolio cascade), 0055 (F3), 0056 (F5), 0057 (F6) — drafted, NOT YET in decisions.md",
+  "component_test_harness": "NONE — zero *.svelte.test.ts; all 504 tests are pure/logic. T2 verifies via pure unit tests + static wiring-presence grep + manual/preview (portfolio fact).",
+  "i18n": {
+    "tactics_namespace": "src/i18n/messages/tactics.ts (37+ keys, all FR/EN)",
+    "relevant_existing_keys": ["tactics.fromYourGameTag", "tactics.fromYourGames", "tactics.noMore", "tactics.drilling", "tactics.themes", "tactics.themesEmpty", "tactics.clear"],
+    "motifLabelOrRaw": "src/i18n/gen.ts:18 — present, used for theme display",
+    "severity_namespace": "ABSENT — T2 must add severity.* (mistake/blunder/inaccuracy/missed-win) FR+EN",
+    "F1_labelOrRaw_and_activity": "ABSENT (F1 not built)"
+  },
+  "invariants_to_preserve": {
+    "AP-COACH-1": "Insights study-plan byte-identical (buildStudyPlan never reads weaknessCounters nor puzzle.meta). T2 is display+selection only -> cannot perturb. Guard: studyPlan determinism test stays green.",
+    "additive-no-DB_VERSION-bump": "T2 adds at most an OPTIONAL SettingsRecord field (trainer source pref) read with ?? default. No bump (precedent ADR-0037/0040/0043/0053).",
+    "bilingual-parity": "Every new user-facing string FR+EN; extend parity test.",
+    "pure-cores": "No Date/Math.random in any new pure helper (provenance formatter, exhaustion decision)."
+  }
+}

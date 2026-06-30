@@ -1,0 +1,97 @@
+{
+  "pr": "coach-output-teaching",
+  "feature": "C6",
+  "scanned_at": "2026-06-30",
+  "verdict": "PROCEED",
+  "premise": "Make the Coach result COMMUNICATE + TEACH. Folds CO8 (narrative voice), CO1 (concept cards for weak motifs), CO13 (surface game review = EvalGraph + turning points), CO9 (expected-impact prioritization). All reuse hooks verified to EXIST.",
+  "hooks": [
+    {
+      "name": "Coach.svelte finishGame discards GameAnalysis",
+      "path": "src/ui/Coach.svelte",
+      "lines": "159-175",
+      "verified": true,
+      "fact": "runAnalysis(source:'played') is called at line 164; only `.dimensions` is kept via buildWeaknessProfile (line 172). The full `analysis` (GameAnalysis: plies, byPhase, acpl, blunders) is discarded. CO13 confirmed."
+    },
+    {
+      "name": "Coach result render (no prose)",
+      "path": "src/ui/Coach.svelte",
+      "lines": "248-267",
+      "verified": true,
+      "fact": "result step = <Radar> + strengths/weaknesses bullet lists + program <ol>. No narrative, no game review, no concept cards, no 'start here'. Confirms the C6 gap."
+    },
+    {
+      "name": "EvalGraph.svelte",
+      "path": "src/ui/EvalGraph.svelte",
+      "lines": "1-91",
+      "verified": true,
+      "fact": "Props: { analysis: GameAnalysis, selected?: number|null, onSelect?: (plyIndex)=>void }. Renders win-prob sparkline via winCurve(analysis); markers on mistakes/blunders; click/Enter selects a ply. Consumes GameAnalysis directly. No accuracy grade (honesty). Ready to consume — NO reimplementation."
+    },
+    {
+      "name": "criticalMoments.ts (turning points + curve)",
+      "path": "src/analysis/criticalMoments.ts",
+      "lines": "1-55",
+      "verified": true,
+      "fact": "PURE. Exports winCurve(analysis): CurvePoint[] and criticalMoments(analysis, {max=5,minLoss=10}): CriticalMoment[] ({plyIndex, ply, side, winProbLoss}), ranked by loss desc, deterministic tie-break by plyIndex. This IS the turning-points hook the brief references — derived from the discarded analysis, never reimplemented."
+    },
+    {
+      "name": "explainPly (Coach 'why' on a real PlyAnalysis)",
+      "path": "src/analysis/explain.ts",
+      "lines": "51-112",
+      "verified": true,
+      "fact": "explainPly(ply: PlyAnalysis, locale): {headline, reasons[], better}. Fact-derived, honest fallback (no invented motif), PURE, locale-injected. This is F4's designated Coach-review 'why'. uciToSan is module-private (matches F4 correction). The Coach has real PlyAnalysis (from the analysis), unlike the trainer-miss path."
+    },
+    {
+      "name": "cardForThemes + loadConcepts (CO1 concept cards)",
+      "path": "src/concepts/concepts.ts",
+      "lines": "63-105",
+      "verified": true,
+      "fact": "cardForThemes(themes, cards): ConceptCard|null picks the highest-precedence themed card (CARD_PRECEDENCE, alias-resolved). loadConcepts(locale, fetchFn?) loads bilingual seed (concepts.json / concepts.fr.json), returns [] on any failure (never throws). This is the CO1 reuse hook — map a weak motif -> family card."
+    },
+    {
+      "name": "ConceptCard.svelte (renderer for cards)",
+      "path": "src/ui",
+      "verified": "pending-build",
+      "fact": "F4 spec references ConceptCard keyMove highlight; a concept-card renderer is expected. Build re-confirms the exact component name/props (decided in §4 A-step); falls back to a minimal inline render of {title, idea, examples} if no shared component exists."
+    },
+    {
+      "name": "CoachProfile (narrative + prioritization source)",
+      "path": "src/coach/types.ts",
+      "lines": "23-33",
+      "verified": true,
+      "fact": "CoachProfile { motifs: MotifScore[] (theme, rating, baseline, delta, n), dimensions: DimensionScore[] (dimension, score, detail, sampleSize), strengths[], weaknesses[], source{ladders,game}, gameAnalyzed }. delta>0 strength / <0 weakness; n = sample size. Everything the narrative + leverage rank need is here. No new persisted field required."
+    },
+    {
+      "name": "buildCoachProgram (PURE narrative-builder template to mirror)",
+      "path": "src/coach/program.ts",
+      "lines": "42-87",
+      "verified": true,
+      "fact": "PURE, worst-first by delta, locale-injected via gt(). The narrative core mirrors this exact shape: pure function, gt(generators), Locale param, no Date/Math.random. Already filters weakMotifs by delta<=-40 and weakDims by score<=35 — the leverage rank reuses these thresholds."
+    },
+    {
+      "name": "Dashboard biggestOpportunity (CO9 'start here' precedent)",
+      "path": "src/ui/Dashboard.svelte",
+      "lines": "88-93",
+      "verified": true,
+      "fact": "Renders profile.weakest (single weakest dim, sampleSize>=3) + a 'Train it now' link. C6's 'start here' line mirrors this pattern with a leverage rank across motifs+dims; key i18n is dashboard.biggestOpportunity (already bilingual, may be reused or paralleled by coachReview.startHere)."
+    },
+    {
+      "name": "gt() generator catalogue (bilingual pure phrases home)",
+      "path": "src/i18n/gen.ts + src/i18n/messages/generators.ts",
+      "verified": true,
+      "fact": "gt(key, locale, params) resolves bilingual phrases for PURE cores over `generators`. generators.ts holds program.*, explain.*, weakness.* templates (per-locale complete, never concatenated). The narrative strings live here as a new namespace (coachReview.* / narrative.*)."
+    },
+    {
+      "name": "SolutionReveal.svelte (F4 forward contract — replay)",
+      "path": "src/ui",
+      "verified": "does-not-exist-yet",
+      "fact": "F4 NOT BUILT. SolutionReveal.svelte does not exist (glob empty). F4 spec §11 defines the contract: C6 consumes it for arbitrary-line replay, passing an explainPly-derived line through the SOURCE-AGNOSTIC `why?` prop; C6 MUST NOT fork it. C6 hard-depends on F4 shipping first."
+    }
+  ],
+  "premise_corrections": [
+    "C1: GameAnalysis has NO precomputed winCurve/criticalMoments FIELD. The curve + turning points are PURE SELECTORS (criticalMoments.ts) over analysis.plies[].playedWhiteCp / winProbLoss. Brief's 'turning points the coach computes then discards' refined: the coach computes the full ply analysis (which contains the per-ply data); winCurve/criticalMoments are pure derivations the result never calls. C6 calls them. Not a STOP.",
+    "C2: The discarded `analysis` is NOT persisted on CoachProfile and need not be. C6 holds it in component $state (gameAnalysis = $state<GameAnalysis|null>(null)) set in finishGame, consumed on the result step. The review is shown for the just-played game only (re-surfacing history is the Dashboard/Import path, out of scope). Additive, NO DB_VERSION bump.",
+    "C3: explainPly requires a real PlyAnalysis (engine eval). The Coach HAS one (from analysis.plies) — unlike the trainer-miss path (F4 used theme-derived). So the Coach 'why' is the rich engine-backed explainPly, exactly as F4 §11 specifies.",
+    "C4: SolutionReveal.svelte does not exist yet (F4 unbuilt). C6 hard-depends on F4. Build order: F4 before C6 (matches architecture DAG Phase 2)."
+  ],
+  "stop": false
+}

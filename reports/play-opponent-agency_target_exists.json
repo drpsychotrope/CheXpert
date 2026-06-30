@@ -1,0 +1,56 @@
+{
+  "pr": "play-opponent-agency",
+  "feature": "P3",
+  "scanned_at": "2026-06-30",
+  "head": "9296aff",
+  "verdict": "TARGETS EXIST — with 2 premise corrections (one FALSE hook claim, one unbuilt dependency)",
+  "summary": "All reuse surfaces for P3 exist in real code. Two corrections vs the task brief: (1) AdaptiveOpponent.pickMove does NOT return eval cp (returns a uci string|null); eval cp is obtained from EngineClient.evaluate(fen).whiteCp. (2) The F6 controller (src/game/gameSession.ts) is DRAFTED (V1 spec) but NOT BUILT — it does not exist on disk. P3 must be spec'd against the F6 contract with F6 declared a hard prerequisite; the Play.svelte hooks are the concrete fallback surface and the today-state for honesty framing.",
+  "hooks": {
+    "src/engine/AdaptiveOpponent.ts": {
+      "exists": true,
+      "clampElo": { "exists": true, "line": 26, "note": "clamps to [ELO_MIN=1320, ELO_MAX=3190]; takes arbitrary Elo — offset/override is a clampElo(targetElo + delta) call." },
+      "applyStrength": { "exists": true, "line": 72, "note": "reads this.state.targetElo and sets UCI_LimitStrength + UCI_Elo + UCI_Chess960. Serialized via applyOptions (audit L8). Setting an override = mutate state.targetElo then applyStrength()." },
+      "rollingWinRate": { "exists": true, "exported": true, "line": 35, "note": "draws count 0.5; empty defaults to TARGET_WINRATE=0.55." },
+      "pickMove": { "exists": true, "line": 81, "returns": "Promise<string | null>  (uci bestmove, NOT eval cp)", "premise_correction": "Task said 'pickMove returns eval cp' — FALSE. It returns res.bestmove (uci). Eval cp comes from engine.evaluate(fen,{...}).whiteCp (white-POV cp, used today in coachEvalBad) or analyzeLines(...).whiteCp." },
+      "pickHumanMove": { "exists": true, "line": 92, "returns": "Promise<string | null> (uci)", "note": "MultiPV-3 temperature sampling; anti-blunder gap 150cp; falls back to pickMove. Math.random is the only impurity (sampleHumanMove takes injected rand)." },
+      "recordGame": { "exists": true, "line": 46, "note": "pure; folds an outcome into OpponentState, nudges targetElo toward 55% band, step 50-100cp." },
+      "ELO_MIN": 1320, "ELO_MAX": 3190, "TARGET_WINRATE": 0.55, "WINDOW": 8, "STEP_MIN": 50, "STEP_MAX": 100
+    },
+    "src/game/playSession.ts": {
+      "exists": true,
+      "applyGameResult": { "exists": true, "line": 40, "returns": "{ nextOpp: OpponentState, nextRating: Rating }", "note": "pure; caller assigns results back. P3 adaptation-feedback line is derived from nextOpp.targetElo vs prevOpp.targetElo." },
+      "botMovetime": { "exists": true, "line": 23, "note": "clock-aware bot budget, clamped per category. PLt 'increment-in-movetime' folds here (currently increment is NOT added to the per-move budget)." },
+      "flagOutcome": { "exists": true, "line": 32, "note": "FIDE Art 6.9 flag resolution; pure." },
+      "BUDGET_BOUNDS": { "exists": true, "line": 14 }
+    },
+    "src/ui/Play.svelte": {
+      "exists": true, "lines": 666,
+      "finishGame": { "exists": true, "line": 404, "signature": "finishGame(outcome: GameOutcome)  // 'win'|'loss'|'draw'", "note": "idempotent via gameFinished guard (audit W6); folds rating via applyGameResult, persists GameRecord. resign() calls finishGame('loss') (line 500); a draw path would call finishGame('draw')." },
+      "resign": { "exists": true, "line": 494, "note": "sets status='over', stops clock, result=youResigned, finishGame('loss'). P3 adds bot-resign (bot triggers finishGame('win')) + draw (finishGame('draw'))." },
+      "ratingLine": { "exists": true, "line": 509, "key": "play.ratingLine", "note": "shows pool rating + bot Elo. P3 adaptation-feedback line sits adjacent to this post-game." },
+      "opponentStyleSelect": { "exists": true, "lines": "517-520", "note": "human|engine <select>; bound to app.settings.opponentStyle via setOpponentStyle(). P3 difficulty-mode <select> mirrors this control + persistence pattern." },
+      "coachEvalBad": { "exists": true, "line": 308, "threshold": "hardcoded cp < -250 (white) / cp > 250 (black)", "note": "PLt difficulty-scaled coached-blunder threshold folds here: scale the 250cp gate by the active difficulty/bot-Elo." },
+      "engineMove": { "exists": true, "line": 321, "note": "where the bot's reply is computed; bot-resign/draw decision is evaluated here (or in the F6 controller's engineReply) AFTER the bot would move, using a full-strength eval." },
+      "checkEnd": { "exists": true, "line": 386, "note": "wraps game.terminal(); P3 draw-by-agreement is a NON-terminal end the controller must surface separately (game is not over by rules)." }
+    },
+    "src/store/db.ts": {
+      "SettingsRecord": { "exists": true, "line": 77, "note": "has opponentStyle?, metacogEnabled?, locale? — additive-optional pattern. P3 difficulty mode persists here as an additive optional field (no DB_VERSION bump)." },
+      "GameRecord": { "exists": true, "line": 21, "note": "has coached:boolean, variant?, startFen?. P3 'override game flag' (Q-E: a Fixed/Easier/Harder game does NOT move the adaptive pool) persists here as an additive optional field e.g. difficultyMode?." },
+      "DB_VERSION": 4,
+      "policy": "additive optional field + schemaRev bump, backfilled in load path — NO DB_VERSION bump (db.ts:121-125)."
+    },
+    "src/engine/EngineClient.ts": {
+      "evaluate": { "exists": true, "line": 161, "returns": "EvalResult { bestmove, whiteCp, score, depthReached }", "note": "whiteCp is the honest eval signal for bot-resign/draw. MUST pass fullStrength:true so a sticky throttled UCI_Elo doesn't corrupt the resign decision (C-1/P0-01)." },
+      "analyzeLines": { "exists": true, "line": 205, "returns": "LineResult[] with whiteCp + mate", "note": "alternative source; pickHumanMove already uses it." }
+    },
+    "src/ui/ConfirmDialog.svelte": { "exists": true, "note": "reusable NON-BLOCKING dialog with danger flag; already used for coached take-back. Reused for draw-offer / accept-draw UI (P3) and confirm-resign (P2 owns confirm-resign)." },
+    "src/game/ChessGame.ts": { "terminal": { "exists": true, "line": 320, "note": "returns {over,reason,winner}; reasons threefold|fiftyMove|insufficient|stalemate|checkmate. Draw-by-agreement is NOT a terminal reason — P3 surfaces it as a distinct agreed-draw end." } }
+  },
+  "dependency_F6": {
+    "spec": "specs/game-session-controller-spec.md (V1)",
+    "built": false,
+    "evidence": "src/game/gameSession.ts and gameSession.test.ts do NOT exist; grep createGameSession|GameSession across src/ = 0 matches.",
+    "contract_for_P3": "F6 controller accepts startFen + config { humanMove?, retry?, bookMove?, movetime? } (opt-in); return-state API; NO auto-chain (applyPlayerMove and engineReply are separate steps); checkTerminal is a pure idempotent query returning {over,reason,winner,outcome} — NEVER a localized string (AP-CTRL-1).",
+    "implication": "P3 is a CONSUMER of the F6 controller (architecture §3 lists P3 dep = F6). P3 spec targets the F6 contract: bot-resign/draw + difficulty live as new controller config/queries; Play wires them. If P3 builds before F6 lands, the same logic targets Play.svelte's engineMove/finishGame directly (fallback). Spec must declare F6 a hard prerequisite and frame today-state honestly."
+  }
+}

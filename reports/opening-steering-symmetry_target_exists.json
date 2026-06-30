@@ -1,0 +1,32 @@
+{
+  "pr": "opening-steering-symmetry",
+  "portfolio": "P4 of enhancements-architecture-spec.md (Play stack; CO17 shares the book)",
+  "scanned": "2026-06-30",
+  "verdict": "PROCEED. Premise CONFIRMED and STRENGTHENED. The opening book is asymmetric (10 White-bot lines vs 4 Black-bot lines) and steering silently no-ops for several Dimensions depending on the bot's colour. Original framing ('only the Black side has gaps') is INCOMPLETE: BOTH colours have uncovered dimensions. selectOpening, OPENING_BOOK, the Dimension set, eco.json, and the single call-site all EXIST exactly as the portfolio describes. No STOP.",
+  "reuse_hooks_verified": {
+    "OPENING_BOOK": { "file": "src/opening/openingBook.ts", "line": 30, "status": "EXISTS — 14 OpeningEntry rows; shape {id,name,botColor,moves[],targets:Dimension}" },
+    "selectOpening": { "file": "src/opening/openingBook.ts", "line": 81, "status": "EXISTS — pure; (botColor, weakest, pick)->OpeningEntry; filters pool by botColor, weight 3 for targets===weakest else 1; deterministic given pick; has a length-0 fallback that returns OPENING_BOOK[0] (NOTE: returns a possibly-wrong-colour entry — see collision report)" },
+    "nextBookMove": { "file": "src/opening/openingBook.ts", "line": 106, "status": "EXISTS — pure; feeds the bot its colour's moves while the game matches the prefix" },
+    "steeringNote": { "file": "src/opening/openingBook.ts", "line": 127, "status": "EXISTS — returns 'Steering toward your weakest area (X) with the Y.' when opening.targets===weakest, else 'Playing the Y.' — the silent-no-op surfaces HERE as a non-steering note" },
+    "Dimension": { "file": "src/analysis/weakness.ts", "line": 13, "status": "EXISTS — exactly 5: tactics | endgameConversion | openingAccuracy | timeManagement | resilience" },
+    "eco_table": { "file": "public/openings/eco.json", "status": "EXISTS — 40 entries (measured), {eco,name,uci[]}; loaded by eco.ts; the new lines' prefixes ARE present here (Sicilian B50, Caro-Kann ...d5 B12, King's Gambit C30) so additions are eco.json-grounded" },
+    "localizedOpeningName_FR_overlay": { "file": "src/opening/eco.ts", "line": 68, "status": "EXISTS — ECO_NAME_FR map; provides the FR/EN parity precedent for any new opening name shown to the user" }
+  },
+  "call_sites": {
+    "selectOpening": [
+      { "file": "src/ui/Play.svelte", "line": 167, "code": "opening = selectOpening(playerColor === 'white' ? 'b' : 'w', weakestDim, Math.random());", "note": "THE only runtime caller. Bot colour = OPPOSITE of player. Player White => bot Black => selectOpening('b',...). This is the path with the worst coverage (bot=Black missing tactics + endgameConversion)." }
+    ],
+    "steerDimension_override": { "file": "src/ui/Play.svelte", "line": 166, "code": "if (app.steerDimension) { weakestDim = app.steerDimension; app.steerDimension = null; }", "note": "Coach C7 'play-steered' step writes app.steerDimension; it flows straight into selectOpening. Completing the book makes that coach step actually steer for either colour — C7-friendly by construction, no coach concern hard-coded here." },
+    "Math_random_purity": { "note": "Math.random() lives at the CALL-SITE (Play.svelte:167), NOT inside selectOpening. The core stays pure/deterministic-given-pick (AP-CHESS-22 doctrine). New lines must not change that boundary." }
+  },
+  "tests_present": {
+    "file": "src/opening/openingBook.test.ts",
+    "covers": "line legality (all lines legal from start), 'covers both bot colours and all five dimensions' (BUT asserts on the UNION of colours — masks the per-colour gap; upgrade target), selectOpening colour filter + ~3:1 bias + variety, nextBookMove on/off book for both colours, steeringNote wording",
+    "gap": "NO test asserts per-colour Dimension coverage, and NO test asserts steering is non-degenerate when bot is Black for a Dimension only White covers. This is the regression the PR must lock."
+  },
+  "dependency_check": {
+    "C7_coach_repertoire_routing": "specs/coach-mode-spec.md routes openingAccuracy weakness to repertoire then 'play-steered', using app.steerDimension as the selectOpening override. P4 must stay coach-agnostic: only complete the book + steering, add no coach-specific entries. CONFIRMED compatible.",
+    "F6_game_session_controller": "specs/game-session-controller-spec.md plans to move the nextBookMove call into gameSession.ts ('bookMove via nextBookMove'). P4 changes DATA (book rows) + selectOpening fallback, not the move-feeding mechanism, so it composes with F6 regardless of build order.",
+    "DB_VERSION": "Untouched. P4 is pure data + pure logic; no persistence. DB_VERSION stays 4 (no bump)."
+  }
+}

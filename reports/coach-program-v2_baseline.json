@@ -1,0 +1,43 @@
+{
+  "pr": "coach-program-v2",
+  "captured_at": "2026-06-30",
+  "method": "npx vitest run (full suite) + grep/read of real source; anchors not estimates",
+  "tests": { "passed": 504, "files": 69, "command": "npx vitest run", "result": "all green" },
+  "svelte_check": { "errors": 0, "warnings": 0, "files": 383, "source": "portfolio §8 (W18 baseline; no .svelte changed since)" },
+  "db_version": 4,
+  "coach_program_tests": {
+    "file": "src/coach/program.test.ts",
+    "count": "11 assertions across 3 describe blocks",
+    "covers": ["worst-first motif routing", "endgame motif→endgames", "weak dims→drills+game modes", "minute-budget respected (≤budget)", "maintenance fallback", "profileToLeaks", "scenarioForFocus"],
+    "note": "The 'respects the minute budget' test (line 51) already exercises buildCoachProgram(p, 10) — proof the minutes param is live and budget-bounded. New mastery/budget/opening tests extend this file."
+  },
+  "current_program_shape": {
+    "step": "{ activity, focus, minutes, reason } (PlanItem)",
+    "time_boxed": "every step has a fixed `minutes` from take(m) = min(m, remaining); total ≤ budget",
+    "mastery": "NONE — no criterion/target field; CO16 adds one",
+    "opening_routing": "openingAccuracy → TWO generic steps: {activity:'repertoire', focus:'opening lines'} + {activity:'play-steered', focus:'openingAccuracy'} (program.ts:72-73); never a specific line",
+    "closed_loop": "NONE in the coach surface; efficacy lives only in Insights"
+  },
+  "efficacy_contract": {
+    "fn": "motifEfficacy(analyses, motifKey, { minMoves=20, splitAt? })",
+    "returns": "EfficacyReadout { early:{missRate,playerMoves,misses}, recent:{...}, deltaPct, enoughData }",
+    "improved_when": "deltaPct < 0 (recent.missRate < early.missRate)",
+    "data_gate": "enoughData = both windows ≥ minMoves player plies in the motif's phase(s)",
+    "honesty": "insights.didItMoveBody — 'Descriptive, not proof … does not prove the training caused the change'",
+    "key_form": "leakKey(p) — same cluster rule as fingerprint; a MotifScore.theme ('fork') maps to a leak key directly for tactical motifs; 'endgame' maps to phase-scoped 'endgame:*' keys"
+  },
+  "i18n": {
+    "coach_namespace": "src/i18n/messages/coach.ts (coach.*)",
+    "insights_toggle_keys_present": ["insights.min15", "insights.min30", "insights.min60"],
+    "program_generator_keys": "src/i18n/messages/generators.ts (program.*) — endgameDrill, motifDrill, endgameConversion, openingAccuracy, openingSteer, timeManagement, resilience, maintenance (read via gt())",
+    "new_keys_must_be": "FR+EN both; reason strings via gt() (generators) so the pure core stays injectable; UI chrome (toggle labels, mastery badge, efficacy line) via t() in coach.ts"
+  },
+  "doctrine_anchors": {
+    "AP-COACH-1": "buildCoachProgram must not call/mutate buildStudyPlan; Insights byte-identical",
+    "AP-COACH-5": "route only to NON-EMPTY modes",
+    "pure-core": "buildCoachProgram stays pure (no Date/Math.random)",
+    "honesty": "efficacy feedback is descriptive before/after, NOT a causal claim (mirror insights.didItMove framing)",
+    "additive-optional": "no DB_VERSION bump; new PlanItem field optional + ?? default",
+    "bilingual": "FR/EN parity for every user-facing string"
+  }
+}

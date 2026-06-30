@@ -1,0 +1,36 @@
+{
+  "pr": "trainer-integrity-retention",
+  "feature": "T3",
+  "scanned_at": "2026-06-30",
+  "name_collisions": {
+    "usedHint": { "hits_in_src": 0, "verdict": "CLEAN — new field, no existing symbol" },
+    "dailyGoal": { "hits_in_src": 0, "verdict": "CLEAN" },
+    "lastTrainedAt / lastTrained": { "hits_in_src": 0, "verdict": "CLEAN" },
+    "streak": {
+      "hits_in_src": "Vision.svelte:27,44,45,188 (component-local in-drill streak of consecutive correct board-vision answers) + i18n vision.scoreLine",
+      "verdict": "SEMANTIC COLLISION on the bare word 'streak'. Vision's streak is per-session in-drill, NOT a training-day streak. MITIGATION: name the persisted PlayerModel field distinctly — recommend dailyStreak (or trainingStreak). Do NOT reuse 'streak' unqualified."
+    }
+  },
+  "shared-surface collisions with dependency F3 (attempt-recording-weakness)": {
+    "severity": "HIGH — F3 and T3 both edit src/ui/Tactics.svelte finish() AND loadNext(), and both add an additive-optional field to the same records",
+    "details": [
+      "Tactics.svelte finish() (lines 222-271): F3 leaves finish() largely as-is (its edits are in Coach.svelte recording + a NEW loadNext branch). T3 MODIFIES finish(): thread usedHint into (a) the FSRS grade via a clamped resultToGrade, (b) the Glicko gain via gradeAttempt, and (c) the recorded attempt row (usedHint?). Both PRs write through recordTacticsAttempt — additive fields on PuzzleAttemptRecord must not conflict.",
+      "Tactics.svelte loadNext() (lines 117-161): F3 INSERTS a weakness-steered branch between personal and plain-curated (F3 §4 A3). T3 does NOT need to touch loadNext for the integrity/retention concern — keep T3 out of loadNext to avoid a merge collision (T3's retention writes hang off finish()/mount, not selection).",
+      "PuzzleAttemptRecord additive fields: F3 adds coachProbe? (db.ts spec §3). T3 adds usedHint?. BOTH are additive-optional, independent keys — no union/required-field churn, no DB_VERSION bump. Coordinate ordering: F3 builds first (portfolio §8 order), so T3's db.ts edit appends usedHint? after coachProbe?.",
+      "schemaRev: F3 does NOT bump schemaRev (its PlayerModel change is only the existing weaknessCounters read + no new PlayerModel field; coachProbe? is on PuzzleAttemptRecord). T3 ADDS new PlayerModel fields (dailyStreak?, dailyGoal?, lastTrainedAt?) -> T3 SHOULD bump PlayerModel.schemaRev (1 -> 2) and backfill in the load path (playerModel.ts), per the migration policy (db.ts:121-124). Still NO DB_VERSION bump."
+    ],
+    "build_order_dependency": "F3 builds first (it is T3's contract). T3 rebases on F3. The seam (finish/loadNext) is small and well-separated by concern (F3=selection+coach recording; T3=hint integrity + retention + impulsivity), so a clean rebase is expected; flag finish() as the one co-edited function to review on merge."
+  },
+  "grade-clamp interaction with existing FSRS first-exposure clamp": {
+    "note": "fsrs.ts gradeCard:85 already clamps Easy->Good on a NEW card (first exposure). A hint clamp (cap effective grade <= Hard) STACKS with this: on a brand-new card a hinted solve would be min(hintCap, firstExposureCap). Compose them as a single 'effective grade = min over active caps' — do not let the hint clamp accidentally raise a grade. The cleanest seam is to clamp the grade BEFORE it enters resultToGrade's output (cap at the call site in finish, or add an optional cap param to gradeCard). Recommend: clamp at the finish() call site (pure, testable) so fsrs.ts stays generic.",
+    "verdict": "compatible; compose as min(), test the stacked case"
+  },
+  "AP-COACH-1 study-plan byte-identity": {
+    "risk": "LOW — T3's impulsivity readout is a NEW Insights section over attempt {solved,ms}; it does NOT feed buildStudyPlan. Retention fields do NOT feed buildStudyPlan. Re-run studyPlan determinism test as the guard.",
+    "verdict": "safe if impulsivity stays a sibling section and never becomes a studyPlan input"
+  },
+  "metacog schema tests": {
+    "risk": "usedHint? is additive on PuzzleAttemptRecord; metacog-schema.test.ts asserts DB_VERSION stays 4 and confidence/selfTag survive. usedHint? must not disturb those.",
+    "verdict": "safe — additive optional, DB_VERSION unchanged"
+  }
+}

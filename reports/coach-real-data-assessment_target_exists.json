@@ -1,0 +1,65 @@
+{
+  "pr": "coach-real-data-assessment",
+  "feature": "C4",
+  "portfolio": "enhancements-architecture-spec.md §3 (Coach stack)",
+  "scanned_at": "2026-06-30",
+  "premise_under_test": "Coach re-probes from zero every run and IGNORES played-game history, assessing from one toy bot game only.",
+  "verdict": "CONFIRMED-WITH-CORRECTION",
+  "premise_findings": {
+    "coach_ignores_history": {
+      "claim": "Coach.svelte never reads loadAllAnalyses; profile is built from one toy game.",
+      "evidence": "grep loadAllAnalyses src/ui/Coach.svelte -> ABSENT. Coach.svelte:164 runs runAnalysis(source:'played') with gameId `coach-${Date.now()}`; Coach.svelte:172 builds dims via buildWeaknessProfile([analysis], baseline(), getLocale()).dimensions (single-element array).",
+      "status": "TRUE"
+    },
+    "buildCoachProfile_takes_gameDimensions": {
+      "claim": "buildCoachProfile({gameDimensions: DimensionScore[] | null}).",
+      "evidence": "src/coach/diagnostic.ts:45-52 signature; lines 77-81 CONSUME gameDimensions, overriding only the tactics cell. It does NOT fork buildWeaknessProfile.",
+      "status": "TRUE (AP-COACH-1 holds today; Q-D = CONSUME)"
+    },
+    "buildWeaknessProfile_is_already_multi_game": {
+      "claim_in_prompt": "buildWeaknessProfile(analyses, rating, locale).",
+      "correction": "Signature is buildWeaknessProfile(analyses: GameAnalysis[], playerRating: number, locale: Locale = 'fr'). It already accepts an ARRAY and aggregates N games (phaseAcpl/tacticsScore/etc. fold over all analyses). The coach simply passes [oneGame] today. C4 = pass the real (windowed) array. NO fork, NO new core needed.",
+      "evidence": "src/analysis/weakness.ts:204-265",
+      "status": "TRUE — native N-game support already present"
+    },
+    "sample_size_honesty_inherited": {
+      "claim": "C4 must label sample size / be directional (no grade).",
+      "correction": "buildWeaknessProfile already emits per-dim sampleSize + collapses thin evidence to 'not measured' (score 50, sampleSize 0) via MIN_PHASE_PLIES(4)/MIN_TACTICS_PLIES(4)/MIN_TIME_BLUNDERS(2)/MIN_BEHIND_EPISODES(3); returns gamesAnalyzed + playerMoves + overallAcpl. Honesty/sample-labelling is INHERITED; C4 only needs to surface gamesAnalyzed and not regress it.",
+      "evidence": "src/analysis/weakness.ts:185-202, 258-264",
+      "status": "TRUE"
+    },
+    "PGN_import_already_exists": {
+      "claim_in_portfolio": "CO11 = build PGN import for assessment; F5 provides the parse/import primitive.",
+      "correction": "Import.svelte ALREADY imports real Lichess/Chess.com PGN: parsePgn + inferPlayerColor (Import.svelte:4,52,62), multi-game split detection (:47), headers-only guard (:53), color-not-detected guard (:63), then runAnalysis(source:'imported') (:96-100) AND persists via putImportedGame to the importedGames store (:85-86). CO11's import+analyze layer is ALREADY BUILT. The C4 gap is the COACH CONSUMING those analyses, not building import.",
+      "evidence": "src/ui/Import.svelte:1-100; src/store/gamesRepo.ts:14 putImportedGame; src/store/db.ts:113,185 importedGames store",
+      "status": "PREMISE-SHIFT (material)"
+    },
+    "analyses_already_unified": {
+      "claim": "Blend source = imported PGN vs played history vs both (Q-A).",
+      "correction": "runAnalysis persists EVERY source ('imported' AND 'played') into the single gameAnalyses store (runAnalysis.ts:63). loadAllAnalyses() reads gameAnalyses (runAnalysis.ts:91-96). Therefore loadAllAnalyses() ALREADY returns imported + played analyses unified. GameAnalysis carries source:'imported'|'played' (types.ts:69) and analyzedAt (types.ts:71) so C4 can window/filter PURELY. The 'both' blend is already the data shape; Q-A reduces to which subset to feed + the window.",
+      "evidence": "src/analysis/runAnalysis.ts:63,91-96; src/analysis/types.ts:67-84",
+      "status": "TRUE — blend substrate already unified"
+    },
+    "F5_getAllGames_not_on_critical_path": {
+      "finding": "C4's blend needs ANALYSES (gameAnalyses via loadAllAnalyses), not game RECORDS. F5's getAllGames (games store reader) is NOT required for the profile blend. C4's only F5 touchpoint is the named-consumer link for the 'import more games' affordance — and that primitive (parsePgn + Import flow) already exists. C4 can stand on EXISTING hooks; F5 supplies the history-list UX, not the assessment data path.",
+      "status": "SEQUENCING NOTE"
+    }
+  },
+  "hooks_to_reuse": {
+    "loadAllAnalyses": {"path": "src/analysis/runAnalysis.ts:91", "exists": true, "note": "reads gameAnalyses (imported+played), cached"},
+    "buildWeaknessProfile": {"path": "src/analysis/weakness.ts:204", "exists": true, "sig": "(analyses: GameAnalysis[], playerRating: number, locale?: Locale)", "note": "already N-game; CONSUME, never fork"},
+    "buildCoachProfile": {"path": "src/coach/diagnostic.ts:45", "exists": true, "sig": "({puzzleRating, probes, gameDimensions: DimensionScore[]|null, assessedAt, locale})", "note": "already accepts game-derived dims"},
+    "runAnalysis_source_played": {"path": "src/ui/Coach.svelte:164 / src/analysis/runAnalysis.ts:39", "exists": true},
+    "runAnalysis_source_imported": {"path": "src/ui/Import.svelte:96 / src/analysis/runAnalysis.ts:39", "exists": true},
+    "parsePgn_inferPlayerColor": {"path": "src/analysis/pgn.ts (used Import.svelte:4)", "exists": true, "note": "F5 primitive — already wired in Import"},
+    "GameAnalysis.source_analyzedAt": {"path": "src/analysis/types.ts:69,71", "exists": true, "note": "enables pure windowing/filtering, no DB change"},
+    "F5_getAllGames": {"path": "src/store/gamesRepo.ts (DRAFTED in games-store-pgn-io-spec.md, NOT BUILT)", "exists": false, "note": "NOT on C4 blend critical path; F5 is the named history-UX dependency"}
+  },
+  "doctrine_gates": {
+    "DB_VERSION": {"current": 4, "c4_bump": false, "reason": "blend reads existing gameAnalyses + windows by existing analyzedAt/source; no new field/store"},
+    "AP-COACH-1_no_fork": {"held": true, "reason": "C4 CONSUMES buildWeaknessProfile([...analyses]); buildStudyPlan/buildWeaknessProfile untouched -> Insights byte-identical"},
+    "AP-COACH-8_no_diagnostic_pool_leak": {"held": true, "reason": "coach ladders still seed nothing into rating pools; the blend reads ANALYSES (real games), it does not write probe results into pools"},
+    "bilingual_parity": {"required": true, "note": "new source/sample-size labels need FR+EN in src/i18n/messages/coach.ts"}
+  },
+  "baseline": {"tests": "504/504 green (69 files)", "svelte_check": "0/0 (per portfolio §8)", "DB_VERSION": 4, "latest_ADR_in_decisions": "0053"}
+}
