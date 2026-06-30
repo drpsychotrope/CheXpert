@@ -19,10 +19,18 @@ export const BUDGET_BOUNDS: BudgetBounds = {
 };
 
 /** Clock-aware bot movetime: scale with the bot's remaining time using a phase-aware moves-left
- *  estimate, clamped per category. Pure. */
-export function botMovetime(remainingMs: number, ply: number, cat: Category, bounds: BudgetBounds = BUDGET_BOUNDS): number {
+ *  estimate, fold in the clock increment (a real opponent uses its increment — P3/Q-F), then clamp
+ *  per category. Pure. `incrementMs` defaults to 0 so existing callers/tests are unchanged; untimed
+ *  and 960 games pass no increment (no clock). */
+export function botMovetime(
+  remainingMs: number,
+  ply: number,
+  cat: Category,
+  bounds: BudgetBounds = BUDGET_BOUNDS,
+  incrementMs = 0,
+): number {
   const movesLeft = Math.max(8, 40 - Math.floor(ply / 2));
-  const raw = remainingMs / movesLeft;
+  const raw = remainingMs / movesLeft + incrementMs;
   const [floor, ceil] = bounds[cat];
   return Math.round(Math.min(ceil, Math.max(floor, raw)));
 }

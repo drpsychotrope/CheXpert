@@ -11,6 +11,16 @@ describe('playSession (W12)', () => {
     it('scales with remaining time within bounds', () => {
       expect(botMovetime(60_000, 0, 'classical')).toBe(1500); // 60s / 40 moves, within [200,2000]
     });
+    it('folds the clock increment into the budget before the per-category clamp (P3/Q-F)', () => {
+      // 60s/40 = 1500ms base; a 3s increment lifts it to 4500ms raw, clamped to the classical ceil 2000.
+      expect(botMovetime(60_000, 0, 'classical', BUDGET_BOUNDS, 3_000)).toBe(BUDGET_BOUNDS.classical[1]);
+      // 12s/40 = 300ms base + 2s increment = 2300ms raw, still clamped to 2000.
+      expect(botMovetime(12_000, 0, 'classical', BUDGET_BOUNDS, 2_000)).toBe(BUDGET_BOUNDS.classical[1]);
+      // Mid-range: 12s/40 = 300ms base + 500ms increment = 800ms, within [200,2000] → not clamped.
+      expect(botMovetime(12_000, 0, 'classical', BUDGET_BOUNDS, 500)).toBe(800);
+      // incrementMs = 0 (default) reproduces the no-increment value exactly.
+      expect(botMovetime(60_000, 0, 'classical', BUDGET_BOUNDS, 0)).toBe(botMovetime(60_000, 0, 'classical'));
+    });
   });
 
   describe('flagOutcome (FIDE Art. 6.9)', () => {

@@ -41,6 +41,36 @@ export const play: Messages = {
   },
   'play.coachedOn': { fr: 'coaché activé', en: 'coached on' },
 
+  // ---- Difficulty control (P3, play-opponent-agency) ----
+  // The rating line under an override shows the EFFECTIVE bot Elo + a mode tag so it never lies about
+  // who you're playing (E1/AP-OPPAGENCY-14); the Adaptive line keeps `play.ratingLine` verbatim.
+  'play.ratingLineOverride': {
+    fr: 'Votre classement {pool} {rating} · bot {elo} Elo ({mode})',
+    en: 'Your {pool} rating {rating} · bot {elo} Elo ({mode})',
+  },
+  'play.difficultyLabel': { fr: 'Difficulté :', en: 'Difficulty:' },
+  'play.difficultyAdaptive': { fr: 'Adaptatif', en: 'Adaptive' },
+  'play.difficultyEasier': { fr: 'Plus facile (−200)', en: 'Easier (−200)' },
+  'play.difficultyHarder': { fr: 'Plus difficile (+200)', en: 'Harder (+200)' },
+  'play.difficultyFixed': { fr: 'Elo fixe', en: 'Fixed Elo' },
+  'play.fixedEloLabel': { fr: 'Elo :', en: 'Elo:' },
+  // Short tags shown inside `play.ratingLineOverride` ({mode}); adaptive needs none (uses the base line).
+  'play.difficultyTagEasier': { fr: 'plus facile', en: 'easier' },
+  'play.difficultyTagHarder': { fr: 'plus difficile', en: 'harder' },
+  'play.difficultyTagFixed': { fr: 'Elo fixe', en: 'fixed Elo' },
+
+  // Bot resign / player draw-offer (P3/Q-B/Q-C). Result strings + the offer button + pending line.
+  'play.offerDraw': { fr: 'Proposer nulle', en: 'Offer draw' },
+  'play.botResigns': { fr: "L'adversaire abandonne — vous gagnez ! ♚", en: 'Your opponent resigns — you win! ♚' },
+  'play.drawAgreed': { fr: 'Nulle par accord mutuel.', en: 'Draw by agreement.' },
+  'play.drawDeclined': { fr: 'Le bot refuse la nulle.', en: 'The bot declines the draw.' },
+  'play.drawOfferedPending': { fr: 'Nulle proposée — en attente du bot…', en: 'Draw offered — awaiting the bot…' },
+
+  // Post-game adaptation line (P3/Q-D), adaptive games only; suppressed for override games.
+  'play.adaptTougher': { fr: 'Le bot sera plus fort la prochaine fois (+{delta} Elo).', en: 'The bot will be tougher next game (+{delta} Elo).' },
+  'play.adaptEasier': { fr: 'Le bot sera plus faible la prochaine fois (−{delta} Elo).', en: 'The bot will be easier next game (−{delta} Elo).' },
+  'play.adaptUnchanged': { fr: 'La force du bot est inchangée pour la prochaine partie.', en: "The bot's strength is unchanged for the next game." },
+
   'play.opponentLabel': { fr: 'Adversaire :', en: 'Opponent:' },
   'play.opponentHuman': { fr: 'Type humain (coups variés)', en: 'Human-like (varied moves)' },
   'play.opponentEngine': { fr: 'Moteur (meilleurs coups)', en: 'Engine (best moves)' },

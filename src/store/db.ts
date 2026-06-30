@@ -38,6 +38,10 @@ export interface GameRecord {
    *  mistakes to the right colour — the played PGN has no White/Black headers to infer it from.
    *  Additive optional; legacy records lack it (history derives a fallback). NO DB_VERSION bump. */
   playerColor?: 'w' | 'b';
+  /** Difficulty mode this game was played under (P3/Q-E, AP-OPPAGENCY-5). Absent = legacy adaptive.
+   *  A non-adaptive (Easier/Harder/Fixed) game is flagged here and does NOT move the adaptive pool or
+   *  the Glicko rating — only adaptive games fold (honesty). Additive optional — NO DB_VERSION bump. */
+  difficultyMode?: import('../engine/opponentAgency').DifficultyMode;
 }
 
 export interface PuzzleAttemptRecord {
@@ -131,6 +135,15 @@ export interface SettingsRecord {
    *  `?? false`). A takeback in a rated game marks that game un-counted (ADR-0058). No DB_VERSION
    *  bump (mirrors `metacogEnabled?`/`autoAnalyzeOnFinish?`). */
   takebackInPlay?: boolean;
+  /** Play difficulty mode (P3/Q-A/Q-H): {adaptive(default) · easier · harder · fixed}. Restored on
+   *  mount, applied to the bot's targetElo before applyStrength(). Additive optional; a legacy/absent
+   *  value reads as the default 'adaptive' (read-site `?? 'adaptive'`) so a legacy profile plays
+   *  exactly as today (zero regression — AP-OPPAGENCY-1). NO DB_VERSION bump (mirrors `opponentStyle?`). */
+  difficultyMode?: import('../engine/opponentAgency').DifficultyMode;
+  /** The explicit Elo for `difficultyMode === 'fixed'` (P3/Q-A/E4). Seeded from the current pool Elo
+   *  when Fixed is first selected (never blank/NaN). Clamped to [1320,3190] at apply time via
+   *  difficultyTargetElo. Additive optional; absent reads as a sensible pool seed. NO DB_VERSION bump. */
+  fixedElo?: number;
   /** Data-shape revision (audit W13). See PlayerModel.schemaRev. */
   schemaRev?: number;
 }

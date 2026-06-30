@@ -1477,3 +1477,69 @@ elsewhere (both optional), no migration to unwind. Cross-links: ADR-0057 (F6 con
 new controller hook, not an inline loop), ADR-0037/0040/0043/0053/0056 (additive-optional precedent),
 `specs/play-in-game-ux-spec.md` §0.5 Q-B / §4 A2-A4 / §9 AP-PLAYUX-3/10. Follow-ups (§11): a takeback
 budget / per-game cap with a difficulty/penalty model (D5 — would re-open this policy; out of P2).
+
+---
+
+## Decision note — Opponent agency & realism on Play (P3, no new ADR)
+
+**Context.** Pre-P3 the Play opponent's strength was 100% automatic and invisible (the adaptive nudge
+toward ~55% in `AdaptiveOpponent.recordGame`/`playSession.applyGameResult`), the opponent-style select only
+toggled *how* the bot picked moves (human-sampled vs best) not *how strong*, the bot never resigned a
+dead-lost position nor accepted a draw, `botMovetime` ignored the clock increment, and `coachEvalBad` used a
+flat 250 cp blunder gate regardless of bot strength. This note records the P3 decisions (per
+`specs/play-opponent-agency-spec.md` V1 §0.5 arbitrages Q-A…Q-I); the realism model was judged a feature
+extension, not a new architectural axis, so **no new ADR** is opened (the honesty rule extends
+AP-CHESS-13/24 and ADR-0058's "an un-counted game does not move the rating" principle).
+
+**Decisions.** (Q-A/Q-H) A difficulty control with four modes — **Adaptive (default) · Easier (−200) ·
+Harder (+200) · Fixed Elo** — applied to the bot's `targetElo` via the pure `difficultyTargetElo(mode,
+adaptiveElo, fixedElo)` (clamped [1320,3190]) **before** `applyStrength()`. Adaptive reproduces today exactly
+(`difficultyTargetElo('adaptive',…) === clampElo(adaptiveSeed)`, idempotent through `initOpponentState` →
+zero regression, AP-OPPAGENCY-1). Persisted additively in `SettingsRecord.difficultyMode?`/`fixedElo?`
+(read-site `?? 'adaptive'`), restored on mount like `lastTimeControl`; the Fixed input is seeded from the
+current pool Elo so it is never blank (E4). (E1/AP-OPPAGENCY-14) Under an override the rating line shows the
+**effective** bot Elo + a mode tag (`play.ratingLineOverride`) so it never misstates strength; the Adaptive
+line stays byte-identical (`play.ratingLine` verbatim). (Q-B) **Bot resign**: a pure
+`decideResign({botPovCp, consecutiveLostPlies, botElo})` true iff the bot is down past an **Elo-scaled**
+threshold (`resignThreshold`: top bots resign at −900 cp, the gate widens to −1800 cp toward the 1600 floor,
+sub-floor bots **never** resign) for ≥ `RESIGN_PLIES` (4) **consecutive** bot-decision plies — never on one
+noisy swing (AP-OPPAGENCY-2). (Q-C) **Player draw-offer** the bot accepts via pure `decideAcceptDraw`
+(|whiteCp| ≤ 30 for ≥ 4 plies AND not winning from its POV — AP-OPPAGENCY-4); a persistent "draw offered"
+line shows until it resolves (E2); bot-initiated offers are **deferred** (AP-OPPAGENCY-12). (Q-D)
+A post-game **adaptation line** from `prevOpp.targetElo` vs `nextOpp.targetElo` via pure
+`adaptationDirection` (tougher/easier/unchanged + delta), suppressed for override games. (Q-E,
+AP-OPPAGENCY-5 — **honesty**) `finishGame` branches on pure `gameAdaptsPool(mode)`: an **adaptive** game
+folds (pool nudge + Glicko rating) as today; an **override** game **skips** the fold entirely but still
+`putGame`s a `GameRecord` flagged `difficultyMode?` for history/analysis. (Q-F) `botMovetime` gains an
+`incrementMs` param (default 0 → existing callers/tests byte-identical) folded into the budget before the
+per-category clamp. (Q-G) `coachEvalBad`'s flat 250 → pure `coachedBlunderThreshold(botElo)` (≈250 at the
+mid pool, tighter for a stronger chosen opponent). (Q-I) All decisions live in a new **pure, DOM-free**
+module `src/engine/opponentAgency.ts` (no `Date`/`Math.random`/engine import — AP-OPPAGENCY-11); the
+full-strength eval fetch (`EngineClient.evaluate(fen,{fullStrength:true}).whiteCp` — never the throttled
+`UCI_Elo` search, AP-OPPAGENCY-3) and the consecutive-ply counters stay at the Play call site.
+
+**Wiring discipline.** The resign/draw decision runs in `Play.engineMove`'s caller-orchestrated reply path
+(F6 fallback call site — the controller was already built, ADR-0057), **not** by fusing
+`applyPlayerMove`→`engineReply` (AP-OPPAGENCY-9). **One** full-strength eval per bot decision feeds **both**
+`decideResign` and `decideAcceptDraw` (AP-OPPAGENCY-10). A throwing/failed eval resets the counters and lets
+the bot play on — never a spurious resign/auto-accept, never a frozen hot path (E3/AP-OPPAGENCY-13, mirrors
+`coachEvalBad`'s `catch → false`). `finishGame`'s `gameFinished` idempotency guard is preserved
+(AP-CTRL-9). P3 reuses `ConfirmDialog` and does **not** touch P2's move-list/takeback/confirm-resign or
+P4's opening book (single concern, AP-OPPAGENCY-7).
+
+**Consequences.** Additive-optional fields only (`SettingsRecord.difficultyMode?`/`fixedElo?`,
+`GameRecord.difficultyMode?`), all read-site defaulted, mirroring the
+`opponentStyle?`/`unrated?`/`variant?` precedent — **no `DB_VERSION` bump** (AP-OPPAGENCY-8). Insights /
+`buildStudyPlan` untouched (byte-identical). **Tests:** `opponentAgency.test.ts` (20) covers
+`difficultyTargetElo`, `decideResign` (strong/weak/floor/transient-swing), `decideAcceptDraw`
+(near-0/winning-declines/not-yet-stable), `coachedBlunderThreshold` (monotonic + mid-pool anchor),
+`adaptationDirection`, `gameAdaptsPool`; `playSession.test.ts` adds the `botMovetime` increment-fold case.
+**758 Vitest green** (757 baseline + 1; the core's 20 already counted), svelte-check **0/0** (415 files),
+build green. **Rollback:** revert the P3 commit — `opponentAgency.ts` is deleted, Play returns to auto-only
+strength / no resign-draw / flat coached threshold, `botMovetime` drops the increment param; the persisted
+optional fields read fine under old code (`?? 'adaptive'`), no migration to unwind. Cross-links: ADR-0057
+(F6 controller), ADR-0058 + AP-CHESS-13/24 (honesty / un-counted-game precedent), AP-CHESS-6 (adaptive
+opponent), `specs/play-opponent-agency-spec.md` §0.5 / §4 / §9. Follow-ups (§11): bot-initiated draw offers
+(deferred), Sparring/Comeback parity once F6 migrates them, resignation-as-teaching-moment (Play+F4),
+difficulty as a coached program step, tuning `RESIGN_*`/`DRAW_*` curves against F5 telemetry, override-game
+weighting in downstream analysis (E5 — P3 only flags the record).

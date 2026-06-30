@@ -27,6 +27,10 @@
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
   import { applyGameResult, botMovetime, flagOutcome, shouldRate, canTakeBackInPlay } from '../game/playSession';
+  import {
+    difficultyTargetElo, decideResign, decideAcceptDraw, resignThreshold, coachedBlunderThreshold,
+    adaptationDirection, gameAdaptsPool, DRAW_CP, type DifficultyMode,
+  } from '../engine/opponentAgency';
   import { toMovePairs } from '../game/moveList';
   import { createGameSession, type GameSession } from '../game/gameSession';
   import ConfirmDialog from './ConfirmDialog.svelte';
@@ -65,6 +69,22 @@
   let opponent: AdaptiveOpponent | null = null;
   let colorChoice = $state<ColorChoice>('white');
   let playerColor = $state<'white' | 'black'>('white');
+
+  // P3 (play-opponent-agency): difficulty control + bot resign/draw + adaptation feedback.
+  // Local state restored on mount from settings + persisted in the handlers (mirrors selectedTC).
+  // `difficultyMode` defaults to 'adaptive' = today's behaviour (zero regression — AP-OPPAGENCY-1).
+  let difficultyMode = $state<DifficultyMode>('adaptive');
+  // The explicit Elo for the Fixed mode; seeded from the current pool Elo when Fixed is first
+  // selected so the input is never blank/NaN (E4). null until seeded/restored.
+  let fixedElo = $state<number | null>(null);
+  // Consecutive bot-decision plies the position has been decisively lost / dead-equal (resign/draw
+  // counters, AP-OPPAGENCY-2/4). Reset each newGame and on a thrown agency eval (E3).
+  let consecutiveLostPlies = 0;
+  let consecutiveEqualPlies = 0;
+  // A live player draw-offer awaiting the bot's next decision (E2). Cleared on accept/decline/newGame.
+  let drawOffered = $state(false);
+  // Post-game adaptation line (Q-D), adaptive games only; '' (suppressed) for override games.
+  let adaptLine = $state('');
 
   // Chess960 state (ADR-0041)
   let variant = $state<'standard' | 'chess960'>('standard');
@@ -138,6 +158,21 @@
   const takebackEnabled = $derived(app.settings?.takebackInPlay ?? false);
   const live = $derived(status === 'playing' || status === 'thinking');
 
+  // P3: the pool's adaptive bot Elo (what `ratingLine` shows today) and the EFFECTIVE bot Elo under
+  // the active difficulty (what's actually applied). Adaptive → identical, so the line is
+  // byte-identical; an override shows the effective value + a mode tag so the line never lies (E1,
+  // AP-OPPAGENCY-14). `?? fixedElo ?? adaptive` keeps the Fixed display honest before a game starts.
+  const adaptiveBotElo = $derived(model ? poolOpponent(model, displayPool).targetElo : 1500);
+  const effectiveBotElo = $derived(difficultyTargetElo(difficultyMode, adaptiveBotElo, fixedElo ?? adaptiveBotElo));
+  const difficultyTag = $derived(
+    difficultyMode === 'easier' ? t('play.difficultyTagEasier')
+    : difficultyMode === 'harder' ? t('play.difficultyTagHarder')
+    : difficultyMode === 'fixed' ? t('play.difficultyTagFixed')
+    : '',
+  );
+  // Offering a draw is only meaningful on the player's live turn (mirrors the takeback/check gates).
+  const canOfferDraw = $derived(status === 'playing' && turnColor() === playerColor && !coachOpen && !thinking && !drawOffered);
+
   // Recompute the unanalysed-backlog count from the persisted stores (F5 reads). Pure selector on
   // top — excludes 960 + color-less legacy records so the count == what the batch will run.
   async function refreshBacklog() {
@@ -171,9 +206,42 @@
     }
   });
 
+  // P3: restore the persisted difficulty mode + fixed Elo on mount (mirrors lastTimeControl). Absent
+  // reads as 'adaptive' (zero regression); a stored fixedElo is restored for the Fixed input.
+  $effect(() => {
+    const s = app.settings;
+    if (!s) return;
+    if (s.difficultyMode) difficultyMode = s.difficultyMode;
+    if (typeof s.fixedElo === 'number') fixedElo = s.fixedElo;
+  });
+
   async function setOpponentStyle(s: 'human' | 'engine') {
     if (app.settings) {
       app.settings.opponentStyle = s;
+      await app.persistSettings();
+    }
+  }
+
+  /** P3: change the difficulty mode. When Fixed is first chosen, seed the Elo input from the current
+   *  pool/adaptive Elo so it's never blank/NaN (E4). Persisted like opponentStyle (additive optional,
+   *  no DB_VERSION bump). */
+  async function setDifficultyMode(m: DifficultyMode) {
+    difficultyMode = m;
+    if (m === 'fixed' && fixedElo == null) fixedElo = adaptiveBotElo;
+    if (app.settings) {
+      app.settings.difficultyMode = m;
+      if (fixedElo != null) app.settings.fixedElo = fixedElo;
+      await app.persistSettings();
+    }
+  }
+
+  /** P3: the Fixed-Elo input changed. Keep a sane number (the bot Elo is clamped to [1320,3190] at
+   *  apply time via difficultyTargetElo) and persist it. */
+  async function setFixedElo(v: number) {
+    if (!Number.isFinite(v)) return;
+    fixedElo = Math.round(v);
+    if (app.settings) {
+      app.settings.fixedElo = fixedElo;
       await app.persistSettings();
     }
   }
@@ -203,6 +271,12 @@
     resignOpen = false;
     checkVerdict = null;
     checkedFen = null;
+    // P3 resets: clear the resign/draw counters, any pending draw offer, and last game's adaptation
+    // line so a new game starts clean (AP-OPPAGENCY-2/4; rematch flows through here too).
+    consecutiveLostPlies = 0;
+    consecutiveEqualPlies = 0;
+    drawOffered = false;
+    adaptLine = '';
 
     if (variant === 'chess960') {
       // Distinguish an invalid entry from a deliberate 0: NaN → random, not silently SP 0 (audit W6).
@@ -237,7 +311,11 @@
     // Seed the bot from the active pool's adaptive state.
     // 960 uses the chess960 pool (lazy seed from classical); standard uses selectedPool (AP-TC-3).
     const activePool: RatingPool = variant === 'chess960' ? 'chess960' : selectedPool;
-    const state = initOpponentState(poolOpponent(model, activePool).targetElo);
+    const adaptiveSeed = poolOpponent(model, activePool).targetElo;
+    // P3 (A2): apply the chosen difficulty to the bot's target Elo BEFORE applyStrength(). Adaptive
+    // reproduces today exactly (difficultyTargetElo('adaptive',…) === clampElo(adaptiveSeed)); an
+    // override offsets/overrides it. Fixed uses the seeded fixedElo (clamped inside the helper).
+    const state = initOpponentState(difficultyTargetElo(difficultyMode, adaptiveSeed, fixedElo ?? adaptiveSeed));
     opponent = new AdaptiveOpponent(app.engine, state, variant === 'chess960');
 
     // Chess960 is always untimed (Q-C); standard respects the selected time control.
@@ -269,10 +347,17 @@
         retry: true,
         bookMove: (played) => (opening ? nextBookMove(opening, played) : null),
         // Clock-aware budget from the BOT's own remaining time (AP-TC-4); untimed/960 → null so the
-        // controller uses pickHumanMove's 300ms default / pickMove's 500ms, exactly as today.
+        // controller uses pickHumanMove's 300ms default / pickMove's 500ms, exactly as today. P3/Q-F:
+        // fold the clock increment into the budget (a real opponent uses its increment).
         movetime: (g, side) =>
           clock
-            ? botMovetime(side === 'w' ? clock.whiteMs : clock.blackMs, g.history().length, selectedPool as Category)
+            ? botMovetime(
+                side === 'w' ? clock.whiteMs : clock.blackMs,
+                g.history().length,
+                selectedPool as Category,
+                undefined,
+                incrementSecOf(selectedTC) * 1000,
+              )
             : null,
         engineFen: (g) => (variant === 'chess960' ? g.fenForEngine() : g.fen),
       },
@@ -450,7 +535,9 @@
   }
 
   /** Quick shallow eval (coached mode, best-effort): true if the move looks like a blunder. Does
-   *  NOT block or touch the clock — onMove decides what to do with the verdict (audit v2 W12). */
+   *  NOT block or touch the clock — onMove decides what to do with the verdict (audit v2 W12). P3/Q-G:
+   *  the blunder gate scales with the active bot Elo (coachedBlunderThreshold) — a tighter gate vs a
+   *  stronger chosen opponent, looser vs a weaker one; ≈ the legacy 250 at a typical pool Elo. */
   async function coachEvalBad(): Promise<boolean> {
     try {
       const evalRes = await app.engine.evaluate(
@@ -458,7 +545,8 @@
         { depth: 8, fullStrength: true },
       );
       const cp = evalRes.whiteCp;
-      return playerColor === 'white' ? cp < -250 : cp > 250;
+      const gate = coachedBlunderThreshold(opponent?.state.targetElo ?? effectiveBotElo);
+      return playerColor === 'white' ? cp < -gate : cp > gate;
     } catch {
       return false; // an eval failure must never block play
     }
@@ -473,6 +561,81 @@
     thinking = true;
     engineError = false;
     applyEngineReply(await session.engineReply());
+    // P3 (A3): after a real bot move that did NOT end the game, run ONE full-strength eval and decide
+    // resign / accept-draw. This runs in the caller-orchestrated engineReply path, NOT by fusing
+    // applyPlayerMove→engineReply (AP-OPPAGENCY-9). Skipped on error/illegal-halt/terminal so a
+    // finished or stranded game never triggers a concession.
+    // (status as string): applyEngineReply mutates `status` opaquely to TS's control-flow analysis,
+    // which still sees the 'thinking' set above — the cast matches the existing P1-14 guard idiom.
+    if (session.movePlayed && (status as string) === 'playing') await evaluateAgency();
+  }
+
+  /** P3 (A3): the bot's resign / accept-draw decision for the just-played bot move. Runs ONE
+   *  full-strength eval and feeds BOTH decisions (one eval per bot decision — AP-OPPAGENCY-10). The
+   *  eval is a serialized worker round-trip that can throw; on throw we reset the counters and let
+   *  the bot play on — never a spurious resign/auto-accept, never a frozen hot path (E3,
+   *  AP-OPPAGENCY-13, mirrors coachEvalBad's catch→false). The decision uses a full-strength eval, not
+   *  the throttled UCI_Elo search, so a weak bot's deliberately-bad search never drives its concession
+   *  (AP-OPPAGENCY-3). */
+  async function evaluateAgency() {
+    if (!session || !opponent) return;
+    const botElo = opponent.state.targetElo;
+    let whiteCp: number;
+    try {
+      const evalRes = await app.engine.evaluate(
+        variant === 'chess960' ? game.fenForEngine() : game.fen,
+        { depth: 10, fullStrength: true },
+      );
+      whiteCp = evalRes.whiteCp;
+    } catch {
+      consecutiveLostPlies = 0;
+      consecutiveEqualPlies = 0;
+      return; // failed eval → no resign, no auto-accept, bot plays on (E3)
+    }
+    // The game may have ended (flag/resign) or a new game started while the eval was in flight.
+    if (status !== 'playing' || !session) return;
+    const botPovCp = botSide === 'w' ? whiteCp : -whiteCp;
+    // Counters track CONSECUTIVE bot-decision plies past the gate (a single noisy ply resets the
+    // count → never resigns on one swing — AP-OPPAGENCY-2). The gate magnitudes are owned by the pure
+    // core (single source of truth); the call site only feeds the running count + the eval cp.
+    consecutiveLostPlies = botPovCp <= -resignThreshold(botElo) ? consecutiveLostPlies + 1 : 0;
+    consecutiveEqualPlies = Math.abs(whiteCp) <= DRAW_CP ? consecutiveEqualPlies + 1 : 0;
+
+    if (decideResign({ botPovCp, consecutiveLostPlies, botElo })) {
+      endByAgency('win', t('play.botResigns'));
+      return;
+    }
+    if (drawOffered) {
+      if (decideAcceptDraw({ whiteCp, botSide, consecutiveEqualPlies })) {
+        drawOffered = false;
+        endByAgency('draw', t('play.drawAgreed'));
+      } else {
+        drawOffered = false; // declined — clear the pending indicator, the game continues
+        result = t('play.drawDeclined');
+      }
+    }
+  }
+
+  /** P3: end the game from a bot agency decision (resign / draw-by-agreement). Mirrors checkEnd's
+   *  side effects: mark the controller over (so nothing else moves), stop the clock, set the result
+   *  string, then fold via finishGame (honesty branch + idempotency guard live there). */
+  function endByAgency(outcome: GameOutcome, resultStr: string) {
+    if (!session) return;
+    session.markOver();
+    status = 'over';
+    stopClockLoop();
+    if (clock) clock = stopClock(clock);
+    result = resultStr;
+    void finishGame(outcome);
+  }
+
+  /** P3 (A3/Q-C): the player offers a draw. The offer rides along to the bot's next decision, where
+   *  the same full-strength agency eval decides accept (near-0, not winning) or decline. A persistent
+   *  "draw offered" line (E2) keeps it legible until resolved. Player-offer only — bot-initiated
+   *  offers are deferred (AP-OPPAGENCY-12). */
+  function offerDraw() {
+    if (!canOfferDraw) return;
+    drawOffered = true;
   }
 
   /** Apply a controller engine-reply snapshot to Play's view + clock (shared by engineMove/retry).
@@ -547,23 +710,32 @@
     // skip the whole rating-write block (no updateRating / no opponent-pool / no gameRatings write)
     // and persist the record with `unrated: true`. Default OFF, so a normal game is byte-identical to
     // today. The single decision authority is the pure `shouldRate` (AP-PLAYUX-3).
-    if (shouldRate(unrated)) {
+    //
+    // P3 honesty (Q-E / AP-OPPAGENCY-5): only an ADAPTIVE game folds into the pool + rating. An
+    // override (Easier/Harder/Fixed) game still persists a flagged GameRecord below but SKIPS the fold
+    // entirely — it must not move the adaptive pool or the Glicko rating. The predicate is the pure
+    // `gameAdaptsPool`. The post-game adaptation line (A5) is derived from the fold's prev/next Elo.
+    if (shouldRate(unrated) && gameAdaptsPool(difficultyMode)) {
       if (variant === 'chess960') {
         // Update the chess960 pool — seeded lazily on the first 960 game from classical (AP-960-7).
         const seed = m.gameRatings.chess960 ?? m.gameRatings.classical ?? poolRating(m, 'classical');
+        const prevElo = poolOpponent(m, 'chess960').targetElo;
         const { nextOpp, nextRating } = applyGameResult(seed, poolOpponent(m, 'chess960'), outcome, botElo);
         m.opponentByPool.chess960 = nextOpp;
         opp.state = nextOpp;
         await opp.applyStrength().catch(() => {});
         m.gameRatings.chess960 = nextRating;
+        setAdaptLine(prevElo, nextOpp.targetElo);
       } else {
         // Standard path: adjust the SELECTED pool's adaptive bot toward the 55% band (AP-TC-3).
         const pool = selectedPool;
+        const prevElo = poolOpponent(m, pool).targetElo;
         const { nextOpp, nextRating } = applyGameResult(poolRating(m, pool), poolOpponent(m, pool), outcome, botElo);
         m.opponentByPool[pool] = nextOpp;
         opp.state = nextOpp;
         await opp.applyStrength().catch(() => {});
         m.gameRatings[pool] = nextRating;
+        setAdaptLine(prevElo, nextOpp.targetElo);
       }
     }
 
@@ -576,6 +748,9 @@
       playedAt: now,
       coached,
       ...(unrated ? { unrated: true } : {}), // ADR-0058: persist the honest un-counted marker
+      // P3 (A6/Q-E): flag the difficulty so history/analysis can tell an override game apart; only an
+      // adaptive game moved the pool/rating above. Additive optional — absent reads as legacy adaptive.
+      ...(difficultyMode !== 'adaptive' ? { difficultyMode } : {}),
       playerColor: playerColor[0] as 'w' | 'b', // F5: persist side for correct history re-analysis
       ...(variant === 'chess960'
         ? { variant: 'chess960', startFen: startFen960 ?? undefined }
@@ -597,6 +772,20 @@
     // Opt-in: analyse JUST this game on finish (never the backlog — Q-C / AP-PLAYLOOP-3). 960 never
     // auto-runs (it's not in the backlog and the core resets the variant anyway, AP-960-4).
     if (autoAnalyzeOnFinish && variant !== 'chess960') void autoAnalyzeFinished();
+  }
+
+  /** P3 (A5): set the post-game adaptation line from the pool's prev/next bot Elo. Pure selection via
+   *  `adaptationDirection` — returns null for override games, so an Easier/Harder/Fixed game shows no
+   *  line (Q-D, suppressed). Only called from inside the adaptive fold, so the values are the real ones
+   *  `applyGameResult` produced. */
+  function setAdaptLine(prevElo: number, nextElo: number) {
+    const dir = adaptationDirection(difficultyMode, prevElo, nextElo);
+    const delta = Math.abs(nextElo - prevElo);
+    adaptLine =
+      dir === 'tougher' ? t('play.adaptTougher', { delta })
+      : dir === 'easier' ? t('play.adaptEasier', { delta })
+      : dir === 'unchanged' ? t('play.adaptUnchanged')
+      : '';
   }
 
   /** Opt-in post-finish hook (F-P1-2): analyse only the just-finished game via the shared core.
@@ -755,7 +944,14 @@
   <h2>{t('play.title')}</h2>
   {#if model}
     <p class="muted">
-      {t('play.ratingLine', { pool: displayPool, rating: Math.round(poolRating(model, displayPool).rating), elo: poolOpponent(model, displayPool).targetElo })}
+      <!-- P3 (E1, AP-OPPAGENCY-14): the Adaptive line is byte-identical to before (elo = the pool's
+           adaptive value); under an override show the EFFECTIVE bot Elo + a mode tag so the line never
+           misstates who you're playing. -->
+      {#if difficultyMode === 'adaptive'}
+        {t('play.ratingLine', { pool: displayPool, rating: Math.round(poolRating(model, displayPool).rating), elo: poolOpponent(model, displayPool).targetElo })}
+      {:else}
+        {t('play.ratingLineOverride', { pool: displayPool, rating: Math.round(poolRating(model, displayPool).rating), elo: effectiveBotElo, mode: difficultyTag })}
+      {/if}
       {#if coached}· <span style="color:var(--accent)">{t('play.coachedOn')}</span>{/if}
     </p>
   {/if}
@@ -768,6 +964,30 @@
         <option value="engine">{t('play.opponentEngine')}</option>
       </select>
     </label>
+
+    <!-- P3 (A2): difficulty control {Adaptive (default) · Easier · Harder · Fixed Elo}. Disabled while
+         a game is live (mirrors the mode/time selects). Adaptive = today's behaviour (zero regression). -->
+    <label class="muted" style="font-size:0.85rem">
+      {t('play.difficultyLabel')}
+      <select value={difficultyMode} disabled={live}
+              onchange={(e) => setDifficultyMode(e.currentTarget.value as DifficultyMode)}>
+        <option value="adaptive">{t('play.difficultyAdaptive')}</option>
+        <option value="easier">{t('play.difficultyEasier')}</option>
+        <option value="harder">{t('play.difficultyHarder')}</option>
+        <option value="fixed">{t('play.difficultyFixed')}</option>
+      </select>
+    </label>
+
+    {#if difficultyMode === 'fixed'}
+      <!-- E4: seeded from the current Elo when Fixed is selected, so it's never blank; the bot Elo is
+           clamped to [1320,3190] at apply time via difficultyTargetElo. -->
+      <label class="muted" style="font-size:0.85rem">
+        {t('play.fixedEloLabel')}
+        <input type="number" min="1320" max="3190" step="10" style="width:5rem" disabled={live}
+               value={fixedElo ?? adaptiveBotElo}
+               onchange={(e) => setFixedElo(Number(e.currentTarget.value))} />
+      </label>
+    {/if}
 
     <label class="muted" style="font-size:0.85rem">
       {t('play.modeLabel')}
@@ -890,6 +1110,14 @@
   {#if unrated && status !== 'idle'}
     <p class="muted" style="font-size:0.82rem; color:var(--bad)">{t('play.unratedNote')}</p>
   {/if}
+  <!-- P3 (E2): persistent "draw offered" indicator while the offer is in flight (until accept/decline). -->
+  {#if drawOffered && live}
+    <p class="muted" style="font-size:0.82rem; color:var(--accent)">{t('play.drawOfferedPending')}</p>
+  {/if}
+  <!-- P3 (A5): post-game adaptation line (adaptive games only; suppressed for override games). -->
+  {#if adaptLine && status === 'over'}
+    <p class="muted" style="font-size:0.82rem">{adaptLine}</p>
+  {/if}
 
   {#if steerNote && status !== 'idle'}
     <p class="muted" style="font-size:0.82rem">{steerNote}</p>
@@ -907,6 +1135,10 @@
       {/if}
     {:else}
       <button onclick={requestResign} style="background:var(--bad)">{t('play.resign')}</button>
+      <!-- P3 (A3/Q-C): offer a draw on the player's turn; resolved at the bot's next decision. -->
+      {#if canOfferDraw}
+        <button class="ghost" onclick={offerDraw}>{t('play.offerDraw')}</button>
+      {/if}
       <!-- P2 on-demand blunder check (PL7, Q-C=a): advisory shallow eval on the player's turn. -->
       {#if canCheckMove}
         <button class="ghost" onclick={checkMove} disabled={checkedFen === fen}>{t('play.checkMove')}</button>
