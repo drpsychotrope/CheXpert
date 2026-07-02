@@ -2170,3 +2170,30 @@ vs the engine and import still works by file/paste; the fetch panel explains and
 svelte-check 0/0 (452 files), build green. **Rollback:** revert — additive setting only.
 Cross-links: ADR-0012 (consent pattern), ADR-0064 (bulk queue consumer), ADR-0060 (%clk consumers),
 `specs/pr-07-lichess-fetch-spec.md`.
+
+## ADR-0066 — Annotated move-by-move replay (PR-08 `annotated-replay`)
+
+**Decision.** `AnalysisResult` gains a standard game-review surface: `ui/AnnotatedReplay.svelte` — a
+NAG-annotated paired move list (?!/?/?? colored, the analysed player's moves bolded), a driven
+view-only board (fenAfter + last-move highlight), ⏮◀▶⏭ + keyboard navigation (arrows/Home/End on a
+labeled region), and a per-move detail line (post-move eval in pawns White-POV, −cp lost, seconds
+thought from PR-02, rule-based explanation + "better was" on classified moves, explore-position
+link). ONE parent-owned ply cursor drives the eval graph, the critical-moment buttons, the
+mistakes list ("View in replay") and the replay; the old single-moment board block is subsumed.
+Pure selectors in `analysis/replay.ts` (`nagFor` — silent on best/good, `evalLabel`, `moveRows`,
+`clampIndex`).
+
+**Why.** Every per-ply field was stored since Phase 2 (severity, evals, cpLoss, explanations —
+plus secondsSpent since ADR-0060) but the UI only showed aggregates + critical moments: the
+review experience every chess tool ships was missing while all its pieces existed.
+
+**Doctrine.** No engine at replay time — everything read from the stored analysis (ADR-0038
+precedent). Replays sound for free via the PR-05 Board integration (lastMove set). PR-21 will add
+the "only move" badge to this surface; PR-20's 960 analysis inherits it (roadmap I1).
+
+**Files.** `analysis/replay.ts` + `analysis/replay.test.ts` (NEW, 4), `ui/AnnotatedReplay.svelte`
+(NEW), `ui/AnalysisResult.svelte` (single cursor, moment-board absorbed, jump links),
+`i18n/messages/analysis.ts` (9 keys FR+EN). **Tests:** 1012 green (1008 + 4), svelte-check 0/0
+(455 files), build green. **Rollback:** revert — pure-additive UI/core. Cross-links: ADR-0060
+(secondsSpent), ADR-0038 (no-engine-at-drill doctrine), ADR-0021 (win% curve it completes), PR-21
+(only-move consumer), `specs/pr-08-annotated-replay-spec.md`.

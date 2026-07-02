@@ -75,6 +75,19 @@ export const analysis: Messages = {
     en: 'Couldn\'t auto-detect your colour (White: "{white}", Black: "{black}"). Type your name as it appears in the PGN, or pick White/Black above, then Analyse again.',
   },
 
+  // PR-08 (ADR-0066): annotated move-by-move replay.
+  'replay.region': { fr: 'Rejeu annoté — flèches pour naviguer', en: 'Annotated replay — arrow keys to navigate' },
+  'replay.first': { fr: 'Position initiale', en: 'Starting position' },
+  'replay.prev': { fr: 'Coup précédent', en: 'Previous move' },
+  'replay.next': { fr: 'Coup suivant', en: 'Next move' },
+  'replay.last': { fr: 'Dernier coup', en: 'Last move' },
+  'replay.spent': { fr: '{s} s de réflexion', en: '{s}s thought' },
+  'replay.startHint': {
+    fr: 'Cliquez un coup (ou utilisez les flèches) — annotations ?!/?/?? , évaluation et temps par coup.',
+    en: 'Click a move (or use the arrows) — ?!/?/?? annotations, eval and time per move.',
+  },
+  'replay.jumpHere': { fr: 'Voir dans le rejeu', en: 'View in replay' },
+
   // ── AnalysisResult.svelte (analysisResult.*) ─────────────────────────────
   'analysisResult.yourAcpl': { fr: 'votre ACPL', en: 'your ACPL' },
   'analysisResult.blunders': { fr: 'gaffes', en: 'blunders' },

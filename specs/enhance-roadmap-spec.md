@@ -133,7 +133,7 @@ Tout le reste : parallélisable dans sa vague.
 | PR-05 `sound-celebration` | [`pr-05-sound-celebration-spec.md`](pr-05-sound-celebration-spec.md) | **livré** (ADR-0063) | 2026-07-02 |
 | PR-06 `bulk-import` | [`pr-06-bulk-import-spec.md`](pr-06-bulk-import-spec.md) | **livré** (ADR-0064) | 2026-07-02 |
 | PR-07 `lichess-fetch` | [`pr-07-lichess-fetch-spec.md`](pr-07-lichess-fetch-spec.md) | **livré** (ADR-0065) | 2026-07-02 |
-| PR-08 `annotated-replay` | — | à drafter | — |
+| PR-08 `annotated-replay` | [`pr-08-annotated-replay-spec.md`](pr-08-annotated-replay-spec.md) | **livré** (ADR-0066) | 2026-07-02 |
 | PR-09 `session-log` | — | à drafter | — |
 | PR-10 `insights-actionable` | — | à drafter | — |
 | PR-11 `metacog-routing` | — | à drafter | — |

@@ -4,8 +4,8 @@
   // read-only board for the selected moment + the explained-mistakes list.
   import { onMount } from 'svelte';
   import { app } from '../state/app.svelte';
-  import Board from './Board.svelte';
   import EvalGraph from './EvalGraph.svelte';
+  import AnnotatedReplay from './AnnotatedReplay.svelte';
   import { explainPly } from '../analysis/explain';
   import { criticalMoments } from '../analysis/criticalMoments';
   import { describeOpening, localizedOpeningName, type OpeningName } from '../opening/eco';
@@ -20,12 +20,11 @@
   let { analysis, puzzlesMade }: Props = $props();
 
   const PHASES = ['opening', 'middlegame', 'endgame'] as const;
-  let selectedPly = $state<number | null>(null);
+  // PR-08 (ADR-0066): one ply cursor drives the replay board, the eval graph AND the
+  // critical-moment buttons (-1 = starting position; the old single-moment board is subsumed).
+  let selectedPly = $state<number>(-1);
 
   const moments = $derived(criticalMoments(analysis));
-  const orientation = $derived(analysis.playerColor === 'b' ? 'black' : 'white');
-  const selPly = $derived(selectedPly != null ? analysis.plies[selectedPly] : null);
-  const selEx = $derived(selPly ? explainPly(selPly, getLocale()) : null);
   const mistakes = $derived(
     analysis.plies
       .filter((p) => p.color === analysis.playerColor && (p.severity === 'mistake' || p.severity === 'blunder'))
@@ -67,7 +66,11 @@
   </p>
 {/if}
 
-<EvalGraph {analysis} selected={selectedPly} onSelect={(i) => (selectedPly = i)} />
+<EvalGraph {analysis} selected={selectedPly >= 0 ? selectedPly : null} onSelect={(i) => (selectedPly = i)} />
+
+<!-- PR-08 (ADR-0066): the annotated move-by-move replay — NAGs, evals, per-move time, keyboard
+     navigation. Driven by the same cursor as the graph and the critical moments. -->
+<AnnotatedReplay {analysis} index={selectedPly} onIndexChange={(i) => (selectedPly = i)} />
 
 <div class="row" style="gap:1rem;font-size:0.85rem">
   {#each PHASES as ph}
@@ -87,18 +90,6 @@
         <span class="muted">−{fmtPct(m.winProbLoss)}</span>
       </button>
     {/each}
-  </div>
-{/if}
-
-{#if selPly && selEx}
-  <div class="col center">
-    <div class="board-wrap" style="max-width:340px;width:100%">
-      <Board fen={selPly.fenBefore} {orientation} viewOnly={true} />
-    </div>
-    <p class="muted" style="font-size:0.85rem">{selEx.headline}</p>
-    {#each selEx.reasons as r}<p class="muted" style="font-size:0.85rem">{r}</p>{/each}
-    {#if selEx.better}<p class="better">{selEx.better}</p>{/if}
-    <button class="link" onclick={() => { if (selPly) { app.analysisFen = selPly.fenBefore; app.go('analysis-board'); } }}>{t('analysisResult.exploreThisPosition')}</button>
   </div>
 {/if}
 
@@ -126,6 +117,8 @@
         <div class="why">
           {#each m.ex.reasons as r}<p>{r}</p>{/each}
           {#if m.ex.better}<p class="better">{m.ex.better}</p>{/if}
+          <!-- PR-08: jump the replay to this move. -->
+          <button class="link" onclick={() => (selectedPly = m.ply.ply)}>{t('replay.jumpHere')}</button>
         </div>
       </details>
     {/each}
