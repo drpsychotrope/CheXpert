@@ -4,6 +4,7 @@
   import AnalysisResult from './AnalysisResult.svelte';
   import { parsePgn, inferPlayerColor } from '../analysis/pgn';
   import { runAnalysis } from '../analysis/runAnalysis';
+  import { splitPgnGames, importGameId, importBulk, type ImportBulkResult } from '../analysis/bulkImport';
   import { getAllGames, getAnalyzedGameIds, getAnalysis } from '../store/gamesRepo';
   import { downloadPgn, pgnFilename } from './pgnDownload';
   import type { GameRecord } from '../store/db';
@@ -13,7 +14,16 @@
   let pgn = $state('');
   let playerName = $state('');
   let colorChoice = $state<'auto' | 'w' | 'b'>('auto');
-  let status = $state<'idle' | 'analyzing' | 'done' | 'error'>('idle');
+  let status = $state<'idle' | 'analyzing' | 'done' | 'error' | 'bulk' | 'bulk-done'>('idle');
+  // PR-06 (ADR-0064): bulk multi-game import. `bulkSources` holds the split games awaiting the
+  // user's explicit choice (all vs first only — no silent first-only anymore); the counters drive
+  // the "game i/N" line; `bulkCancel` is polled between games (never mid-game).
+  let bulkSources = $state<string[] | null>(null);
+  let bulkIndex = $state(0);
+  let bulkTotal = $state(0);
+  let bulkCancel = false;
+  let bulkSummary = $state<ImportBulkResult | null>(null);
+  let fileInput = $state<HTMLInputElement | null>(null);
   let progress = $state(0);
   let total = $state(0);
   let error = $state('');
@@ -129,35 +139,87 @@
     }
   }
 
-  /** Tiny stable string hash (djb2) — content-addresses an import so re-analysing the same PGN
-   *  overwrites itself while distinct games never collide on players+ply-count (audit v2 P1-11). */
-  function shortHash(s: string): string {
-    let h = 5381;
-    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-    return (h >>> 0).toString(36);
-  }
-
   const SAMPLE =
     '[Event "Casual"]\n[White "You"]\n[Black "Opponent"]\n[TimeControl "300+3"]\n\n' +
     '1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5 Nxd5 6. Nxf7 Kxf7 ' +
     '7. Qf3+ Ke6 8. Nc3 Ncb4 9. a3 *';
 
-  async function analyze() {
+  /** Entry: detect multi-game pastes (PR-06). N>1 → present an explicit choice (all vs first) —
+   *  the old silent analyse-first-only is gone; N==1 → straight to the single-game flow. */
+  function analyze() {
+    const games = splitPgnGames(pgn);
+    if (games.length > 1) {
+      bulkSources = games;
+      bulkSummary = null;
+      notice = t('import.detectedGames', { n: games.length });
+      return;
+    }
+    void analyzeSingle(pgn);
+  }
+
+  /** PR-06 (ADR-0064): run the whole detected batch through the sequential, cancellable loop. */
+  async function runBulk() {
+    const sources = bulkSources;
+    if (!sources || !sources.length) return;
+    bulkSources = null;
+    notice = '';
+    error = '';
+    result = null;
+    bulkCancel = false;
+    bulkIndex = 0;
+    bulkTotal = sources.length;
+    bulkSummary = null;
+    status = 'bulk';
+    const summary = await importBulk(
+      app.engine,
+      app.puzzles,
+      model ? Math.round(model.puzzleRating.rating) : 1200,
+      sources,
+      playerName,
+      colorChoice,
+      {
+        isCancelled: () => bulkCancel,
+        onGameStart: (i, n) => {
+          bulkIndex = i;
+          bulkTotal = n;
+          progress = 0;
+          total = 0;
+        },
+        onPositionProgress: (d, n) => {
+          progress = d;
+          total = n;
+        },
+      },
+    );
+    bulkSummary = summary;
+    result = summary.last;
+    puzzlesMade = summary.puzzles;
+    elapsedMs = 0;
+    status = 'bulk-done';
+  }
+
+  /** PR-06: load a .pgn file straight into the paste area (then the normal detect flow applies). */
+  async function onPgnFile(e: Event) {
+    const file = (e.currentTarget as HTMLInputElement).files?.[0];
+    (e.currentTarget as HTMLInputElement).value = '';
+    if (!file) return;
+    pgn = await file.text();
+    bulkSources = null;
+    bulkSummary = null;
+    notice = '';
+  }
+
+  async function analyzeSingle(raw: string) {
     error = '';
     result = null;
     puzzlesMade = 0;
     notice = '';
+    bulkSources = null;
     status = 'analyzing';
     progress = 0;
 
     try {
-      // A multi-game PGN (Lichess/Chess.com "export all", studies) makes chess.js throw a cryptic
-      // error; detect it, analyse the first game, and tell the user (audit v2 P1-10).
-      const games = pgn.split(/\n\s*\n(?=\[Event\s)/i).map((s) => s.trim()).filter(Boolean);
-      const source = games.length > 1 ? games[0] : pgn;
-      if (games.length > 1) {
-        notice = t('import.detectedGames', { n: games.length });
-      }
+      const source = raw.trim();
       const parsed = parsePgn(source); // throws on malformed
       if (parsed.plies.length === 0) {
         // Headers-only / move-less PGN — don't persist an all-zeros junk analysis (audit v2 L21).
@@ -185,8 +247,8 @@
       }
 
       const baseRating = model ? Math.round(model.puzzleRating.rating) : 1200;
-      // Content-addressed id: distinct games never collide on players+ply-count (audit v2 P1-11).
-      const gameId = `import:${parsed.headers.White ?? '?'}-${parsed.headers.Black ?? '?'}-${shortHash(source)}`;
+      // Content-addressed id: distinct games never collide (audit v2 P1-11; shared with bulk — PR-06).
+      const gameId = importGameId(parsed.headers, source);
       const now = Date.now();
       const t0 = performance.now();
 
@@ -265,13 +327,30 @@
   </div>
 
   <div class="row">
-    <button onclick={analyze} disabled={status === 'analyzing' || pgn.trim().length === 0}>
+    <button onclick={analyze} disabled={status === 'analyzing' || status === 'bulk' || pgn.trim().length === 0}>
       {status === 'analyzing' ? t('import.analysing') : t('import.analyse')}
     </button>
-    <button class="ghost" onclick={() => (pgn = SAMPLE)} disabled={status === 'analyzing'}>
+    <!-- PR-06: load a whole .pgn file (Lichess/Chess.com "export all") into the paste area. -->
+    <button class="ghost" onclick={() => fileInput?.click()} disabled={status === 'analyzing' || status === 'bulk'}>
+      {t('import.loadFile')}
+    </button>
+    <input type="file" accept=".pgn,application/x-chess-pgn,text/plain" style="display:none" bind:this={fileInput} onchange={onPgnFile} />
+    <button class="ghost" onclick={() => (pgn = SAMPLE)} disabled={status === 'analyzing' || status === 'bulk'}>
       {t('import.loadSample')}
     </button>
   </div>
+
+  {#if notice}
+    <p class="feedback">{notice}</p>
+  {/if}
+
+  <!-- PR-06 (ADR-0064): explicit multi-game choice — all (sequential batch) or first only. -->
+  {#if bulkSources}
+    <div class="row">
+      <button onclick={runBulk}>{t('import.analyseAll', { n: bulkSources.length })}</button>
+      <button class="ghost" onclick={() => void analyzeSingle(bulkSources?.[0] ?? '')}>{t('import.analyseFirstOnly')}</button>
+    </div>
+  {/if}
 
   {#if status === 'analyzing'}
     <div class="panel">
@@ -280,15 +359,35 @@
     </div>
   {/if}
 
+  {#if status === 'bulk'}
+    <div class="panel col" style="gap:0.4rem">
+      <p>{t('import.bulkProgress', { i: bulkIndex, n: bulkTotal })}</p>
+      <div class="bar"><div class="bar-fill" style="width:{total ? (progress / total) * 100 : 0}%"></div></div>
+      <button class="ghost" onclick={() => (bulkCancel = true)}>{t('import.bulkCancel')}</button>
+    </div>
+  {/if}
+
+  {#if status === 'bulk-done' && bulkSummary}
+    <div class="panel col" style="gap:0.25rem">
+      <b>{t('import.bulkDoneTitle')}</b>
+      <span style="font-size:0.85rem">{t('import.bulkDoneLine', { analyzed: bulkSummary.analyzed, puzzles: bulkSummary.puzzles })}</span>
+      {#if bulkSummary.skippedColor}
+        <span class="muted" style="font-size:0.82rem">{t('import.bulkSkippedColor', { n: bulkSummary.skippedColor })}</span>
+      {/if}
+      {#if bulkSummary.skippedDup}
+        <span class="muted" style="font-size:0.82rem">{t('import.bulkSkippedDup', { n: bulkSummary.skippedDup })}</span>
+      {/if}
+      {#if bulkSummary.failed}
+        <span class="muted" style="font-size:0.82rem;color:var(--bad)">{t('import.bulkFailed', { n: bulkSummary.failed })}</span>
+      {/if}
+    </div>
+  {/if}
+
   {#if status === 'error'}
     <p class="feedback bad">{t('import.couldNotAnalyse', { error })}</p>
   {/if}
 
-  {#if notice}
-    <p class="feedback">{notice}</p>
-  {/if}
-
-  {#if status === 'done' && result}
+  {#if (status === 'done' || status === 'bulk-done') && result}
     <div class="panel col">
       <h3>{t('import.resultTitle')}</h3>
       {#if elapsedMs > 0}

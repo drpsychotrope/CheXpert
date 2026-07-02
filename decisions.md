@@ -2120,3 +2120,27 @@ milestone), `store/db.ts` (+`soundEnabled?`), `state/app.svelte.ts` (boot sync),
 0/0 (448 files), build green; preview smoke: clean boot, toggle ON by default, zero console errors.
 **Rollback:** revert — additive setting only. Cross-links: Q-F=a + I7 (roadmap), ADR-0062 (pool
 snapshots the record check reads), PR-09 (mastery celebration), `specs/pr-05-sound-celebration-spec.md`.
+
+## ADR-0064 — Bulk multi-game PGN import (PR-06 `bulk-import`)
+
+**Decision.** The Import screen now handles a multi-game PGN as a first-class flow: detection offers
+an EXPLICIT choice ("Analyse all N" / "First only" — the old silent first-only is gone), a `.pgn`
+file can be loaded directly, and the batch runs through a new sequential, cancellable loop
+(`analysis/bulkImport.ts` — `splitPgnGames`, `shortHash`/`importGameId` extracted from Import.svelte
+as the single id authority, and `importBulk` with injectable seams, mirroring `analyzeBacklog`).
+Per game: parse → empty movetext counted failed (L21) → colour inferred PER GAME from the headers
+vs the player name, undeterminable → **skipped and counted, never guessed** (audit v2 C-3) → dedup
+via the content-addressed id → persist → analyse → mark analysed; each game try/catch'd so one bad
+PGN never aborts the batch (F-P1-4). The end panel reports analysed / colour-skipped / dups /
+failures / personal puzzles created.
+
+**Why.** Only the first game of a paste was analysed (audit v2 P1-10 workaround), so a new user
+with a 200-game archive started empty — the personalised loop only became real around game 20.
+This is the cold-start unlock; PR-07 (Lichess fetch) feeds the same queue.
+
+**Files.** `analysis/bulkImport.ts` + `analysis/bulkImport.test.ts` (NEW, 8 — all by injection, no
+engine), `ui/Import.svelte` (detect→choice, runBulk, file input, progress + summary panels; local
+shortHash removed in favour of the shared one), `i18n/messages/analysis.ts` (10 keys FR+EN,
+detectedGames reworded). **Tests:** 1002 green (994 + 8), svelte-check 0/0 (450 files), build green.
+**Rollback:** revert — no schema change. Cross-links: audit v2 P1-10/P1-11/C-3, `analyzeBacklog`
+(P1 pattern), PR-07 (consumer), `specs/pr-06-bulk-import-spec.md`.

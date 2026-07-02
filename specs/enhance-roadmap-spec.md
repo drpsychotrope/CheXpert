@@ -131,7 +131,7 @@ Tout le reste : parallélisable dans sa vague.
 | PR-03 `postgame-debrief` | [`pr-03-postgame-debrief-spec.md`](pr-03-postgame-debrief-spec.md) | **livré** (ADR-0061) | 2026-07-02 |
 | PR-04 `progress-graph` | [`pr-04-progress-graph-spec.md`](pr-04-progress-graph-spec.md) | **livré** (ADR-0062) | 2026-07-02 |
 | PR-05 `sound-celebration` | [`pr-05-sound-celebration-spec.md`](pr-05-sound-celebration-spec.md) | **livré** (ADR-0063) | 2026-07-02 |
-| PR-06 `bulk-import` | — | à drafter | — |
+| PR-06 `bulk-import` | [`pr-06-bulk-import-spec.md`](pr-06-bulk-import-spec.md) | **livré** (ADR-0064) | 2026-07-02 |
 | PR-07 `lichess-fetch` | — | à drafter | — |
 | PR-08 `annotated-replay` | — | à drafter | — |
 | PR-09 `session-log` | — | à drafter | — |

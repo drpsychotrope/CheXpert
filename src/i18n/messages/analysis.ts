@@ -29,9 +29,26 @@ export const analysis: Messages = {
   'import.analysedIn': { fr: 'Analysé en {seconds}s ({ms}ms/coup)', en: 'Analysed in {seconds}s ({ms}ms/ply)' },
   // Status / error notices (set in script)
   'import.detectedGames': {
-    fr: '{n} parties détectées — analyse de la première. Collez une partie à la fois pour les autres.',
-    en: 'Detected {n} games — analysing the first. Paste one game at a time for the rest.',
+    fr: '{n} parties détectées — analysez tout ou seulement la première.',
+    en: 'Detected {n} games — analyse them all, or just the first.',
   },
+  // PR-06 (ADR-0064): bulk multi-game import.
+  'import.loadFile': { fr: 'Charger un fichier .pgn…', en: 'Load a .pgn file…' },
+  'import.analyseAll': { fr: 'Analyser les {n} parties', en: 'Analyse all {n} games' },
+  'import.analyseFirstOnly': { fr: 'Seulement la 1ʳᵉ', en: 'First only' },
+  'import.bulkProgress': { fr: 'Partie {i} / {n}…', en: 'Game {i} / {n}…' },
+  'import.bulkCancel': { fr: 'Arrêter après cette partie', en: 'Stop after this game' },
+  'import.bulkDoneTitle': { fr: 'Import terminé', en: 'Import finished' },
+  'import.bulkDoneLine': {
+    fr: '{analyzed} parties analysées · {puzzles} puzzles personnels créés',
+    en: '{analyzed} games analysed · {puzzles} personal puzzles created',
+  },
+  'import.bulkSkippedColor': {
+    fr: "{n} ignorées : couleur indéterminable (renseignez votre pseudo tel qu'il apparaît dans le PGN, puis réessayez — jamais devinée).",
+    en: '{n} skipped: colour undeterminable (set your name as it appears in the PGN and retry — never guessed).',
+  },
+  'import.bulkSkippedDup': { fr: '{n} déjà analysées (ignorées).', en: '{n} already analysed (skipped).' },
+  'import.bulkFailed': { fr: '{n} en échec (PGN illisible ou erreur moteur) — le lot a continué.', en: '{n} failed (unreadable PGN or engine error) — the batch continued.' },
   'import.noMoves': { fr: 'Aucun coup trouvé dans ce PGN.', en: 'No moves found in this PGN.' },
   'import.colorNotDetected': {
     fr: "Impossible de détecter automatiquement votre couleur (Blancs : « {white} », Noirs : « {black} »). Tapez votre nom tel qu'il apparaît dans le PGN, ou choisissez Blancs/Noirs ci-dessus, puis relancez Analyser.",
