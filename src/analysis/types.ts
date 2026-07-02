@@ -57,6 +57,10 @@ export interface PlyAnalysis extends ParsedPly {
   phase: GamePhase;
   /** Mate distance at fenBefore (mover POV), if any. */
   mate?: number;
+  /** PR-21 (ADR-0079, Q-E=c): White-POV eval of the SECOND-best line at fenBefore, persisted by
+   *  a targeted MultiPV=2 re-pass over the player's mistake/blunder plies only. Additive; absent
+   *  on every other ply and on pre-PR-21 analyses (no measurement → no only-move claim). */
+  secondBestCp?: number;
   /** Motif of the MISSED idea, present on mistakes/blunders. */
   motif?: MotifResult;
 }

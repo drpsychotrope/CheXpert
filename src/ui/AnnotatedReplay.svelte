@@ -7,6 +7,7 @@
   import Board from './Board.svelte';
   import { explainPly } from '../analysis/explain';
   import { moveRows, evalLabel, clampIndex } from '../analysis/replay';
+  import { isOnlyMove } from '../analysis/onlyMove';
   import type { GameAnalysis } from '../analysis/types';
   import { t, getLocale } from '../i18n';
 
@@ -69,6 +70,10 @@
         {/if}
         {#if cur.secondsSpent != null}
           <span class="muted">{t('replay.spent', { s: Math.round(cur.secondsSpent) })}</span>
+        {/if}
+        <!-- PR-21 (ADR-0079): the best move stood alone here — measured, never guessed. -->
+        {#if isOnlyMove(cur)}
+          <span class="only-move">{t('replay.onlyMove')}</span>
         {/if}
       </div>
       {#if ex}
@@ -150,4 +155,5 @@
   .half.mistake:not(.cur) { color: #e0965c; }
   .half.blunder:not(.cur) { color: var(--bad); }
   .half.mine { font-weight: 600; }
+  .only-move { color: var(--accent); font-size: 0.78rem; font-weight: 600; border: 1px solid var(--accent); border-radius: 4px; padding: 0 0.3rem; }
 </style>

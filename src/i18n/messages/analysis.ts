@@ -87,6 +87,12 @@ export const analysis: Messages = {
     en: 'Click a move (or use the arrows) — ?!/?/?? annotations, eval and time per move.',
   },
   'replay.jumpHere': { fr: 'Voir dans le rejeu', en: 'View in replay' },
+  // PR-21 (ADR-0079): measured only-move badge.
+  'replay.onlyMove': { fr: 'seul coup', en: 'only move' },
+  'whenToThink.onlyMove': {
+    fr: "Il n'y avait qu'un coup ici : toutes les alternatives perdaient nettement (mesuré).",
+    en: 'There was only one move here: every alternative lost clearly (measured).',
+  },
 
   // PR-13 (ADR-0071): your-own-repertoire deviation.
   'analysisResult.youLeftLine': {

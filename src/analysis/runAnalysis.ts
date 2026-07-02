@@ -9,6 +9,7 @@ import type { PuzzleRepo } from '../trainer/PuzzleRepo';
 import { openTrainerDB } from '../store/db';
 import { parsePgn } from './pgn';
 import { parse960Pgn } from './pgn960';
+import { onlyMoveTargets } from './onlyMove';
 import { analyzeGame, engineEvaluator } from './BatchAnalyzer';
 import { generatePuzzlesFromAnalysis, engineLineEvaluator } from './generatePuzzles';
 import type { GameAnalysis } from './types';
@@ -66,6 +67,24 @@ export async function runAnalysis(
       onProgress: input.onProgress,
     });
     analysis.analyzedAt = input.now;
+
+    // PR-21 (ADR-0079, ratified Q-E=c): targeted MultiPV=2 re-pass on the player's
+    // mistake/blunder plies ONLY — the badge concerns nothing else, so the ~20s/game budget is
+    // untouched for clean games. Best-effort per ply: a failed probe just leaves the field
+    // absent (no measurement, no only-move claim).
+    for (const idx of onlyMoveTargets(analysis)) {
+      const p = analysis.plies[idx];
+      try {
+        const lines = await engine.analyzeLines(p.engineFenBefore ?? p.fenBefore, {
+          multipv: 2,
+          movetime: movetimeMs,
+          fullStrength: true,
+        });
+        if (lines.length >= 2) p.secondBestCp = lines[1].whiteCp;
+      } catch {
+        /* absent beats wrong */
+      }
+    }
 
     const seen = await seenPersonalFens();
     rawPuzzles = await generatePuzzlesFromAnalysis(analysis, engineLineEvaluator(engine), {

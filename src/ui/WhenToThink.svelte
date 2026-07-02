@@ -20,6 +20,7 @@
   } from '../analysis/criticalMomentDrill';
   import { fallbackDrillItems } from '../analysis/criticalMomentFallback';
   import { explainPly, type Explanation } from '../analysis/explain';
+  import { isOnlyMove } from '../analysis/onlyMove';
   import { t, tn, fmtPct, getLocale } from '../i18n';
 
   let items = $state<DrillItem[]>([]);
@@ -124,6 +125,10 @@
             {@html t('whenToThink.swingRoutine', { pct: fmtPct(Math.round(current.winProbLoss)) })}
           {/if}
         </p>
+        <!-- PR-21 (ADR-0079): the measured "only move" fact, when the re-pass captured it. -->
+        {#if isOnlyMove(current.ply)}
+          <p class="swing" style="color:var(--accent)">{t('whenToThink.onlyMove')}</p>
+        {/if}
         {#if explanation}
           <p class="headline">{explanation.headline}</p>
           {#each explanation.reasons as reason}

@@ -2475,3 +2475,23 @@ clocks/tc-on-960-recs). **Tests:** 1046 green (1041 + 5), svelte-check 0/0 (469 
 green. **Rollback:** revert — additive fields only; produced 960 analyses stay shape-valid.
 Cross-links: ADR-0041 (Q-C/Q-D lifted; README override supersedes), ADR-0047 (colour restriction
 lifted), audit C-1/C-3 doctrines, ratified I1, `specs/pr-20-chess960-first-class-spec.md`.
+
+## ADR-0079 — Measured "only move": targeted MultiPV re-pass (PR-21 `only-move`, Q-E=c)
+
+**Decision.** The batch pass stays single-PV; after classification, `runAnalysis` runs a TARGETED
+MultiPV=2 re-pass over the player's mistake/blunder plies only (ratified Q-E=c — the badge concerns
+nothing else, so a clean game costs nothing extra) and persists the second line's White-POV eval as
+the additive `PlyAnalysis.secondBestCp`. Pure `analysis/onlyMove.ts` derives the claim:
+mover-POV gap ≥ 120 cp ⇒ "only move"; ABSENT data ⇒ false — no measurement, no claim (pre-PR-21
+analyses simply never show the badge). Best-effort per ply (a failed probe leaves the field absent
+— absent beats wrong); 960 covered via engineFenBefore under the same finally-reset. Consumers:
+an "only move" badge in the annotated replay's detail line (PR-08) and a measured "there was only
+one move here" line on the WhenToThink reveal (`DrillItem.ply` carries the full PlyAnalysis).
+Lifts the critical-moment spec §11 deferral. Deferred consumer (§11): tagging generated puzzles.
+
+**Files.** `analysis/onlyMove.ts` + tests (NEW, 3), `analysis/types.ts` (+secondBestCp),
+`analysis/runAnalysis.ts` (targeted re-pass), `ui/AnnotatedReplay.svelte` (badge),
+`ui/WhenToThink.svelte` (reveal line), i18n (2 keys FR+EN). **Tests:** 1049 green (1046 + 3),
+svelte-check 0/0 (471 files), build green. **Rollback:** revert — additive field. Cross-links:
+ADR-0038 (no engine at drill time — the measurement happens at ANALYSIS time, the drill only
+reads), ADR-0066 (replay surface), ratified Q-E=c, `specs/pr-21-only-move-spec.md`.
