@@ -59,8 +59,8 @@ export const settings: Messages = {
     en: 'Allow network for the Syzygy endgame tablebase',
   },
   'settings.networkHint': {
-    fr: "Le retour parfait du trainer de finales vient de l'API Syzygy de Lichess. Désactivé, les finales fonctionnent quand même contre le moteur — sans la notation parfaite de la table. Activé, seule la position (un FEN) est envoyée ; les résultats sont mis en cache pour ne récupérer chaque position qu'une fois.",
-    en: "The endgame trainer's perfect feedback comes from the Lichess Syzygy API. With this off, endgame drills still work against the engine — you just won't get tablebase-perfect move grading. When on, only the position (a FEN) is sent; results are cached so each position is fetched at most once.",
+    fr: "Couvre les deux seules fonctions réseau : la table Syzygy du trainer de finales (envoie une position — un FEN) et la récupération de vos parties Lichess (envoie votre pseudo). Désactivé, les finales fonctionnent quand même contre le moteur et l'import reste possible par fichier/collage. Les résultats Syzygy sont mis en cache pour ne récupérer chaque position qu'une fois.",
+    en: 'Covers the only two network features: the endgame trainer\'s Syzygy tablebase (sends a position — a FEN) and the Lichess games fetch (sends your username). With this off, endgame drills still work against the engine and importing still works by file/paste. Syzygy results are cached so each position is fetched at most once.',
   },
   'settings.networkStatus': { fr: 'Réseau : {state}', en: 'Network: {state}' },
   'settings.on': { fr: 'activé', en: 'on' },

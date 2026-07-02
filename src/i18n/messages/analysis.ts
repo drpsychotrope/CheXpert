@@ -49,6 +49,26 @@ export const analysis: Messages = {
   },
   'import.bulkSkippedDup': { fr: '{n} déjà analysées (ignorées).', en: '{n} already analysed (skipped).' },
   'import.bulkFailed': { fr: '{n} en échec (PGN illisible ou erreur moteur) — le lot a continué.', en: '{n} failed (unreadable PGN or engine error) — the batch continued.' },
+  // PR-07 (ADR-0065): opt-in Lichess fetch.
+  'import.lichessTitle': { fr: 'Récupérer depuis Lichess', en: 'Fetch from Lichess' },
+  'import.lichessUserLabel': { fr: 'Pseudo Lichess', en: 'Lichess username' },
+  'import.lichessMaxLabel': { fr: 'Parties', en: 'Games' },
+  'import.lichessFetch': { fr: 'Récupérer', en: 'Fetch' },
+  'import.lichessFetching': { fr: 'Récupération…', en: 'Fetching…' },
+  'import.lichessHint': {
+    fr: 'Envoie uniquement ce pseudo à lichess.org (API publique, aucun compte requis) et récupère vos dernières parties avec leurs pendules — elles alimentent aussi le diagnostic de gestion du temps.',
+    en: 'Sends only this username to lichess.org (public API, no account needed) and fetches your latest games with their clocks — they feed the time-management diagnosis too.',
+  },
+  'import.lichessNeedsNetwork': {
+    fr: "La récupération Lichess nécessite l'accès réseau (désactivé par défaut).",
+    en: 'The Lichess fetch needs network access (off by default).',
+  },
+  'import.lichessOpenSettings': { fr: 'Ouvrir les Réglages', en: 'Open Settings' },
+  'import.lichessErrInvalid': { fr: 'Pseudo Lichess invalide (2-30 caractères, lettres/chiffres/_/-).', en: 'Invalid Lichess username (2-30 chars, letters/digits/_/-).' },
+  'import.lichessErrNotFound': { fr: 'Utilisateur introuvable sur Lichess — vérifiez le pseudo.', en: 'User not found on Lichess — check the username.' },
+  'import.lichessErrRate': { fr: 'Lichess limite le débit — réessayez dans une minute.', en: 'Lichess is rate-limiting — retry in a minute.' },
+  'import.lichessErrNetwork': { fr: 'Erreur réseau en contactant Lichess.', en: 'Network error reaching Lichess.' },
+  'import.lichessErrEmpty': { fr: 'Aucune partie renvoyée pour ce pseudo.', en: 'No games returned for this username.' },
   'import.noMoves': { fr: 'Aucun coup trouvé dans ce PGN.', en: 'No moves found in this PGN.' },
   'import.colorNotDetected': {
     fr: "Impossible de détecter automatiquement votre couleur (Blancs : « {white} », Noirs : « {black} »). Tapez votre nom tel qu'il apparaît dans le PGN, ou choisissez Blancs/Noirs ci-dessus, puis relancez Analyser.",

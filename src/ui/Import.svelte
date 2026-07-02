@@ -5,6 +5,7 @@
   import { parsePgn, inferPlayerColor } from '../analysis/pgn';
   import { runAnalysis } from '../analysis/runAnalysis';
   import { splitPgnGames, importGameId, importBulk, type ImportBulkResult } from '../analysis/bulkImport';
+  import { fetchLichessGames, LICHESS_MAX_CHOICES, type LichessFetchError } from '../analysis/lichessFetch';
   import { getAllGames, getAnalyzedGameIds, getAnalysis } from '../store/gamesRepo';
   import { downloadPgn, pgnFilename } from './pgnDownload';
   import type { GameRecord } from '../store/db';
@@ -24,6 +25,47 @@
   let bulkCancel = false;
   let bulkSummary = $state<ImportBulkResult | null>(null);
   let fileInput = $state<HTMLInputElement | null>(null);
+  // PR-07 (ADR-0065): opt-in Lichess fetch — gated on the SAME consent switch as Syzygy
+  // (settings.allowNetwork, ADR-0012). The username persists in settings for reuse; the fetched
+  // multi-game PGN lands in the paste area and flows through the normal PR-06 detect→bulk path.
+  let lichessUser = $state('');
+  let lichessMax = $state<number>(50);
+  let lichessBusy = $state(false);
+  const networkOn = $derived(app.settings?.allowNetwork ?? false);
+
+  async function fetchFromLichess() {
+    if (!networkOn || lichessBusy) return;
+    lichessBusy = true;
+    error = '';
+    notice = '';
+    try {
+      const r = await fetchLichessGames(lichessUser, lichessMax);
+      if (!r.ok) {
+        const key: Record<LichessFetchError, string> = {
+          'invalid-username': 'import.lichessErrInvalid',
+          'not-found': 'import.lichessErrNotFound',
+          'rate-limited': 'import.lichessErrRate',
+          network: 'import.lichessErrNetwork',
+          empty: 'import.lichessErrEmpty',
+        };
+        error = t(key[r.error]);
+        status = 'error';
+        return;
+      }
+      pgn = r.pgn;
+      // The username IS the player name for per-game colour inference (a Lichess archive always
+      // names the account on one side).
+      playerName = lichessUser.trim();
+      if (app.settings) {
+        app.settings.lichessUsername = playerName;
+        await app.persistSettings();
+      }
+      status = 'idle';
+      analyze(); // → multi-game choice (PR-06) or straight single-game flow
+    } finally {
+      lichessBusy = false;
+    }
+  }
   let progress = $state(0);
   let total = $state(0);
   let error = $state('');
@@ -46,7 +88,11 @@
     analyzedIds = ids;
   }
 
-  onMount(loadHistory);
+  onMount(() => {
+    void loadHistory();
+    // PR-07: seed the Lichess field from the persisted username.
+    lichessUser = app.settings?.lichessUsername ?? '';
+  });
 
   /** Localized "played on" date for a history row (locale-aware, derived from playedAt). */
   function fmtPlayedAt(ms: number): string {
@@ -338,6 +384,37 @@
     <button class="ghost" onclick={() => (pgn = SAMPLE)} disabled={status === 'analyzing' || status === 'bulk'}>
       {t('import.loadSample')}
     </button>
+  </div>
+
+  <!-- PR-07 (ADR-0065): opt-in Lichess fetch, gated on the ADR-0012 consent switch. Only the
+       typed username is sent; the result feeds the normal paste→detect→bulk path. -->
+  <div class="panel col" style="gap:0.4rem">
+    <b style="font-size:0.9rem">{t('import.lichessTitle')}</b>
+    {#if networkOn}
+      <div class="row" style="align-items:flex-end;flex-wrap:wrap">
+        <label style="flex:1;min-width:10rem">
+          {t('import.lichessUserLabel')}
+          <input bind:value={lichessUser} placeholder="ex. thibault" autocomplete="off" />
+        </label>
+        <label>
+          {t('import.lichessMaxLabel')}
+          <select bind:value={lichessMax}>
+            {#each LICHESS_MAX_CHOICES as n (n)}
+              <option value={n}>{n}</option>
+            {/each}
+          </select>
+        </label>
+        <button onclick={fetchFromLichess} disabled={lichessBusy || !lichessUser.trim() || status === 'bulk'}>
+          {lichessBusy ? t('import.lichessFetching') : t('import.lichessFetch')}
+        </button>
+      </div>
+      <p class="muted" style="font-size:0.78rem">{t('import.lichessHint')}</p>
+    {:else}
+      <p class="muted" style="font-size:0.82rem">
+        {t('import.lichessNeedsNetwork')}
+        <button class="ghost" style="font-size:0.8rem;padding:0.2rem 0.5rem;margin-left:0.4rem" onclick={() => app.go('settings')}>{t('import.lichessOpenSettings')}</button>
+      </p>
+    {/if}
   </div>
 
   {#if notice}

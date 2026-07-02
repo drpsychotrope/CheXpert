@@ -2144,3 +2144,29 @@ shortHash removed in favour of the shared one), `i18n/messages/analysis.ts` (10 
 detectedGames reworded). **Tests:** 1002 green (994 + 8), svelte-check 0/0 (450 files), build green.
 **Rollback:** revert — no schema change. Cross-links: audit v2 P1-10/P1-11/C-3, `analyzeBacklog`
 (P1 pattern), PR-07 (consumer), `specs/pr-06-bulk-import-spec.md`.
+
+## ADR-0065 — Opt-in Lichess games fetch (PR-07 `lichess-fetch`)
+
+**Decision.** The Import screen gains "Fetch from Lichess": the app's SECOND network feature ever,
+behind the SAME off-by-default consent switch as Syzygy (ADR-0012 `allowNetwork`). Pure core
+`analysis/lichessFetch.ts` (username validation — an invalid one triggers NO call; export URL with
+`clocks=true&opening=false&evals=false`, max clamped 1–300; injected-fetch mapping to TYPED errors:
+invalid-username / not-found / rate-limited / network / empty). The fetched multi-game PGN lands in
+the paste area and flows through PR-06's detect→bulk queue; the username doubles as the player name
+for per-game colour inference and persists as additive `SettingsRecord.lichessUsername`. `clocks=
+true` means fetched games carry %clk and feed the time-management radar like PR-02's own games.
+
+**Pre-flight (roadmap N3, executed live 2026-07-02).** `GET lichess.org/api/games/user/{u}?max=2&
+clocks=true` → 200 `application/x-chess-pgn`, standard headers + `{ [%clk 0:10:00] }` comments —
+consumed unchanged by splitPgnGames/parsePgn. Public API, no auth, no token.
+
+**Privacy.** Settings network hint + README Privacy rewritten to honestly list BOTH egress features
+(Syzygy: a FEN; Lichess fetch: the typed username — nothing else). Network off → endgames still work
+vs the engine and import still works by file/paste; the fetch panel explains and links to Settings.
+
+**Files.** `analysis/lichessFetch.ts` + `.test.ts` (NEW, 6), `ui/Import.svelte` (gated panel),
+`store/db.ts` (+`lichessUsername?`), `i18n/messages/analysis.ts` (12 keys FR+EN),
+`i18n/messages/settings.ts` (networkHint reworded), README Privacy. **Tests:** 1008 green (1002+6),
+svelte-check 0/0 (452 files), build green. **Rollback:** revert — additive setting only.
+Cross-links: ADR-0012 (consent pattern), ADR-0064 (bulk queue consumer), ADR-0060 (%clk consumers),
+`specs/pr-07-lichess-fetch-spec.md`.

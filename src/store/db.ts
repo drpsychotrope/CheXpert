@@ -157,6 +157,10 @@ export interface SettingsRecord {
    *  (Q-F=a) — a legacy/absent value reads `?? true`; one-click kill-switch in Settings.
    *  Additive optional — NO DB_VERSION bump (mirrors `metacogEnabled?`). */
   soundEnabled?: boolean;
+  /** PR-07 (ADR-0065): the Lichess username used by the opt-in games fetch, persisted for reuse.
+   *  Only ever SENT to lichess.org when the user clicks Fetch AND `allowNetwork` is on
+   *  (ADR-0012 consent). Additive optional — NO DB_VERSION bump. */
+  lichessUsername?: string;
   /** Data-shape revision (audit W13). See PlayerModel.schemaRev. */
   schemaRev?: number;
 }

@@ -307,10 +307,12 @@ is fetched at most once. Settings → *Delete all my data* wipes every store plu
 Everything stays on your device. Your games, puzzle history, ratings, and player model live in your
 browser's IndexedDB. Nothing is sent anywhere by default.
 
-The **only** feature that makes a network call is the endgame trainer's Syzygy tablebase lookup
-(Lichess API). It is **off by default**, enabled only with your explicit consent in Settings, sends
-only the board position (a FEN — no identity, no account), and caches every result so a position is
-fetched at most once. With it off, endgame drills still work against the engine.
+Exactly **two** features make network calls, both behind the same **off-by-default** consent
+switch in Settings: the endgame trainer's Syzygy tablebase lookup (sends only the board position —
+a FEN — and caches every result so a position is fetched at most once), and the optional **Lichess
+games fetch** on the Import screen (sends only the username you type to the public export API — no
+account, no token; ADR-0065). With the switch off, endgame drills still work against the engine and
+importing still works by file or paste.
 
 Because everything lives in browser storage, Settings → *Your data* offers a full local
 **backup/restore**: one JSON file with every store (games, analyses, ratings, SRS, repertoire,
