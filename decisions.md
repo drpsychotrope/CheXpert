@@ -2006,3 +2006,33 @@ deep-equal (curated excluded, personal kept) + replace-everything + unknown-stor
 change (DB_VERSION intact, zero new fields). Cross-links: ADR-0013 (wipe), ADR-0049 (origin-keyed
 storage), ADR-0054/0056 (`downloadText` primitive), `specs/pr-01-data-backup-spec.md`,
 `specs/enhance-roadmap-spec.md` (PR-01, I2, I5).
+
+## ADR-0060 — Play telemetry: per-move %clk in the persisted PGN + rating snapshot on GameRecord (PR-02)
+
+**Decision.** Timed standard games persist a **%clk-annotated PGN** (one `[%clk H:MM:SS]` comment per
+ply — the mover's remaining time after the press, post-increment — plus the `TimeControl` header,
+lifting that ADR-0036 deferral), and every COUNTED game stamps `ratingBefore`/`ratingAfter` (additive
+fields, no DB_VERSION bump) around the Glicko fold.
+
+**Why.** The analysis pipeline already consumes `%clk` (parsePgn → `clockMs`/`secondsSpent` →
+the time-management radar dimension), but only imported PGNs carried clocks — the player's own
+games, the app's main data source, contributed zero to the time dimension. And the rating delta was
+computed then dropped at game end; the snapshot series is what the progress graph (PR-04) reads.
+
+**Shape.** Pure core `game/clockTrace.ts` (`msToClk` defensive clamp, `timeControlTag`,
+`pgnWithClocks` — chess.js replay + `setComment`; a side-mismatched snapshot is SKIPPED: absent
+beats wrong). Play snapshots at the two press sites from the Clock STATE MACHINE (advanced by
+`performance.now()` deltas — never rAF paint counts, I4; precedent: audit v2 saw the coach dialog
+freeze the rAF clock). Takeback splices the last 2 snapshots so the trace tracks the history; the
+clock itself is not rewound (ADR-0058 honesty). Annotation is best-effort: any failure keeps the
+plain PGN (AP-TELEM-1 — never lose the record over telemetry). Untimed/960 games stay plain
+(PR-20 inherits the variant-agnostic accumulator, I1). No snapshot on unrated/override games —
+no fold, no rating movement, nothing to claim (AP-TELEM-3).
+
+**Files.** `game/clockTrace.ts` (NEW pure), `game/clockTrace.test.ts` (NEW, 8 — includes the
+producer→parsePgn round-trip with secondsSpent derivation), `ui/Play.svelte` (trace + fold capture +
+best-effort annotation), `store/db.ts` (2 additive fields), `store/repos.test.ts` (+1).
+**Tests:** 977 green (968 + 9), svelte-check 0/0 (440 files), build green. **Rollback:** revert —
+additive fields only, zero migration. Cross-links: ADR-0036 (TimeControl deferral lifted),
+ADR-0058 (takeback un-count), `specs/pr-02-play-telemetry-spec.md`, `specs/enhance-roadmap-spec.md`
+(PR-02, I1/I4), PR-04 (consumer of the rating series), PR-03 (consumer of the clock stats).

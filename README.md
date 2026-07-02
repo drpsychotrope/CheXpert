@@ -47,7 +47,9 @@ Everything runs in the browser. Nothing leaves your device by default.
 - **Time controls** — pick a clock on the Play screen (Bullet 1+0/2+1, Blitz 3+2/5+0, Rapid 10+0/15+10,
   Classical 30+0, or No clock). Both sides have a Fischer-increment clock; flag and you lose on time —
   unless your opponent has no mating material, which is a draw (FIDE Art. 6.9). The bot plays to its own
-  clock (snappy in bullet, deliberate in classical). Your **game rating is per time control** — a bullet
+  clock (snappy in bullet, deliberate in classical). Timed games persist **per-move clocks** (`%clk`,
+  like a Lichess export) so your own games feed the time-management diagnosis, and every counted game
+  records your **rating before/after** (ADR-0060). Your **game rating is per time control** — a bullet
   result no longer moves your classical number. The headline rating shown elsewhere is your classical pool;
   the practice drills (Comeback/Sparring) remain untimed = classical.
 - **Coached mode** — optional engine check that flags an apparent blunder right after you play it and offers a take-back (best-effort; pre-move alerts come in Phase 2).

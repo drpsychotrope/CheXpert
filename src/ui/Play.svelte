@@ -27,6 +27,7 @@
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
   import { applyGameResult, botMovetime, flagOutcome, shouldRate, canTakeBackInPlay } from '../game/playSession';
+  import { pgnWithClocks, timeControlTag } from '../game/clockTrace';
   import {
     difficultyTargetElo, decideResign, decideAcceptDraw, resignThreshold, coachedBlunderThreshold,
     adaptationDirection, gameAdaptsPool, DRAW_CP, type DifficultyMode,
@@ -119,6 +120,9 @@
 
   // One-click post-game analysis (ADR-0022): no PGN paste needed.
   let lastGame = $state<{ id: string; pgn: string; playedAt: number; result: 'win' | 'loss' | 'draw' } | null>(null);
+  // PR-02 (ADR-0060): per-ply clock snapshots for the %clk-annotated persisted PGN. Plain array —
+  // nothing renders from it; reset in newGame, popped by takeBack, consumed once in finishGame.
+  let clockTrace: import('../game/clockTrace').PlyClockSnap[] = [];
   // The full stored record of the just-finished game — fed to the shared analysis core for the
   // single-game button + the opt-in auto-run (P1, play-loop-closure §4.6). Its playerColor is in
   // scope at write so no provenance issue (AP-PLAYLOOP-12).
@@ -277,6 +281,7 @@
     consecutiveEqualPlies = 0;
     drawOffered = false;
     adaptLine = '';
+    clockTrace = []; // PR-02: fresh per-ply clock capture for the new game (rematch flows through here)
 
     if (variant === 'chess960') {
       // Distinguish an invalid entry from a deliberate 0: NaN → random, not silently SP 0 (audit W6).
@@ -514,7 +519,13 @@
    *  This interposition (coached gate above + clock press here) is exactly why the controller does
    *  NOT auto-chain applyPlayerMove → engineReply (Q-G / C1-1). */
   async function commitPlayerMove() {
-    if (clock) clock = press(clock, playerSideClock);
+    if (clock) {
+      clock = press(clock, playerSideClock);
+      // PR-02 (ADR-0060): snapshot the mover's remaining ms right after the press (post-increment)
+      // — standard %clk semantics. Values come from the Clock state machine (performance.now()
+      // deltas), never rAF paint counts (I4).
+      clockTrace.push({ side: playerSideClock, remainingMs: playerSideClock === 'w' ? clock.whiteMs : clock.blackMs });
+    }
     if (checkEnd()) return;
     await engineMove();
   }
@@ -663,7 +674,11 @@
       return;
     }
     if ((status as string) === 'over') return; // P1-14: resign landed mid-think; resign() set result/clock
-    if (session.movePlayed && clock) clock = press(clock, botSide);
+    if (session.movePlayed && clock) {
+      clock = press(clock, botSide);
+      // PR-02: mirror of the player-side snapshot — the bot's remaining ms after its press.
+      clockTrace.push({ side: botSide, remainingMs: botSide === 'w' ? clock.whiteMs : clock.blackMs });
+    }
     // Run the end-check side effects (result string + fold/persist); the controller already set
     // status to 'over'/'playing' but Play owns those side effects (AP-CTRL-9).
     if (!checkEnd()) status = 'playing';
@@ -715,6 +730,10 @@
     // override (Easier/Harder/Fixed) game still persists a flagged GameRecord below but SKIPS the fold
     // entirely — it must not move the adaptive pool or the Glicko rating. The predicate is the pure
     // `gameAdaptsPool`. The post-game adaptation line (A5) is derived from the fold's prev/next Elo.
+    // PR-02 (ADR-0060): capture the player's rating around the fold so the GameRecord carries its
+    // own before/after snapshot — the raw series the progress graph (PR-04) reads. Stays null on
+    // unrated/override games (no fold → no snapshot, honesty: the rating did not move).
+    let foldRating: { before: number; after: number } | null = null;
     if (shouldRate(unrated) && gameAdaptsPool(difficultyMode)) {
       if (variant === 'chess960') {
         // Update the chess960 pool — seeded lazily on the first 960 game from classical (AP-960-7).
@@ -725,28 +744,45 @@
         opp.state = nextOpp;
         await opp.applyStrength().catch(() => {});
         m.gameRatings.chess960 = nextRating;
+        foldRating = { before: seed.rating, after: nextRating.rating };
         setAdaptLine(prevElo, nextOpp.targetElo);
       } else {
         // Standard path: adjust the SELECTED pool's adaptive bot toward the 55% band (AP-TC-3).
         const pool = selectedPool;
+        const prevRating = poolRating(m, pool);
         const prevElo = poolOpponent(m, pool).targetElo;
-        const { nextOpp, nextRating } = applyGameResult(poolRating(m, pool), poolOpponent(m, pool), outcome, botElo);
+        const { nextOpp, nextRating } = applyGameResult(prevRating, poolOpponent(m, pool), outcome, botElo);
         m.opponentByPool[pool] = nextOpp;
         opp.state = nextOpp;
         await opp.applyStrength().catch(() => {});
         m.gameRatings[pool] = nextRating;
+        foldRating = { before: prevRating.rating, after: nextRating.rating };
         setAdaptLine(prevElo, nextOpp.targetElo);
       }
     }
 
     const now = Date.now();
+    // PR-02 (ADR-0060): persist the %clk-annotated PGN for timed standard games so the analysis
+    // pipeline's existing clock consumers (pgn.ts secondsSpent → time radar) finally see YOUR OWN
+    // games. Best-effort: any annotation failure keeps the plain PGN — never lose the record over
+    // telemetry (AP-TELEM-1). Untimed/960 games (clock === null) stay plain.
+    let pgnOut = game.pgn();
+    if (clock && clockTrace.length && variant !== 'chess960' && !selectedTC.untimed) {
+      try {
+        pgnOut = pgnWithClocks(pgnOut, clockTrace, timeControlTag(initialSecOf(selectedTC), incrementSecOf(selectedTC)));
+      } catch {
+        /* keep the plain PGN */
+      }
+    }
     const rec: GameRecord = {
       id: `g:${now}`,
-      pgn: game.pgn(),
+      pgn: pgnOut,
       result: outcome,
       botElo,
       playedAt: now,
       coached,
+      // PR-02: rating snapshot around the fold (absent on unrated/override games). Additive.
+      ...(foldRating ? { ratingBefore: foldRating.before, ratingAfter: foldRating.after } : {}),
       ...(unrated ? { unrated: true } : {}), // ADR-0058: persist the honest un-counted marker
       // P3 (A6/Q-E): flag the difficulty so history/analysis can tell an override game apart; only an
       // adaptive game moved the pool/rating above. Additive optional — absent reads as legacy adaptive.
@@ -913,6 +949,10 @@
     const snap = session.takeBackPlayerMove(); // undoes bot reply + player move; recomputes lastMove
     fen = snap.fen;
     lastMove = snap.lastMove;
+    // PR-02: the two undone plies leave the %clk trace too, so it stays aligned with the history.
+    // The clock itself is NOT rewound (time honestly spent) — the re-played move snapshots the
+    // current, lower remaining time.
+    clockTrace.splice(-2, 2);
     // The position changed under the player — invalidate any prior on-demand check verdict.
     checkVerdict = null;
     checkedFen = null;

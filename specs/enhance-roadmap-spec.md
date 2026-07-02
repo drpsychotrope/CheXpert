@@ -127,7 +127,7 @@ Tout le reste : parallélisable dans sa vague.
 | PR | Spec fille | Statut | Merge |
 |---|---|---|---|
 | PR-01 `data-backup` | [`pr-01-data-backup-spec.md`](pr-01-data-backup-spec.md) | **livré** (ADR-0059) | 2026-07-02 |
-| PR-02 `play-telemetry` | — | à drafter | — |
+| PR-02 `play-telemetry` | [`pr-02-play-telemetry-spec.md`](pr-02-play-telemetry-spec.md) | **livré** (ADR-0060) | 2026-07-02 |
 | PR-03 `postgame-debrief` | — | à drafter | — |
 | PR-04 `progress-graph` | — | à drafter | — |
 | PR-05 `sound-celebration` | — | à drafter | — |

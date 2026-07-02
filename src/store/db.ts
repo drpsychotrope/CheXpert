@@ -42,6 +42,12 @@ export interface GameRecord {
    *  A non-adaptive (Easier/Harder/Fixed) game is flagged here and does NOT move the adaptive pool or
    *  the Glicko rating — only adaptive games fold (honesty). Additive optional — NO DB_VERSION bump. */
   difficultyMode?: import('../engine/opponentAgency').DifficultyMode;
+  /** PR-02 (ADR-0060): the player's Glicko rating around this game's fold — the raw series the
+   *  progress graph (PR-04) reads. Absent on legacy records AND on games that did not move the
+   *  rating (unrated takeback ADR-0058, difficulty-override P3): no fold → no snapshot, honesty.
+   *  Additive optional — NO DB_VERSION bump. */
+  ratingBefore?: number;
+  ratingAfter?: number;
 }
 
 export interface PuzzleAttemptRecord {
