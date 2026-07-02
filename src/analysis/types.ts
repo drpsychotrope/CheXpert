@@ -17,6 +17,11 @@ export interface ParsedPly {
   clockMs?: number;
   /** Seconds the mover spent on this move (needs clocks + increment). */
   secondsSpent?: number;
+  /** PR-20 (ADR-0078): engine-facing FENs for Chess960 plies (X-FEN castling the UI FENs can't
+   *  carry — fenBefore/fenAfter stay chess.js/chessground-safe). The evaluator prefers these
+   *  when present; standard games never set them. Additive optional. */
+  engineFenBefore?: string;
+  engineFenAfter?: string;
 }
 
 export interface ParsedGame {

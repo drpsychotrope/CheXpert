@@ -54,8 +54,10 @@ Everything runs in the browser. Nothing leaves your device by default.
   the practice drills (Comeback/Sparring) remain untimed = classical.
 - **Coached mode** — optional engine check that flags an apparent blunder right after you play it and offers a take-back (best-effort; pre-move alerts come in Phase 2).
 - **Chess960 (Wild)** — play a random Fischer-random position or a specific SP-ID (0–959) against
-  the adaptive bot. Castle by dragging the king onto its own rook. v1 is untimed and not yet
-  auto-analysed (the standard analysis pipeline assumes opening theory; see ADR-0041).
+  the adaptive bot, **with clocks, either color, and full local analysis** (the game replays
+  through the app's own 960 rules shim and the engine runs `UCI_Chess960`; opening/theory modules
+  simply don't apply). Personal puzzles are mined from castling-rights-free positions. Castle by
+  dragging the king onto its own rook (ADR-0078, superseding ADR-0041's v1 limits).
 - **One-click review** — after a game, *Analyse this game* runs the full local analysis (puzzles +
   weakness dashboard) with no PGN to copy or paste.
 - **Post-game debrief & progress** — every game ends on a debrief card (rating before→after,

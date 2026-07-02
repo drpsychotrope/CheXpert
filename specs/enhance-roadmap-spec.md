@@ -143,10 +143,10 @@ Tout le reste : parallélisable dans sa vague.
 | PR-15 `explorer-own-stats` | [`pr-15-explorer-own-stats-spec.md`](pr-15-explorer-own-stats-spec.md) | **livré** (ADR-0073) | 2026-07-02 |
 | PR-16 `endgame-from-games` | [`pr-16-endgame-from-games-spec.md`](pr-16-endgame-from-games-spec.md) | **livré** (ADR-0074) | 2026-07-02 |
 | PR-17 `puzzle-playout` | [`pr-17-puzzle-playout-spec.md`](pr-17-puzzle-playout-spec.md) | **livré** (ADR-0075) | 2026-07-02 |
-| PR-18 `coach-multiday` | — | à drafter | — |
-| PR-19a `concept-cards-interactive` | — | à drafter | — |
-| PR-19b `concept-cards-srs` | — | à drafter | — |
-| PR-20 `chess960-first-class` | — | à drafter | — |
+| PR-18 `coach-multiday` | [`pr-18-coach-multiday-spec.md`](pr-18-coach-multiday-spec.md) | **livré** (ADR-0076) | 2026-07-02 |
+| PR-19a `concept-cards-interactive` | [`pr-19-concept-cards-v2-spec.md`](pr-19-concept-cards-v2-spec.md) | **livré** (ADR-0077) | 2026-07-02 |
+| PR-19b `concept-cards-srs` | [`pr-19-concept-cards-v2-spec.md`](pr-19-concept-cards-v2-spec.md) | **livré** (ADR-0077) | 2026-07-02 |
+| PR-20 `chess960-first-class` | [`pr-20-chess960-first-class-spec.md`](pr-20-chess960-first-class-spec.md) | **livré** (ADR-0078) | 2026-07-02 |
 | PR-21 `only-move` | — | à drafter | — |
 | PR-22 `premove-alert` | — | à drafter | — |
 | PR-23 `board-line-reeval` | — | à drafter | — |

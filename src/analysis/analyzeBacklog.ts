@@ -59,6 +59,10 @@ export async function analyzeOnePlayedGame(
     now: (opts.now ?? Date.now)(),
     movetimeMs: opts.movetimeMs ?? 200,
     onProgress: opts.onProgress,
+    // PR-20 (ADR-0078): 960 games analyse through the shim parser + UCI_Chess960 — the ONE
+    // call-site covers the Play button, the auto-run AND the backlog batch.
+    variant: game.variant ?? 'standard',
+    startFen: game.startFen,
   });
   return analysis;
 }

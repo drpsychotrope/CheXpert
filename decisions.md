@@ -2443,3 +2443,35 @@ i18n (5 keys FR+EN). **Tests:** wiring over the already-tested ensureCard/review
 `concept:*` cards are harmless (kind-filtered everywhere). Cross-links: ADR-0040 (deferrals
 lifted), ADR-0017 (exact-match), ADR-0010/0043 (SRS + per-square precedent), ratified Q-C=b,
 `specs/pr-19-concept-cards-v2-spec.md`.
+
+## ADR-0078 — Chess960 first-class: analysis + clocks + colour (PR-20, lifts ADR-0041 Q-C/Q-D)
+
+**Decision.** (a) 960 games ANALYSE now: the real blocker was chess.js being unable to replay 960
+castling, so `analysis/pgn960.ts` replays the movetext through the app's own ChessGame shim
+(resolveMove understands king-onto-rook), emitting chess.js/chessground-safe UI FENs plus additive
+`engineFenBefore/After` X-FENs the evaluator prefers; `EngineClient.setChess960()` puts the whole
+pass in UCI_Chess960 with a **finally-reset** (the audit v2 C-1 failure class); the ONE shared
+call-site (`analyzeOnePlayedGame`) routes the Play button, the auto-run AND the backlog batch, and
+the backlog selector now includes 960 records (when they carry their startFen — defensive). A
+desynced replay THROWS loudly (the C-3 doctrine: never a silently wrong analysis). Theory modules
+(ECO naming, book steering, repertoire deviation) disable themselves on 960 UCIs — unmatched
+prefixes return null; no flags needed. (b) Personal puzzles mined from 960 games keep only
+castling-rights-free positions (the drill engine is standard) and carry an additive
+`Puzzle.variant` tag. (c) Clocks apply to 960 (Q-C lifted; timeControl persisted on 960 records —
+poolOfGame still routes them to the chess960 pool) and the colour choice opens up (the ADR-0047
+restriction had no reason once steering is absent). Inherited free (ratified I1): the annotated
+replay and the debrief (opening rows simply absent).
+
+**Deferred (§11).** %clk in persisted 960 PGNs (pgnWithClocks is chess.js-based; a 960-aware
+writer comes later — the 960 time dimension waits).
+
+**Files.** `analysis/pgn960.ts` + tests (NEW, 5 — real SP-0 replay with engine FENs, SP-518
+castling, loud throw, castle derivation), `variant/chess960.ts` (+castleFromStartFen),
+`engine/EngineClient.ts` (+setChess960), `analysis/types.ts` (+engineFen* additive),
+`analysis/BatchAnalyzer.ts` (?? seam), `analysis/runAnalysis.ts` (variant path, finally-reset,
+puzzle filter), `analysis/analyzeBacklog.ts` (variant routing), `analysis/unanalyzedGames.ts`
+(960 included), `trainer/puzzle.ts` (+variant?), `ui/Play.svelte` (auto/button/notice/colour/
+clocks/tc-on-960-recs). **Tests:** 1046 green (1041 + 5), svelte-check 0/0 (469 files), build
+green. **Rollback:** revert — additive fields only; produced 960 analyses stay shape-valid.
+Cross-links: ADR-0041 (Q-C/Q-D lifted; README override supersedes), ADR-0047 (colour restriction
+lifted), audit C-1/C-3 doctrines, ratified I1, `specs/pr-20-chess960-first-class-spec.md`.

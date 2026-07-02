@@ -99,6 +99,15 @@ function startFenFor(backRank: string): string {
   return `${black}/pppppppp/8/8/8/8/PPPPPPPP/${white} w KQkq - 0 1`;
 }
 
+/** Derive the castling shim config from a stored 960 start FEN (PR-20, ADR-0078): the back
+ *  rank is the FEN's first segment (Black's rank-8 layout — identical files for both sides at
+ *  the start). Lets the analysis replay a persisted `GameRecord.startFen` without re-deriving
+ *  the SP-ID. */
+export function castleFromStartFen(startFen: string): Chess960Castle {
+  const backRank = startFen.split(' ')[0].split('/')[0].toLowerCase();
+  return castleFromBackRank(backRank);
+}
+
 /** Position by SP-ID (0..959). `byId(id).id === id`; id 518 === standard. */
 export function chess960PositionById(id: number): Chess960Position {
   const n = ((id % 960) + 960) % 960;

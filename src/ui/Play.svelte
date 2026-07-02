@@ -266,8 +266,9 @@
 
   async function newGame() {
     if (!model) return;
-    // Chess960 stays White (no opening theory / color choice — ADR-0041/0047).
-    playerColor = variant === 'chess960' ? 'white' : resolveColor(colorChoice);
+    // PR-20 (ADR-0078): colour choice applies to 960 too (the ADR-0041/0047 restriction is lifted
+    // with the analysis unlock — there was never a theory reason once steering is absent).
+    playerColor = resolveColor(colorChoice);
     result = '';
     lastGame = null;
     lastGameRec = null;
@@ -339,8 +340,8 @@
     const state = initOpponentState(difficultyTargetElo(difficultyMode, adaptiveSeed, fixedElo ?? adaptiveSeed));
     opponent = new AdaptiveOpponent(app.engine, state, variant === 'chess960');
 
-    // Chess960 is always untimed (Q-C); standard respects the selected time control.
-    if (variant === 'chess960' || selectedTC.untimed) {
+    // PR-20 (ADR-0078, lifts ADR-0041 Q-C): 960 respects the selected time control like standard.
+    if (selectedTC.untimed) {
       clock = null;
     } else {
       clock = startClock(initClock(initialSecOf(selectedTC) * 1000, incrementSecOf(selectedTC) * 1000, 'w'));
@@ -847,17 +848,15 @@
       // adaptive game moved the pool/rating above. Additive optional — absent reads as legacy adaptive.
       ...(difficultyMode !== 'adaptive' ? { difficultyMode } : {}),
       playerColor: playerColor[0] as 'w' | 'b', // F5: persist side for correct history re-analysis
-      ...(variant === 'chess960'
-        ? { variant: 'chess960', startFen: startFen960 ?? undefined }
+      // PR-20 (ADR-0078): 960 records carry their time control too (clocks lifted, Q-C).
+      ...(variant === 'chess960' ? { variant: 'chess960' as const, startFen: startFen960 ?? undefined } : {}),
+      timeControl: selectedTC.untimed
+        ? { initialSec: 0, incrementSec: 0, category: 'classical' as const, untimed: true }
         : {
-            timeControl: selectedTC.untimed
-              ? { initialSec: 0, incrementSec: 0, category: 'classical', untimed: true }
-              : {
-                  initialSec: initialSecOf(selectedTC),
-                  incrementSec: incrementSecOf(selectedTC),
-                  category: categoryFor(initialSecOf(selectedTC), incrementSecOf(selectedTC)),
-                },
-          }),
+            initialSec: initialSecOf(selectedTC),
+            incrementSec: incrementSecOf(selectedTC),
+            category: categoryFor(initialSecOf(selectedTC), incrementSecOf(selectedTC)),
+          },
     };
     await putGame(rec);
     lastGame = { id: rec.id, pgn: rec.pgn, playedAt: rec.playedAt, result: rec.result };
@@ -907,9 +906,9 @@
     }
     await app.persistModel(now);
     await refreshBacklog(); // the just-finished game is now counted until analysed (F-P1-3)
-    // Opt-in: analyse JUST this game on finish (never the backlog — Q-C / AP-PLAYLOOP-3). 960 never
-    // auto-runs (it's not in the backlog and the core resets the variant anyway, AP-960-4).
-    if (autoAnalyzeOnFinish && variant !== 'chess960') void autoAnalyzeFinished();
+    // Opt-in: analyse JUST this game on finish (never the backlog — Q-C / AP-PLAYLOOP-3).
+    // PR-20 (ADR-0078): 960 auto-runs too — the shared core routes it through the shim parser.
+    if (autoAnalyzeOnFinish) void autoAnalyzeFinished();
   }
 
   /** P3 (A5): set the post-game adaptation line from the pool's prev/next bot Elo. Pure selection via
@@ -1140,9 +1139,8 @@
       </select>
     </label>
 
-    {#if variant !== 'chess960'}
-      <ColorPicker bind:value={colorChoice} disabled={live} />
-    {/if}
+    <!-- PR-20 (ADR-0078): colour + clocks now apply to 960 too (Q-C lifted). -->
+    <ColorPicker bind:value={colorChoice} disabled={live} />
 
     {#if variant === 'chess960'}
       <label class="muted" style="font-size:0.85rem">
@@ -1152,30 +1150,28 @@
       </label>
     {/if}
 
-    {#if variant !== 'chess960'}
-      <label class="muted" style="font-size:0.85rem">
-        {t('play.timeLabel')}
-        <select
-          value={selectedTC.id}
-          disabled={live}
-          onchange={(e) => { selectedTC = TIME_CONTROL_PRESETS.find((p) => p.id === e.currentTarget.value) ?? selectedTC; }}
-        >
-          {#each TIME_CONTROL_PRESETS as p (p.id)}
-            <option value={p.id}>{p.label}</option>
-          {/each}
-        </select>
-      </label>
+    <label class="muted" style="font-size:0.85rem">
+      {t('play.timeLabel')}
+      <select
+        value={selectedTC.id}
+        disabled={live}
+        onchange={(e) => { selectedTC = TIME_CONTROL_PRESETS.find((p) => p.id === e.currentTarget.value) ?? selectedTC; }}
+      >
+        {#each TIME_CONTROL_PRESETS as p (p.id)}
+          <option value={p.id}>{p.label}</option>
+        {/each}
+      </select>
+    </label>
 
-      {#if selectedTC.id === 'custom'}
-        <label class="muted" style="font-size:0.85rem">
-          {t('play.customMin')} <input type="number" min="0" style="width:3.5rem" disabled={live}
-            oninput={(e) => { customInitialSec = Math.max(0, Number(e.currentTarget.value) * 60); }}
-            value={customInitialSec / 60} />
-        </label>
-        <label class="muted" style="font-size:0.85rem">
-          {t('play.customInc')} <input type="number" min="0" style="width:3.5rem" bind:value={customIncrementSec} disabled={live} />
-        </label>
-      {/if}
+    {#if selectedTC.id === 'custom'}
+      <label class="muted" style="font-size:0.85rem">
+        {t('play.customMin')} <input type="number" min="0" style="width:3.5rem" disabled={live}
+          oninput={(e) => { customInitialSec = Math.max(0, Number(e.currentTarget.value) * 60); }}
+          value={customInitialSec / 60} />
+      </label>
+      <label class="muted" style="font-size:0.85rem">
+        {t('play.customInc')} <input type="number" min="0" style="width:3.5rem" bind:value={customIncrementSec} disabled={live} />
+      </label>
     {/if}
   </div>
 
@@ -1186,9 +1182,7 @@
     </div>
   {/if}
 
-  {#if variant !== 'chess960'}
-    <p class="muted" style="font-size:0.82rem">{playerColor === 'white' ? t('play.youPlayWhite') : t('play.youPlayBlack')}</p>
-  {/if}
+  <p class="muted" style="font-size:0.82rem">{playerColor === 'white' ? t('play.youPlayWhite') : t('play.youPlayBlack')}</p>
 
   <div class="play-area">
     <div class="board-wrap">
@@ -1304,7 +1298,8 @@
         <button class="ghost" onclick={takeBack}>{t('play.takeBack')}</button>
       {/if}
     {/if}
-    {#if status === 'over' && lastGame && variant !== 'chess960'}
+    <!-- PR-20 (ADR-0078): 960 games analyse like standard now (shim parser + UCI_Chess960). -->
+    {#if status === 'over' && lastGame}
       <button class="ghost" onclick={analyzePlayed} disabled={aStatus === 'analyzing'}>
         {aStatus === 'analyzing' ? t('play.analysing') : aResult ? t('play.reanalyse') : t('play.analyseThisGame')}
       </button>
@@ -1326,11 +1321,7 @@
   {#if status === 'over' && autoAnalyzed && !aResult}
     <p class="muted" style="font-size:0.82rem; color:var(--good)">{t('play.loop.autoAnalysed')}</p>
   {/if}
-  {#if status === 'over' && variant === 'chess960'}
-    <p class="muted" style="font-size:0.8rem; max-width:440px">
-      {t('play.chess960NoAnalysis')}
-    </p>
-  {/if}
+  <!-- PR-20 (ADR-0078): the "960 not analysed yet" notice is gone — it analyses now. -->
 
   {#if aStatus === 'analyzing'}
     <div class="panel" style="max-width:420px">
