@@ -147,9 +147,9 @@ Tout le reste : parallélisable dans sa vague.
 | PR-19a `concept-cards-interactive` | [`pr-19-concept-cards-v2-spec.md`](pr-19-concept-cards-v2-spec.md) | **livré** (ADR-0077) | 2026-07-02 |
 | PR-19b `concept-cards-srs` | [`pr-19-concept-cards-v2-spec.md`](pr-19-concept-cards-v2-spec.md) | **livré** (ADR-0077) | 2026-07-02 |
 | PR-20 `chess960-first-class` | [`pr-20-chess960-first-class-spec.md`](pr-20-chess960-first-class-spec.md) | **livré** (ADR-0078) | 2026-07-02 |
-| PR-21 `only-move` | — | à drafter | — |
-| PR-22 `premove-alert` | — | à drafter | — |
-| PR-23 `board-line-reeval` | — | à drafter | — |
+| PR-21 `only-move` | [`pr-21-only-move-spec.md`](pr-21-only-move-spec.md) | **livré** (ADR-0079) | 2026-07-02 |
+| PR-22 `premove-alert` | [`pr-22-premove-alert-spec.md`](pr-22-premove-alert-spec.md) | **livré** (ADR-0080) | 2026-07-02 |
+| PR-23 `board-line-reeval` | — | **déjà livré avant le roadmap** — constat vérifié 2026-07-02 : `AnalysisBoard.analyze()` ré-évalue chaque position explorée (MultiPV 3, seq-token anti-stale) ; le DEFER Q-B miné datait d'avant ce code. Aucun travail. | 2026-07-02 |
 
 ## §5. Phase B — doctrine de tests (transverse ; détail par spec fille)
 

@@ -741,7 +741,38 @@
     }
     // Run the end-check side effects (result string + fold/persist); the controller already set
     // status to 'over'/'playing' but Play owns those side effects (AP-CTRL-9).
-    if (!checkEnd()) status = 'playing';
+    if (!checkEnd()) {
+      status = 'playing';
+      // PR-22 (ADR-0080): the README's Phase-2 promise — an automatic risk read at the start of
+      // YOUR turn. Coached mode + slow cadences only; non-blocking; best-effort.
+      void preMoveAlert();
+    }
+  }
+
+  /** PR-22 (ADR-0080): auto pre-move alert. Reuses the on-demand checkMove machinery (one
+   *  shallow eval per position via checkedFen; the manual button stays coherent — it disables on
+   *  the already-checked position). Slow cadences only (never bullet/blitz — engine budget), only
+   *  the RISKY badge auto-shows (a permanent "fine" every move would be noise), stale results
+   *  dropped on generation/position change. */
+  function preAlertEligible(): boolean {
+    if (!coached || status !== 'playing' || turnColor() !== playerColor) return false;
+    if (selectedTC.untimed) return true;
+    const cat = categoryFor(initialSecOf(selectedTC), incrementSecOf(selectedTC));
+    return cat === 'rapid' || cat === 'classical';
+  }
+  async function preMoveAlert() {
+    if (!preAlertEligible()) return;
+    if (checkedFen === game.fen) return; // one read per position (AP-PLAYUX-5)
+    const gen = analyzeGen;
+    const fenAt = game.fen;
+    checkedFen = fenAt;
+    try {
+      const bad = await coachEvalBad();
+      if (gen !== analyzeGen || game.fen !== fenAt || status !== 'playing') return; // stale
+      if (bad) checkVerdict = 'risky';
+    } catch {
+      /* best-effort — no alert on engine hiccup */
+    }
   }
 
   /** Recover from a bot-move engine error: drop any stuck search and try the move again (P1-05).

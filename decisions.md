@@ -2495,3 +2495,21 @@ Lifts the critical-moment spec §11 deferral. Deferred consumer (§11): tagging 
 svelte-check 0/0 (471 files), build green. **Rollback:** revert — additive field. Cross-links:
 ADR-0038 (no engine at drill time — the measurement happens at ANALYSIS time, the drill only
 reads), ADR-0066 (replay surface), ratified Q-E=c, `specs/pr-21-only-move-spec.md`.
+
+## ADR-0080 — Automatic pre-move risk alert in coached slow games (PR-22 `premove-alert`)
+
+**Decision.** Coached mode now runs an AUTOMATIC risk read at the start of the player's turn —
+the README's "pre-move alerts come in Phase 2" promise, delivered by automating the existing
+on-demand checkMove machinery (one shallow coachEvalBad per position via the checkedFen guard;
+the manual button stays coherent — it disables on an already-read position). Structural guards:
+coached mode only (no new toggle — this IS that mode's Phase 2), rapid/classical/untimed only
+(never bullet/blitz — engine budget), only the RISKY badge auto-shows (a permanent "fine" every
+move would be noise), stale results dropped on generation/position/status change, best-effort
+(an engine hiccup alerts nothing). Fire-and-forget after status='playing' — the bot reply never
+waits on it. Per-candidate (hover/drag) evaluation stays deferred (cost ×N).
+
+**Files.** `ui/Play.svelte` (preAlertEligible + preMoveAlert + the applyEngineReply call — the
+single path every bot reply takes). No new i18n (reuses play.checkRisky), no schema. **Tests:**
+1049 green unchanged, svelte-check 0/0 (471 files), build green. **Rollback:** revert — no
+persistent state. Cross-links: PL7/ADR-0058 era checkMove (automated), README Phase-2 promise
+(lifted), `specs/pr-22-premove-alert-spec.md`.

@@ -52,7 +52,9 @@ Everything runs in the browser. Nothing leaves your device by default.
   records your **rating before/after** (ADR-0060). Your **game rating is per time control** — a bullet
   result no longer moves your classical number. The headline rating shown elsewhere is your classical pool;
   the practice drills (Comeback/Sparring) remain untimed = classical.
-- **Coached mode** — optional engine check that flags an apparent blunder right after you play it and offers a take-back (best-effort; pre-move alerts come in Phase 2).
+- **Coached mode** — optional engine check that flags an apparent blunder right after you play it
+  and offers a take-back, plus an **automatic pre-move risk alert** at the start of your turn in
+  rapid/classical/untimed games (never bullet/blitz; only "risky" ever auto-shows — ADR-0080).
 - **Chess960 (Wild)** — play a random Fischer-random position or a specific SP-ID (0–959) against
   the adaptive bot, **with clocks, either color, and full local analysis** (the game replays
   through the app's own 960 rules shim and the engine runs `UCI_Chess960`; opening/theory modules
