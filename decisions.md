@@ -2270,3 +2270,31 @@ never stack (priority order tested).
 svelte-check 0/0 (459 files), build green. **Rollback:** revert — no schema. Cross-links: ADR-0037
 (metacog collection), ADR-0036 (timed tactics), ADR-0040 (concepts), coach-intake C5 REJECT
 (respected), `specs/pr-11-metacog-routing-spec.md`.
+
+## ADR-0070 — Scenario library ×2.6 + targeted motif re-probe + hot-measure label (PR-12)
+
+**Decision.** (a) `IMBALANCE_LIBRARY` grows 5 → 13 (ratified Q-D=a; the roadmap's "7" counted the
+weakness template — corrected): knight-vs-bad-bishop, queen-vs-two-rooks, outside majority,
+exchange-up, opposite-bishops attack, space advantage, two-minors-vs-rook, minority attack — each
+FEN validated by the auto-iterating scenarios test (legal + side-to-move == sideToTrain), FR+EN
+goals; Sparring lists them automatically (library-driven). (b) Targeted re-probe (lifts
+coach-program-v2 D2): "↻ Re-check {motif}" chips on the saved-profile card for every WEAK motif
+(delta<0) run `singleMotifPlan(theme)` through the wizard's ladder, then merge SURGICALLY: only
+that MotifScore moves (baseline kept = the profile's, so deltas stay comparable); the full old
+profile becomes coachProfilePrev (the trend shows old→new for that motif); dimensions/assessedAt/
+strengths-weaknesses labels deliberately untouched (refresh at the next full assessment — stated in
+the UI). `saveAssessment` is a no-op during a re-probe so a parked scoped run can never resume into
+a FULL-profile commit. (c) Ratified I10: pure `isHotMeasure` (non-probe attempts on the theme
+within 6h) → a descriptive "hot measure" label on the result — never a gate.
+
+**Placement (documented deviation).** The button lives on the PROFILE card, not the result-step
+efficacy lines — the real moment of need is returning after drilling; efficacy lines stay
+descriptive.
+
+**Files.** `analysis/scenarios.ts` (+8), `coach/probePlan.ts` (+singleMotifPlan),
+`coach/hotMeasure.ts` + `coach/hotMeasure.test.ts` (NEW, 3), `ui/Coach.svelte` (re-probe flow +
+resume guard + chips), `i18n/messages/coach.ts` (4 keys). **Tests:** 1025 green (1022 + 3; all 8
+new FENs passed the legality sweep first run), svelte-check 0/0 (461 files), build green.
+**Rollback:** revert — no schema; a merged profile stays shape-valid. Cross-links: ADR-0030
+(scenario library), ADR-0048 (probe scoring), coach-program-v2 D2 (lifted), ratified Q-D=a + I10,
+`specs/pr-12-coach-probes-v3-spec.md`.

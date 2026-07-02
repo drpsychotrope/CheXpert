@@ -23,6 +23,7 @@
     buildProbePlan,
     borderlineDepth,
     coarseEndgameSpec,
+    singleMotifPlan,
     COACH_PROBE_MAX_TOTAL,
     type ProbeSpec,
     type ProbeKind,
@@ -47,6 +48,7 @@
   import { resolveColor, type ColorChoice } from '../game/color';
   import { t, getLocale, fmtPct } from '../i18n';
   import { labelOrRaw, gt, motifLabelOrRaw } from '../i18n/gen';
+  import { isHotMeasure } from '../coach/hotMeasure';
   import { coachProfileFilename } from '../coach/funnel';
   import { downloadText } from './pgnDownload';
 
@@ -259,6 +261,9 @@
    *  resumable steps are stored; transient steps clear nothing (the last resumable snapshot stands). */
   function saveAssessment() {
     if (!RESUMABLE_STEPS.has(step)) return;
+    // PR-12: a targeted re-probe (seconds long) is NOT resumable — parking it would make the
+    // resume path commit a one-motif run as a FULL profile. Guard, don't snapshot.
+    if (reprobeTheme) return;
     app.coachAssessment = {
       step,
       plan: $state.snapshot(plan) as ProbeSpec[],
@@ -515,12 +520,80 @@
 
   /** After all motif/endgame ladders: run the timed block if it was selected, else offer the game. */
   function afterLadders() {
+    // PR-12 (ADR-0070): a targeted re-probe never continues into timed/game — it merges and exits.
+    if (reprobeTheme) return void commitReprobe();
     if (pickTimed && plan.some((p) => p.kind === 'timed')) {
       startTimedBlock();
     } else {
       step = 'offer-game';
       saveAssessment(); // CF4: resumable at the offer step
     }
+  }
+
+  // ── PR-12 (ADR-0070, lifts coach-program-v2 D2): targeted motif re-probe ──
+  // One themed ladder, then a SURGICAL merge into the saved profile: only that MotifScore moves
+  // (baseline kept = the profile's, so deltas stay comparable); the full old profile becomes
+  // coachProfilePrev so the trend shows old→new for THIS motif (others read flat). Dimensions,
+  // assessedAt and the strengths/weaknesses labels are deliberately untouched — labels refresh at
+  // the next full re-assessment (documented in the spec).
+  let reprobeTheme = $state<string | null>(null);
+  let reprobeDone = $state('');
+  let reprobeHot = $state(false); // I10: the read happened right after drilling that motif
+
+  function startReprobe(theme: string) {
+    if (!saved || app.puzzles.size === 0) return;
+    app.coachAssessment = null; // a parked full assessment must not swallow this scoped run
+    reprobeTheme = theme;
+    reprobeDone = '';
+    reprobeHot = false;
+    plan = singleMotifPlan(theme);
+    themeIdx = 0;
+    totalSpent = 0;
+    probes.length = 0;
+    probeDims.length = 0;
+    probedDims = new Set();
+    activeProbe = null;
+    probeFeedback = '';
+    endgameAnyScored = false;
+    coarseAppended = false;
+    timedDim = null;
+    startNextLadder();
+  }
+
+  async function commitReprobe() {
+    const theme = reprobeTheme;
+    reprobeTheme = null;
+    const m = app.model;
+    const probe = theme ? probes.find((p) => p.theme === theme) : undefined;
+    if (!theme || !m?.coachProfile || !probe || probe.n === 0) {
+      reprobeDone = t('coach.reprobeFailed');
+      step = 'intro';
+      return;
+    }
+    const prof = m.coachProfile;
+    // I10: label (never block) a read taken right after drilling the same motif.
+    try {
+      reprobeHot = isHotMeasure(await allAttempts(), theme, Date.now());
+    } catch {
+      reprobeHot = false;
+    }
+    const merged = {
+      theme,
+      rating: probe.rating,
+      n: probe.n,
+      baseline: prof.puzzleRating, // keep the PROFILE baseline so deltas stay comparable
+      delta: probe.rating - prof.puzzleRating,
+    };
+    m.coachProfilePrev = prof;
+    m.coachProfile = {
+      ...prof,
+      motifs: prof.motifs.some((x) => x.theme === theme)
+        ? prof.motifs.map((x) => (x.theme === theme ? merged : x))
+        : [...prof.motifs, merged],
+    };
+    await app.persistModel(Date.now());
+    reprobeDone = t('coach.reprobeDone', { motif: motifLabelOrRaw(theme, getLocale()) });
+    step = 'intro';
   }
 
   // ── C2/CO15 timed block ──────────────────────────────────────────────────
@@ -906,6 +979,26 @@
           <p class="muted" style="font-size:0.75rem">
             {t('coach.sampleSizes')} {saved.motifs.map((m) => `${motifLabelOrRaw(m.theme, getLocale())} ${m.n}`).join(' · ')}
           </p>
+        {/if}
+        <!-- PR-12 (ADR-0070): targeted re-probe of a WEAK motif — drill it, then re-check just
+             that measurement (merges into the profile; a full re-assess stays one click away). -->
+        {#if saved.motifs.some((m) => m.delta < 0)}
+          <div class="row" style="gap:0.35rem;flex-wrap:wrap;justify-content:center">
+            {#each saved.motifs.filter((m) => m.delta < 0) as m (m.theme)}
+              <button
+                class="ghost"
+                style="font-size:0.75rem;padding:0.2rem 0.55rem"
+                disabled={app.puzzles.size === 0}
+                onclick={() => startReprobe(m.theme)}
+              >↻ {t('coach.reprobe', { motif: motifLabelOrRaw(m.theme, getLocale()) })}</button>
+            {/each}
+          </div>
+        {/if}
+        {#if reprobeDone}
+          <p class="feedback" style="font-size:0.8rem">{reprobeDone}</p>
+          {#if reprobeHot}
+            <p class="muted" style="font-size:0.75rem">{t('coach.reprobeHot')}</p>
+          {/if}
         {/if}
         <div class="row" style="gap:1.5rem;align-items:flex-start">
           <div class="col"><b>{t('coach.strengths')}</b>{#each saved.strengths as s}<span>✔ {s}</span>{:else}<span class="muted">—</span>{/each}</div>

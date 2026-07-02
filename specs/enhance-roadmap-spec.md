@@ -137,7 +137,7 @@ Tout le reste : parallélisable dans sa vague.
 | PR-09 `session-log` | [`pr-09-session-log-spec.md`](pr-09-session-log-spec.md) | **livré** (ADR-0067, v5) | 2026-07-02 |
 | PR-10 `insights-actionable` | [`pr-10-insights-actionable-spec.md`](pr-10-insights-actionable-spec.md) | **livré** (ADR-0068) | 2026-07-02 |
 | PR-11 `metacog-routing` | [`pr-11-metacog-routing-spec.md`](pr-11-metacog-routing-spec.md) | **livré** (ADR-0069) | 2026-07-02 |
-| PR-12 `coach-probes-v3` | — | à drafter | — |
+| PR-12 `coach-probes-v3` | [`pr-12-coach-probes-v3-spec.md`](pr-12-coach-probes-v3-spec.md) | **livré** (ADR-0070) | 2026-07-02 |
 | PR-13 `repertoire-deviation` | — | à drafter | — |
 | PR-14 `guess-own-games` | — | à drafter | — |
 | PR-15 `explorer-own-stats` | — | à drafter | — |

@@ -273,6 +273,20 @@ export const coach: Messages = {
   // PR-10 (ADR-0068): honesty badges + actionable Insights.
   'radar.noData': { fr: 'Pas encore mesuré (aucune donnée)', en: 'Not measured yet (no data)' },
   'coach.sampleSizes': { fr: 'Échantillons par motif :', en: 'Sample sizes per motif:' },
+  // PR-12 (ADR-0070): targeted motif re-probe + hot-measure label (I10).
+  'coach.reprobe': { fr: 'Re-vérifier {motif}', en: 'Re-check {motif}' },
+  'coach.reprobeDone': {
+    fr: '{motif} re-mesuré — le profil et la tendance sont à jour (les libellés forces/faiblesses se rafraîchissent à la prochaine évaluation complète).',
+    en: '{motif} re-measured — profile and trend updated (the strengths/weaknesses labels refresh at the next full assessment).',
+  },
+  'coach.reprobeFailed': {
+    fr: 'Re-mesure impossible (aucun problème servi) — réessayez.',
+    en: 'Could not re-measure (no puzzles served) — try again.',
+  },
+  'coach.reprobeHot': {
+    fr: 'Mesure à chaud : ce motif a été drillé il y a moins de 6 h — la récence peut gonfler le score. Descriptif, rien n\'est bloqué.',
+    en: 'Hot measure: this motif was drilled less than 6h ago — recency can inflate the score. Descriptive; nothing is blocked.',
+  },
   'insights.learnPattern': { fr: 'Apprendre le pattern', en: 'Learn the pattern' },
   'insights.sparTargeted': { fr: 'Sparring ciblé', en: 'Targeted sparring' },
   'insights.redrill': { fr: 'Re-driller ce motif', en: 'Re-drill this motif' },
