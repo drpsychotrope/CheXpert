@@ -45,12 +45,17 @@
   {#each dimensions as d, i}
     {@const na = d.sampleSize === 0}
     {@const [lx, ly] = point(i, 1.18)}
+    <!-- PR-10/F18 (ADR-0068): the stored plain-language `detail` + sample size, surfaced as a
+         native SVG tooltip on hover/focus — the honesty data was computed all along. -->
     <text x={lx} y={ly} class="label" class:na text-anchor="middle" dominant-baseline="middle">
+      <title>{na ? t('radar.noData') : `${d.detail} (n=${d.sampleSize})`}</title>
       {t('dimShort.' + d.dimension)}
       {#if na}<tspan x={lx} dy="1.15em" class="na-tag">n/a</tspan>{/if}
     </text>
     {@const [dx, dy] = point(i, na ? 0.02 : d.score / 100)}
-    <circle cx={dx} cy={dy} r="3" class="dot" class:na />
+    <circle cx={dx} cy={dy} r="3" class="dot" class:na>
+      <title>{na ? t('radar.noData') : `${d.detail} (n=${d.sampleSize})`}</title>
+    </circle>
   {/each}
 </svg>
 

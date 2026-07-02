@@ -270,6 +270,13 @@ export const coach: Messages = {
   'insights.min60': { fr: '60 min', en: '60 min' },
   'insights.planItem': { fr: '{minutes} min · {activity}', en: '{minutes}m · {activity}' },
 
+  // PR-10 (ADR-0068): honesty badges + actionable Insights.
+  'radar.noData': { fr: 'Pas encore mesuré (aucune donnée)', en: 'Not measured yet (no data)' },
+  'coach.sampleSizes': { fr: 'Échantillons par motif :', en: 'Sample sizes per motif:' },
+  'insights.learnPattern': { fr: 'Apprendre le pattern', en: 'Learn the pattern' },
+  'insights.sparTargeted': { fr: 'Sparring ciblé', en: 'Targeted sparring' },
+  'insights.redrill': { fr: 'Re-driller ce motif', en: 'Re-drill this motif' },
+
   // PR-04 (ADR-0062): rating-over-time charts.
   'insights.ratingProgress': { fr: 'Classement dans le temps', en: 'Rating over time' },
   'insights.gameRatingCurve': { fr: 'Partie — {pool}', en: 'Game — {pool}' },

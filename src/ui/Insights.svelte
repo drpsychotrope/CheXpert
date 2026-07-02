@@ -16,6 +16,8 @@
   import type { RatingPool } from '../rating/pools';
   import { calibration, type MetacogAttempt } from '../metacog/metacog';
   import { impulsivity } from '../metacog/impulsivity';
+  import { loadConcepts, cardForThemes, type ConceptCard } from '../concepts/concepts';
+  import { scenarioForFocus } from '../coach/program';
   import { t, fmtPct, fmtNum, getLocale } from '../i18n';
   import { motifLabelOrRaw, labelOrRaw } from '../i18n/gen';
 
@@ -51,7 +53,16 @@
 
   const DIMS: Dimension[] = ['tactics', 'openingAccuracy', 'endgameConversion', 'timeManagement', 'resilience'];
 
+  // PR-10 (ADR-0068): concept cards for the leak rows — the "Learn the pattern" link only renders
+  // when a card actually exists for the motif (no dead links).
+  let concepts = $state<ConceptCard[]>([]);
+
   onMount(async () => {
+    try {
+      concepts = await loadConcepts(getLocale());
+    } catch {
+      /* cards asset missing — links simply don't render */
+    }
     const analyses = await loadAllAnalyses();
     analysesAll = analyses;
     if (analyses.length) {
@@ -72,6 +83,31 @@
     if (t === 'repertoire') return app.go('repertoire');
     if (t === 'endgames') return app.go('endgames');
     app.tacticsFilterThemes = [l.key];
+    app.tacticsTimed = false;
+    app.go('tactics');
+  }
+
+  // PR-10 (ADR-0068): three wire-ups, zero new logic — every hook already existed.
+  /** Concept card for a leak's motif, if one exists (gates the "Learn the pattern" link). */
+  function leakCard(l: Leak): ConceptCard | null {
+    return cardForThemes([l.key], concepts);
+  }
+  function learnLeak(l: Leak) {
+    app.conceptFocusMotif = l.key;
+    app.go('concepts');
+  }
+  /** Targeted sparring is offered ONLY where the scenario mapping is semantically sound
+   *  (endgame-target leaks → the rook-up conversion scenario) — no fork-flavoured IQP nonsense. */
+  function canSparLeak(l: Leak): boolean {
+    return leakTarget(l) === 'endgames';
+  }
+  function sparLeak(l: Leak) {
+    app.sparringScenarioId = scenarioForFocus(`endgame: ${l.motif}`);
+    app.go('sparring');
+  }
+  /** Efficacy row → re-drill that motif in Tactics (the readout finally has a next action). */
+  function redrill(motifKey: string) {
+    app.tacticsFilterThemes = [motifKey];
     app.tacticsTimed = false;
     app.go('tactics');
   }
@@ -108,6 +144,17 @@
             <div>
               <b>{motifLabelOrRaw(l.motif, getLocale())}</b> <span class="muted" style="font-size:0.8rem">{t('phaseLabel.' + l.phase)}</span><br />
               <span class="muted" style="font-size:0.82rem">{t('insights.leakStat', { count: l.count, pct: fmtPct(l.avgWpl) })}</span>
+              <!-- PR-10 (ADR-0068): each leak exposes its follow-ups — learn the pattern (when a
+                   card exists) and targeted sparring (endgame leaks only, honest routing). -->
+              {#if leakCard(l) || canSparLeak(l)}
+                <br />
+                {#if leakCard(l)}
+                  <button class="link-sm" onclick={() => learnLeak(l)}>{t('insights.learnPattern')}</button>
+                {/if}
+                {#if canSparLeak(l)}
+                  <button class="link-sm" onclick={() => sparLeak(l)}>{t('insights.sparTargeted')}</button>
+                {/if}
+              {/if}
             </div>
             <button onclick={() => drillLeak(l)}>{t('insights.drill')}</button>
           </div>
@@ -141,6 +188,8 @@
               <br /><span class="muted" style="font-size:0.75rem">
                 {t('insights.earlyRecent', { earlyMisses: e.early.misses, earlyMoves: e.early.playerMoves, recentMisses: e.recent.misses, recentMoves: e.recent.playerMoves })}
               </span>
+              <!-- PR-10 (ADR-0068): the readout finally has a next action. -->
+              <br /><button class="link-sm" onclick={() => redrill(e.motifKey)}>{t('insights.redrill')}</button>
             {:else}
               <span class="muted" style="font-size:0.8rem">{t('insights.tooLittleData')}</span>
             {/if}
@@ -269,3 +318,17 @@
     {/if}
   {/if}
 </section>
+
+<style>
+  /* PR-10: small inline follow-up links on leak/efficacy rows. */
+  button.link-sm {
+    background: none;
+    border: none;
+    color: var(--accent);
+    padding: 0;
+    font-size: 0.78rem;
+    text-decoration: underline;
+    cursor: pointer;
+    margin-right: 0.7rem;
+  }
+</style>

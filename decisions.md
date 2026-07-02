@@ -2225,3 +2225,27 @@ automatically (dynamic objectStoreNames iteration, AP-BACKUP-1 paying off). **Te
 svelte-check 0/0 (457 files), build green. **Rollback:** revert — an empty v5 store remains
 (harmless; IDB never downgrades). Cross-links: ADR-0039 Q-B (superseded), I6/I8 (ratified),
 ADR-0063 (milestone cue), PR-18 (programId/day consumer), `specs/pr-09-session-log-spec.md`.
+
+## ADR-0068 — Actionable Insights + radar honesty badges (PR-10 `insights-actionable`)
+
+**Decision.** Three pure wire-ups plus two honesty surfaces, zero new logic (cluster ratified
+Q-B=a): each Insights leak row exposes "Learn the pattern" (rendered ONLY when a concept card
+actually exists for the motif — no dead links) and "Targeted sparring" (ONLY for endgame-target
+leaks → the rook-up conversion scenario; mapping a tactical motif onto IQP would be semantically
+wrong, so it is not offered — honest routing); each efficacy row gains "Re-drill this motif"
+(tactics filtered on the motif key — the readout finally has a next action). The Radar surfaces the
+`DimensionScore.detail` string + `n=X` it always computed as a native SVG `<title>` tooltip per
+axis (n/a axes say "not measured yet"), and both Coach radars (saved profile + fresh result) list
+per-motif sample sizes from `MotifScore.n` — a 2-puzzle diagnosis now reads as thin.
+
+**Why.** The routing signals (`conceptFocusMotif`, `sparringScenarioId`, `scenarioForFocus`,
+`cardForThemes`) and the honesty data (`detail`, `n`) all existed — computed, stored, and never
+shown. This closes three loops and aligns the UI with the measurement doctrine at the cost of
+~40 lines of glue.
+
+**Files.** `ui/Insights.svelte` (links + gating + concepts load), `ui/Radar.svelte` (tooltips),
+`ui/Coach.svelte` (sample-size lines ×2), `i18n/messages/coach.ts` (5 keys FR+EN). **Tests:** pure
+wiring over already-tested hooks — 1016 green unchanged, svelte-check 0/0 (457 files), build green,
+preview smoke clean. **Rollback:** revert — no schema, no core. Cross-links: ADR-0040 (cards),
+ADR-0030 (sparring scenarios), coach-program-v2 E1b REJECT (no auto-reorder — respected),
+`specs/pr-10-insights-actionable-spec.md`.

@@ -46,7 +46,7 @@
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
   import { t, getLocale, fmtPct } from '../i18n';
-  import { labelOrRaw, gt } from '../i18n/gen';
+  import { labelOrRaw, gt, motifLabelOrRaw } from '../i18n/gen';
   import { coachProfileFilename } from '../coach/funnel';
   import { downloadText } from './pgnDownload';
 
@@ -900,6 +900,13 @@
         </p>
         {#if savedStale}<p class="feedback">{t('coach.staleNudge', { days: COACH_STALE_DAYS })}</p>{/if}
         <Radar dimensions={saved.dimensions} />
+        <!-- PR-10/F18 (ADR-0068): per-motif sample sizes — the stored `n` finally shown, so a
+             thin diagnosis reads as thin (2 puzzles ≠ certainty). -->
+        {#if saved.motifs.length}
+          <p class="muted" style="font-size:0.75rem">
+            {t('coach.sampleSizes')} {saved.motifs.map((m) => `${motifLabelOrRaw(m.theme, getLocale())} ${m.n}`).join(' · ')}
+          </p>
+        {/if}
         <div class="row" style="gap:1.5rem;align-items:flex-start">
           <div class="col"><b>{t('coach.strengths')}</b>{#each saved.strengths as s}<span>✔ {s}</span>{:else}<span class="muted">—</span>{/each}</div>
           <div class="col"><b>{t('coach.focusOn')}</b>{#each saved.weaknesses as w}<span>△ {w}</span>{:else}<span class="muted">—</span>{/each}</div>
@@ -1044,6 +1051,12 @@
     <div class="panel col center" style="gap:0.75rem;width:100%">
       <h3>{t('coach.profileTitle')}</h3>
       <Radar dimensions={profile.dimensions} />
+      <!-- PR-10/F18 (ADR-0068): per-motif sample sizes on the fresh result too. -->
+      {#if profile.motifs.length}
+        <p class="muted" style="font-size:0.75rem">
+          {t('coach.sampleSizes')} {profile.motifs.map((m) => `${motifLabelOrRaw(m.theme, getLocale())} ${m.n}`).join(' · ')}
+        </p>
+      {/if}
       <p class="muted" style="font-size:0.8rem">{t('coach.directional', { source: provenanceSource })}</p>
       <!-- CF8/FOLD-C3: when the calibration game's engine failed to boot, say so HONESTLY — the
            profile is puzzles-only, not the result of a deliberate Skip (AP-CFUNNEL-4). -->
