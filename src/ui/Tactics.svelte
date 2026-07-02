@@ -9,7 +9,8 @@
   import { acceptAltMove, type LineEval } from '../trainer/altMove';
   import type { Puzzle } from '../trainer/puzzle';
   import { putAttempt, getAttempt, attemptsByPuzzle, recordTacticsAttempt, solvedTodayCount } from '../store/attemptsRepo';
-  import { resultToGrade, clampForConfidence, DEFAULT_GRADE_THRESHOLDS } from '../srs/fsrs';
+  import { resultToGrade, clampForConfidence, DEFAULT_GRADE_THRESHOLDS, Grade } from '../srs/fsrs';
+  import { reviewItem } from '../srs/SrsStore';
   import { clampGradeForHint, applyGlickoGain } from '../trainer/hintGrade';
   import { rollStreak, goalProgress, DEFAULT_DAILY_GOAL } from '../trainer/retention';
   import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
@@ -850,7 +851,13 @@
   {/if}
 
   {#if showCard && card}
-    <ConceptCard {card} onClose={() => (showCard = false)} />
+    <!-- PR-19b (ADR-0077): the in-trainer card grades its concept's FSRS card too. -->
+    <ConceptCard
+      {card}
+      onClose={() => (showCard = false)}
+      onTryResult={(solved) =>
+        void reviewItem('concept', card!.motif, solved ? Grade.Good : Grade.Again, Date.now()).catch(() => {})}
+    />
   {/if}
 
   {#if metacog && trainer?.state.status === 'failed'}

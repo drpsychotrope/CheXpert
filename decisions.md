@@ -2419,3 +2419,27 @@ on the saved card resumes at the first unattempted day; Home shows "Coach progra
 (467 files), build green. **Rollback:** revert — additive field ignored by older code.
 Cross-links: ADR-0045 (deferral lifted), ADR-0067 (sessionLog + I8 fields), ratified I8,
 `specs/pr-18-coach-multiday-spec.md`.
+
+## ADR-0077 — Interactive concept cards + per-concept SRS (PR-19a/19b, lifts ADR-0040 §11 ×2)
+
+**Decision.** (19a) A concept card's FIRST example is now "your turn": key move hidden, live
+mini-board, exact-match on the stored keyMove (the ADR-0017 honesty contract), miss → position
+held + "Show the move", solved/revealed → the annotated worked example returns; the remaining
+examples stay taught examples — teach-THEN-try. A one-shot `onTryResult(solved)` hook fires when
+the try resolves. (19b — sequenced after 19a, ratified Q-C=b) `SrsItemKind` gains the additive
+`'concept'` value (id `concept:fork`, NO DB_VERSION bump); both card surfaces (Tactics modal +
+library) grade the concept through the EXISTING `reviewItem` (solved → Good, revealed → Again);
+due concepts resurface in the LIBRARY ("Due for a refresh today: …", one click filters to the
+card) — deliberately NOT in the Review badge (it counts puzzle+repertoire explicitly; a concept
+refresh is a library moment, and diluting the badge would hide real due work).
+
+**Why.** The cards were the one PASSIVE surface in an active-recall app — seen once via
+`conceptSeen`, then forgotten. Both halves were explicit ADR-0040 §11 deferrals.
+
+**Files.** `ui/ConceptCard.svelte` (try state machine, per-card reset, hook), `srs/types.ts`
+(+'concept'), `ui/Concepts.svelte` (due strip + grading), `ui/Tactics.svelte` (modal grading),
+i18n (5 keys FR+EN). **Tests:** wiring over the already-tested ensureCard/reviewItem/dueCards —
+1041 green unchanged, svelte-check 0/0 (467 files), build green. **Rollback:** revert — orphan
+`concept:*` cards are harmless (kind-filtered everywhere). Cross-links: ADR-0040 (deferrals
+lifted), ADR-0017 (exact-match), ADR-0010/0043 (SRS + per-square precedent), ratified Q-C=b,
+`specs/pr-19-concept-cards-v2-spec.md`.

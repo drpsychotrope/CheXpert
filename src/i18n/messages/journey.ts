@@ -245,6 +245,13 @@ export const journey: Messages = {
   'concepts.showAll': { fr: 'tout afficher', en: 'show all' },
   'concepts.noCards': { fr: 'Aucune carte de concept disponible.', en: 'No concept cards available.' },
   'concepts.dismiss': { fr: 'fermer', en: 'dismiss' },
+  // PR-19a (ADR-0077): teach-then-try on the first example.
+  'concepts.tryPrompt': { fr: 'À vous de jouer — trouvez le coup du motif.', en: 'Your turn — find the motif move.' },
+  'concepts.trySolved': { fr: 'Trouvé ✔', en: 'Found it ✔' },
+  'concepts.tryWrong': { fr: 'Pas celui-là — cherchez le motif.', en: 'Not that one — look for the motif.' },
+  'concepts.tryReveal': { fr: 'Montrer le coup', en: 'Show the move' },
+  // PR-19b (ADR-0077): due concept refreshers in the library.
+  'concepts.dueLine': { fr: 'À revoir aujourd’hui :', en: 'Due for a refresh today:' },
 
   // ── Review (spaced repetition) ─────────────────────────────────────────────
   'review.title': { fr: 'Révision', en: 'Review' },
