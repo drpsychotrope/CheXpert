@@ -2091,3 +2091,32 @@ smoothing, no extrapolation. Day-bucketing the puzzle curve avoids plotting raw 
 green (984 + 6), svelte-check 0/0 (446 files), build green. **Rollback:** revert — additive field
 only. Cross-links: ADR-0060 (snapshot source), ADR-0036 (per-pool ratings), roadmap I9,
 `specs/pr-04-progress-graph-spec.md`.
+
+## ADR-0063 — Synthesized sound layer + sober celebrations (PR-05 `sound-celebration`)
+
+**Decision.** A WebAudio-synthesized sound layer (`ui/sound.ts`) — move / capture / check / win /
+loss / draw / milestone, all data-driven `RECIPES` (notes ≤250 ms, whole cue ≤500 ms, gain ≤0.2) —
+**ON by default** with a one-click Settings kill-switch (`SettingsRecord.soundEnabled ?? true`,
+additive, ratified Q-F=a). Move sounds are wired at ONE shared site (roadmap I7): a `Board.svelte`
+effect that fires only when the position changes WITH a non-null `lastMove` — so every game mode,
+drill and replay sounds for free, while static boards (vision prompts, diagrams) stay silent by
+construction. Celebrations stay sober (AP-ROADMAP-7): a game-end cue per outcome, a "new personal
+best {rating}" line + cue when the post-fold rating beats every prior pool snapshot (first snapshot
+is not a record), and a milestone cue when the day-streak crosses {3,7,14,30,60,100}. Session
+mastery celebration is deferred to PR-09 (its recap owns that moment).
+
+**Why.** Zero audio existed anywhere (grep = 0); a silent chess app reads as broken and audit v2
+scored UX 5/10. Synthesis keeps the repo asset-free and license-clean.
+
+**Robustness.** `playSound` is feature-detected + fully try/catch'd — audio can never break a move
+(AP-SOUND-1); jsdom no-throw is tested. Classification is pure (`moveSoundEvent`: check > capture >
+move; capture = strict piece-count drop, which covers en passant). The module flag is synced at boot
+and on toggle so play sites never read Settings.
+
+**Files.** `ui/sound.ts` + `ui/sound.test.ts` (NEW, 4), `ui/Board.svelte` (one effect, null-sentinel
+mount guard), `ui/Play.svelte` (outcome cue + personal-best line), `ui/Tactics.svelte` (streak
+milestone), `store/db.ts` (+`soundEnabled?`), `state/app.svelte.ts` (boot sync),
+`ui/Settings.svelte` (Sons panel), i18n (4 keys FR+EN). **Tests:** 994 green (990 + 4), svelte-check
+0/0 (448 files), build green; preview smoke: clean boot, toggle ON by default, zero console errors.
+**Rollback:** revert — additive setting only. Cross-links: Q-F=a + I7 (roadmap), ADR-0062 (pool
+snapshots the record check reads), PR-09 (mastery celebration), `specs/pr-05-sound-celebration-spec.md`.

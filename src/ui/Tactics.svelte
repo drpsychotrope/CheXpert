@@ -17,6 +17,7 @@
   import { failCountByPuzzle, isLeech } from '../srs/schedule';
   import { steerFromWeakness } from '../trainer/weaknessSelect';
   import { provenanceOf, bandToQuery, sourceToQuery, type DifficultyBand, type TrainerSource, type PuzzleProvenance } from '../trainer/provenance';
+  import { playSound } from './sound';
   import { t, getLocale } from '../i18n';
   import { motifLabelOrRaw } from '../i18n/gen';
 
@@ -510,9 +511,15 @@
     // and persist dailyStreak/lastTrainedAt INTO the same model snapshot the atomic write commits
     // (mirrors the weaknessCounters fold). Pure rollStreak; no Date in the core (AP-TINTEG-9).
     if (solved) {
-      const rolled = rollStreak({ dailyStreak: model.dailyStreak ?? 0, lastTrainedAt: model.lastTrainedAt ?? 0 }, now);
+      const prevStreak = model.dailyStreak ?? 0;
+      const rolled = rollStreak({ dailyStreak: prevStreak, lastTrainedAt: model.lastTrainedAt ?? 0 }, now);
       model.dailyStreak = rolled.dailyStreak;
       model.lastTrainedAt = rolled.lastTrainedAt;
+      // PR-05 (ADR-0063): sober milestone cue when the day-streak crosses a landmark. Sound only —
+      // Home already shows the streak; no modal, no interruption (AP-ROADMAP-7).
+      if (rolled.dailyStreak > prevStreak && [3, 7, 14, 30, 60, 100].includes(rolled.dailyStreak)) {
+        playSound('milestone');
+      }
     }
     // IndexedDB cannot structured-clone a Svelte 5 $state proxy ("could not be cloned"),
     // and `puzzle` is $state — its proxied arrays (themes/moves/meta) make these db.put()s

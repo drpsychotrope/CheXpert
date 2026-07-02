@@ -93,6 +93,8 @@ export const play: Messages = {
     fr: 'vous {you} (moy. {avg} s/coup) · bot {bot}',
     en: 'you {you} (avg {avg}s/move) · bot {bot}',
   },
+  // PR-05 (ADR-0063): sober personal-best line (set with the milestone cue).
+  'play.newRatingBest': { fr: 'Nouveau record personnel : {rating} !', en: 'New personal best: {rating}!' },
   'play.debrief.note': {
     fr: "Le bot vise ~55 % de victoires pour vous : c'est la zone où l'on progresse le plus.",
     en: 'The bot aims for you to win ~55% of games: the zone where you improve fastest.',

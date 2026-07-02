@@ -29,6 +29,8 @@
   import { applyGameResult, botMovetime, flagOutcome, shouldRate, canTakeBackInPlay } from '../game/playSession';
   import { pgnWithClocks, timeControlTag } from '../game/clockTrace';
   import { clockSummary, fmtDuration, avgSecPerMove, ratingDelta, type DebriefData } from '../game/debrief';
+  import { poolOfGame } from '../analysis/progress';
+  import { playSound } from './sound';
   import { describeOpening } from '../opening/eco';
   import RecapCard from './RecapCard.svelte';
   import {
@@ -131,6 +133,10 @@
   // that were already computed there (fold snapshot, rolling win-rate, %clk trace); the opening
   // name arrives async (describeOpening) and patches in. Null while a game is live.
   let debrief = $state<DebriefData | null>(null);
+  // PR-05 (ADR-0063): "new personal best for this pool" line — set with the milestone cue when the
+  // post-fold rating beats every prior snapshot of the pool (needs ≥1 prior point; a first game is
+  // not a record). Sober: one line + one short sound, no modal.
+  let recordLine = $state('');
   // The full stored record of the just-finished game — fed to the shared analysis core for the
   // single-game button + the opt-in auto-run (P1, play-loop-closure §4.6). Its playerColor is in
   // scope at write so no provenance issue (AP-PLAYLOOP-12).
@@ -291,6 +297,7 @@
     adaptLine = '';
     clockTrace = []; // PR-02: fresh per-ply clock capture for the new game (rematch flows through here)
     debrief = null; // PR-03: clear the previous game's debrief card
+    recordLine = ''; // PR-05: clear the previous game's personal-best line
 
     if (variant === 'chess960') {
       // Distinguish an invalid entry from a deliberate 0: NaN → random, not silently SP 0 (audit W6).
@@ -879,6 +886,25 @@
         if (o && debrief) debrief = { ...debrief, openingName: o.name, eco: o.eco };
       }).catch(() => {});
     }
+
+    // PR-05 (ADR-0063): outcome cue — the one game-end sound (finishGame is idempotent-guarded).
+    playSound(outcome === 'win' ? 'win' : outcome === 'loss' ? 'loss' : 'draw');
+    // Sober personal-best celebration: the post-fold rating beats every PRIOR snapshot of this
+    // pool (rec is already stored — exclude it). First-ever snapshot is not a record.
+    if (foldRating) {
+      try {
+        const pool = variant === 'chess960' ? 'chess960' : selectedPool;
+        const prior = (await getAllGames())
+          .filter((g) => g.id !== rec.id && g.ratingAfter != null && poolOfGame(g) === pool)
+          .map((g) => g.ratingAfter as number);
+        if (prior.length && foldRating.after > Math.max(...prior)) {
+          recordLine = t('play.newRatingBest', { rating: Math.round(foldRating.after) });
+          playSound('milestone');
+        }
+      } catch {
+        /* celebration is best-effort */
+      }
+    }
     await app.persistModel(now);
     await refreshBacklog(); // the just-finished game is now counted until analysed (F-P1-3)
     // Opt-in: analyse JUST this game on finish (never the backlog — Q-C / AP-PLAYLOOP-3). 960 never
@@ -1233,6 +1259,10 @@
   <!-- P3 (A5): post-game adaptation line (adaptive games only; suppressed for override games). -->
   {#if adaptLine && status === 'over'}
     <p class="muted" style="font-size:0.82rem">{adaptLine}</p>
+  {/if}
+  <!-- PR-05 (ADR-0063): sober personal-best line, set with the milestone cue. -->
+  {#if recordLine && status === 'over'}
+    <p style="font-size:0.85rem;color:var(--good)">{recordLine}</p>
   {/if}
 
   {#if steerNote && status !== 'idle'}

@@ -66,6 +66,14 @@ export const settings: Messages = {
   'settings.on': { fr: 'activé', en: 'on' },
   'settings.off': { fr: 'désactivé', en: 'off' },
 
+  // PR-05 (ADR-0063): synthesized sounds toggle (ON by default, Q-F=a).
+  'settings.sound': { fr: 'Sons', en: 'Sound' },
+  'settings.soundLabel': { fr: "Sons de l'interface (coups, fin de partie, jalons)", en: 'Interface sounds (moves, game end, milestones)' },
+  'settings.soundHint': {
+    fr: 'Courts et discrets, synthétisés localement (aucun fichier audio). Coupez-les ici en un clic.',
+    en: 'Short and subtle, synthesized locally (no audio files). Kill them here in one click.',
+  },
+
   'settings.yourData': { fr: 'Vos données', en: 'Your data' },
   'settings.rerunEval': { fr: "Refaire l'évaluation de niveau", en: 'Re-run skill evaluation' },
   'settings.rerunCoach': { fr: "Refaire l'évaluation du coach", en: 'Re-run coaching assessment' },

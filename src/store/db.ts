@@ -153,6 +153,10 @@ export interface SettingsRecord {
    *  when Fixed is first selected (never blank/NaN). Clamped to [1320,3190] at apply time via
    *  difficultyTargetElo. Additive optional; absent reads as a sensible pool seed. NO DB_VERSION bump. */
   fixedElo?: number;
+  /** PR-05 (ADR-0063): synthesized UI sounds (moves, game end, milestones). ON by default
+   *  (Q-F=a) — a legacy/absent value reads `?? true`; one-click kill-switch in Settings.
+   *  Additive optional — NO DB_VERSION bump (mirrors `metacogEnabled?`). */
+  soundEnabled?: boolean;
   /** Data-shape revision (audit W13). See PlayerModel.schemaRev. */
   schemaRev?: number;
 }

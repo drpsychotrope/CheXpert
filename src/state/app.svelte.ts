@@ -95,6 +95,9 @@ class AppState {
       this.settings = await loadSettings();
       // Apply the persisted UI language before the first render (V2-W18). Default FR.
       setLocaleState(this.settings.locale ?? 'fr');
+      // PR-05 (ADR-0063): sync the sound kill-switch (ON by default, Q-F=a) before any board mounts.
+      const { setSoundEnabled } = await import('../ui/sound');
+      setSoundEnabled(this.settings.soundEnabled ?? true);
       await this.puzzles.init();
       await this.refreshDue(now);
       await this.refreshUnanalyzed();

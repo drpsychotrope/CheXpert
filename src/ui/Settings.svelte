@@ -5,6 +5,7 @@
   import { coachProfileFilename } from '../coach/funnel';
   import { downloadText } from './pgnDownload';
   import { exportAll, importAll, validateBackup, backupFilename, type BackupFile, type BackupError } from '../store/backup';
+  import { setSoundEnabled, playSound } from './sound';
   import { t, getLocale, type Locale } from '../i18n';
 
   const settings = $derived(app.settings);
@@ -88,6 +89,17 @@
   async function toggleTakeback() {
     if (!settings) return;
     settings.takebackInPlay = !(settings.takebackInPlay ?? false);
+    await app.persistSettings();
+  }
+
+  // PR-05 (ADR-0063): the sound kill-switch (Q-F=a — ON by default). The module flag is synced
+  // here AND at boot so playSound sites never read Settings themselves.
+  async function toggleSound() {
+    if (!settings) return;
+    const next = !(settings.soundEnabled ?? true);
+    settings.soundEnabled = next;
+    setSoundEnabled(next);
+    if (next) playSound('move'); // audible confirmation the switch works
     await app.persistSettings();
   }
 
@@ -203,6 +215,15 @@
       {t('settings.takebackInPlay')}
     </label>
     <p class="muted" style="font-size:0.85rem">{t('settings.takebackInPlayHelp')}</p>
+  </div>
+
+  <div class="panel col">
+    <h3>{t('settings.sound')}</h3>
+    <label class="row" style="flex-direction:row;align-items:center;gap:0.6rem">
+      <input type="checkbox" checked={settings?.soundEnabled ?? true} onchange={toggleSound} />
+      {t('settings.soundLabel')}
+    </label>
+    <p class="muted" style="font-size:0.85rem">{t('settings.soundHint')}</p>
   </div>
 
   <div class="panel col">

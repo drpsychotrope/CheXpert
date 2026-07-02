@@ -58,6 +58,11 @@ Everything runs in the browser. Nothing leaves your device by default.
   auto-analysed (the standard analysis pipeline assumes opening theory; see ADR-0041).
 - **One-click review** — after a game, *Analyse this game* runs the full local analysis (puzzles +
   weakness dashboard) with no PGN to copy or paste.
+- **Post-game debrief & progress** — every game ends on a debrief card (rating before→after,
+  recent form vs the ~55% target band, the opening you actually played, per-side time), and
+  Insights draws your **rating over time** per pool plus a day-bucketed puzzle-rating curve
+  (internal scale, honestly labeled). Subtle **synthesized sounds** (moves, game end, personal
+  bests, streak milestones) ship on by default with a one-click kill-switch (ADR-0061/0062/0063).
 - **In-game move list, rematch, confirm-resign, opt-in takeback, on-demand move check** — a
   scrollable, auto-following SAN move list reads the game back as you play; *Rematch* restarts with the
   same color/clock/variant; *Resign* asks first; an opt-in *Take back* (Settings) undoes your move and
