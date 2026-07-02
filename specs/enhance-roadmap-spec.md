@@ -141,8 +141,8 @@ Tout le reste : parallélisable dans sa vague.
 | PR-13 `repertoire-deviation` | [`pr-13-repertoire-deviation-spec.md`](pr-13-repertoire-deviation-spec.md) | **livré** (ADR-0071) | 2026-07-02 |
 | PR-14 `guess-own-games` | [`pr-14-guess-own-games-spec.md`](pr-14-guess-own-games-spec.md) | **livré** (ADR-0072) | 2026-07-02 |
 | PR-15 `explorer-own-stats` | [`pr-15-explorer-own-stats-spec.md`](pr-15-explorer-own-stats-spec.md) | **livré** (ADR-0073) | 2026-07-02 |
-| PR-16 `endgame-from-games` | — | à drafter | — |
-| PR-17 `puzzle-playout` | — | à drafter | — |
+| PR-16 `endgame-from-games` | [`pr-16-endgame-from-games-spec.md`](pr-16-endgame-from-games-spec.md) | **livré** (ADR-0074) | 2026-07-02 |
+| PR-17 `puzzle-playout` | [`pr-17-puzzle-playout-spec.md`](pr-17-puzzle-playout-spec.md) | **livré** (ADR-0075) | 2026-07-02 |
 | PR-18 `coach-multiday` | — | à drafter | — |
 | PR-19a `concept-cards-interactive` | — | à drafter | — |
 | PR-19b `concept-cards-srs` | — | à drafter | — |

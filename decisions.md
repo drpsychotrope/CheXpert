@@ -2378,3 +2378,23 @@ when ≤7 pieces).
 **Tests:** 1036 green (1033 + 3), svelte-check 0/0 (465 files), build green. **Rollback:** revert —
 no schema. Cross-links: ADR-0030 (sparring), ADR-0060 (stored evals), ADR-0012 (Syzygy stays in
 Endgames), `specs/pr-16-endgame-from-games-spec.md`.
+
+## ADR-0075 — Post-puzzle play-out vs the bot (PR-17 `puzzle-playout`)
+
+**Decision.** A one-shot `app.sparringCustomFen {fen, sideToTrain, label}` signal (mirroring the
+existing one-shot signals, never persisted) + a "Play the position out vs the bot" link once a
+puzzle ENDED (solved or failed) and the position still has legal moves (a final mate offers
+nothing). Sparring consumes it into an ad-hoc `custom:playout` scenario (never listed in the
+picker) and — the generic fix — `start()` now kicks ONE engine move when the position is not the
+player's turn: the normal post-solve case (your winning line just ended, opponent to move).
+Library/leak scenarios are player-to-move by contract and never hit that path. Un-counted by
+nature (sparring never rates).
+
+**Why.** The reveal showed the line and stopped; the sparring runner already accepted any FEN —
+the missing piece was one signal, one gate, and the bot-to-move kick.
+
+**Files.** `state/app.svelte.ts` (+signal), `ui/Tactics.svelte` (gated link),
+`ui/Sparring.svelte` (consume + conditional kick), i18n (3 keys FR+EN). **Tests:** pure wiring on
+the tested runner — 1036 green unchanged, svelte-check 0/0 (465 files), build green. **Rollback:**
+revert — no schema. Cross-links: ADR-0030 (sparring runner), ADR-0074 (player-to-move contract),
+`specs/pr-17-puzzle-playout-spec.md`.

@@ -807,6 +807,22 @@
     </p>
   {/if}
 
+  <!-- PR-17 (ADR-0075): play out the final position vs the adaptive bot (un-counted sparring).
+       Only when the puzzle ENDED and the position still has legal moves (a mate has nothing left). -->
+  {#if trainer && trainer.state.status !== 'solving' && display.dests().size > 0}
+    <button
+      class="link"
+      onclick={() => {
+        app.sparringCustomFen = {
+          fen,
+          sideToTrain: orientation === 'black' ? 'b' : 'w',
+          label: t('tactics.playoutLabel'),
+        };
+        app.go('sparring');
+      }}
+    >{t('tactics.playout')}</button>
+  {/if}
+
   {#if trainer?.state.status === 'failed' && puzzle}
     <!-- F4: opt-in "Show solution" on a miss (Q-D). Non-blocking & Retry-safe (AP-TEACH-4):
          the board reset + Retry above stay; this only animates the line when tapped, with a

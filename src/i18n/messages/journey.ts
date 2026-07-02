@@ -164,6 +164,11 @@ export const journey: Messages = {
   'sparring.backToScenarios': { fr: '← Scénarios', en: '← Scenarios' },
   'sparring.resign': { fr: 'Abandonner', en: 'Resign' },
   'sparring.engineFailedToStart': { fr: 'Le moteur n’a pas pu démarrer : {error}', en: 'Engine failed to start: {error}' },
+  // PR-17 (ADR-0075): ad-hoc post-puzzle play-out.
+  'sparring.playoutGoal': {
+    fr: 'Continuez la position contre le bot — convertissez ce que le puzzle a gagné (partie non comptée).',
+    en: 'Play the position out against the bot — convert what the puzzle won (un-counted game).',
+  },
   'sparring.engineIllegalMove': {
     fr: 'Le moteur a renvoyé un coup illégal — partie interrompue.',
     en: 'Engine returned an illegal move — game halted.',

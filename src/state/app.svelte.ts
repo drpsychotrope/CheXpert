@@ -85,6 +85,9 @@ class AppState {
   coachOfferDismissed = $state(false);
   /** Set by a coach 'sparring' program step; consumed once by Sparring.svelte to auto-open a scenario. */
   sparringScenarioId = $state<string | null>(null);
+  /** PR-17 (ADR-0075): an ad-hoc play-out position (post-puzzle "play it out vs the bot").
+   *  Consumed once by Sparring.svelte; NOT persisted (mirrors the other one-shot signals). */
+  sparringCustomFen = $state<{ fen: string; sideToTrain: 'w' | 'b'; label: string } | null>(null);
   /** Set by a coach 'play-steered' program step; consumed once by Play.svelte to override the steer dimension. */
   steerDimension = $state<import('../analysis/weakness').Dimension | null>(null);
   /** Due SRS cards (puzzle + repertoire) for the Home/Review badge — the loop's re-engagement

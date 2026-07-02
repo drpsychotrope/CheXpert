@@ -37,6 +37,9 @@ export const tactics: Messages = {
   'tactics.retryFind': { fr: 'Réessayez — trouvez le coup.', en: 'Retry — find the move.' },
   'tactics.leech': { fr: 'Celui-ci vous résiste sans arrêt.', en: 'This one keeps beating you.' },
   'tactics.learnPattern': { fr: 'Apprendre le motif →', en: 'Learn the pattern →' },
+  // PR-17 (ADR-0075): post-puzzle play-out vs the bot.
+  'tactics.playout': { fr: 'Jouer la position contre le bot →', en: 'Play the position out vs the bot →' },
+  'tactics.playoutLabel': { fr: 'Suite de puzzle', en: 'Puzzle follow-up' },
   'tactics.openInLibrary': { fr: 'ouvrir dans la bibliothèque', en: 'open in library' },
   'tactics.whyMissGroup': { fr: 'Pourquoi avez-vous raté ?', en: 'Why did you miss?' },
   'tactics.whyMiss': { fr: 'Pourquoi avez-vous raté ? (optionnel)', en: 'Why did you miss? (optional)' },

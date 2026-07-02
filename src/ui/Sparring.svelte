@@ -52,6 +52,19 @@
       app.sparringScenarioId = null; // consume once
       if (seeded) await start(seeded);
     }
+    // PR-17 (ADR-0075): ad-hoc play-out position (post-puzzle). Consumed once, never listed.
+    if (app.sparringCustomFen) {
+      const c = app.sparringCustomFen;
+      app.sparringCustomFen = null;
+      await start({
+        id: 'custom:playout',
+        name: c.label,
+        category: 'weakness',
+        fen: c.fen,
+        sideToTrain: c.sideToTrain,
+        goal: t('sparring.playoutGoal'),
+      });
+    }
   });
 
   async function start(s: Scenario) {
@@ -68,6 +81,10 @@
     try {
       await opponent.applyStrength();
       status = 'playing';
+      // PR-17 (ADR-0075): an ad-hoc position may start with the BOT to move (e.g. the final
+      // puzzle position after your winning line) — kick its reply so the play-out actually runs.
+      // Library/leak scenarios are player-to-move by contract and skip this.
+      if (game.turn !== playerSide) await engineMove();
     } catch (e) {
       result = t('sparring.engineFailedToStart', { error: String(e) });
       status = 'over';
