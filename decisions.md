@@ -2318,3 +2318,23 @@ never learn you abandoned them in actual play.
 FR+EN). **Tests:** 1030 green (1025 + 5), svelte-check 0/0 (463 files), build green. **Rollback:**
 revert — no schema. Cross-links: ADR-0028 (general book naming), ADR-0011 (repertoire lines),
 ADR-0066 (replay jump), `specs/pr-13-repertoire-deviation-spec.md`.
+
+## ADR-0072 — Guess-the-move on your own analysed games (PR-14 `guess-own-games`)
+
+**Decision.** The Guess screen lists "Your analysed games" (latest 10 standard, newest first) above
+the master classics; picking one runs the UNCHANGED `GuessGame` driver on your PGN with your
+persisted colour (F5). The stored per-ply analysis ENRICHES each correct/revealed move: when the
+move you originally played was classified inaccuracy/mistake/blunder, the feedback says so and
+appends `explainPly`'s better-move line — you rediscover your own mistakes by re-guessing them.
+`side()` now reads the driver's `guessColor` (source-agnostic). The driver's honest exact-match
+scoring contract (ADR-0017) is deliberately untouched: the analysis comments, it never re-grades.
+
+**Why.** Guess-the-move was three hard-coded games, disconnected from everything (the enhance
+audit's F13); the driver already took any (pgn, color) — a whole trainer became personal for one
+data provider and zero core edits.
+
+**Files.** `ui/GuessMove.svelte` (own-games picker, conditional header, severity notes on both
+paths, best-effort load), `i18n/messages/tactics.ts` (7 keys FR+EN). guess.ts untouched.
+**Tests:** 1030 green unchanged (no new core — the driver was already tested), svelte-check 0/0
+(463 files), build green. **Rollback:** revert — no schema. Cross-links: ADR-0017 (exact-match
+contract kept), ADR-0056 (playerColor source), ADR-0015 (explainPly), `specs/pr-14-guess-own-games-spec.md`.

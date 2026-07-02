@@ -1,9 +1,14 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import Board from './Board.svelte';
   import { ChessGame } from '../game/ChessGame';
   import { MASTER_GAMES, type MasterGame } from '../guess/games';
   import { GuessGame } from '../guess/guess';
-  import { t, fmtPct } from '../i18n';
+  import { getAllGames, getAnalyzedGameIds, getAnalysis } from '../store/gamesRepo';
+  import { explainPly } from '../analysis/explain';
+  import type { GameRecord } from '../store/db';
+  import type { GameAnalysis, PlyAnalysis } from '../analysis/types';
+  import { t, fmtPct, getLocale } from '../i18n';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -15,14 +20,63 @@
   let lastMove = $state<[string, string] | null>(null);
   let feedback = $state('');
   let feedbackKind = $state<'good' | 'bad' | ''>('');
+  // PR-14 (ADR-0072): guess-the-move on YOUR OWN analysed games. The stored per-ply analysis
+  // enriches each reveal: when the move you originally played was classified a mistake, the
+  // feedback says so and shows the stored better-move line — prediction practice ON your history.
+  let ownGames = $state<Array<{ rec: GameRecord; analysis: GameAnalysis }>>([]);
+  let ownActive = $state<GameAnalysis | null>(null);
+
+  const OWN_PICKER_MAX = 10;
+
+  onMount(async () => {
+    try {
+      const [games, analyzedIds] = await Promise.all([getAllGames(), getAnalyzedGameIds()]);
+      const candidates = games
+        .filter((g) => analyzedIds.has(g.id) && (g.variant ?? 'standard') === 'standard')
+        .slice(-OWN_PICKER_MAX)
+        .reverse(); // newest first
+      const withAnalyses = await Promise.all(
+        candidates.map(async (rec) => ({ rec, analysis: await getAnalysis(rec.id) })),
+      );
+      ownGames = withAnalyses.filter((x): x is { rec: GameRecord; analysis: GameAnalysis } => !!x.analysis);
+    } catch {
+      ownGames = []; // storage hiccup — the master games still work
+    }
+  });
 
   function start(g: MasterGame) {
     chosen = g;
+    ownActive = null;
     guess = new GuessGame(g.pgn, g.guessColor);
     sync();
     feedback = g.guessColor === 'w' ? t('guess.youAreWhite') : t('guess.youAreBlack');
     feedbackKind = '';
     mode = 'play';
+  }
+
+  /** PR-14: replay one of your own analysed games — you guess YOUR side's moves. */
+  function startOwn(rec: GameRecord, analysis: GameAnalysis) {
+    const color = rec.playerColor ?? analysis.playerColor;
+    chosen = null;
+    ownActive = analysis;
+    guess = new GuessGame(rec.pgn, color);
+    sync();
+    feedback = color === 'w' ? t('guess.youAreWhite') : t('guess.youAreBlack');
+    feedbackKind = '';
+    mode = 'play';
+  }
+
+  /** The stored classification of the ply that was just guessed/revealed (own games only). */
+  function ownSeverityNote(ply: PlyAnalysis | null): string {
+    if (!ownActive || !ply) return '';
+    const stored = ownActive.plies[ply.ply];
+    if (!stored || (stored.severity !== 'inaccuracy' && stored.severity !== 'mistake' && stored.severity !== 'blunder')) return '';
+    const ex = explainPly(stored, getLocale());
+    return ` ${t('guess.ownWasClassified', { severity: stored.severity })}${ex.better ? ` ${ex.better}` : ''}`;
+  }
+
+  function fmtOwnDate(ms: number): string {
+    return new Intl.DateTimeFormat(getLocale() === 'fr' ? 'fr-FR' : 'en-US', { dateStyle: 'medium' }).format(new Date(ms));
   }
 
   function sync() {
@@ -32,13 +86,15 @@
   }
 
   function side(): 'white' | 'black' {
-    return chosen?.guessColor === 'b' ? 'black' : 'white';
+    // Works for both sources: the driver knows the guess side (PR-14).
+    return guess?.guessColor === 'b' ? 'black' : 'white';
   }
 
   function onMove(from: string, to: string, promo: 'q' | 'r' | 'b' | 'n' = 'q') {
     if (!guess || guess.done) return;
     const uci = from + to + (display.isPromotion(from, to) ? promo : '');
     const before = guess.fen();
+    const exp = guess.expected(); // PR-14: captured before the driver advances
     const res = guess.guess(uci);
     if (res === 'wrong') {
       feedback = t('guess.wrong');
@@ -51,7 +107,7 @@
     lastMove = [from, to];
     feedback = guess.done
       ? t('guess.gameOverScored', { score: guess.score, guesses: guess.guesses, pct: fmtPct(guess.accuracy() * 100) })
-      : t('guess.correct');
+      : t('guess.correct') + ownSeverityNote(exp as PlyAnalysis | null);
     feedbackKind = 'good';
   }
 
@@ -61,7 +117,7 @@
     sync();
     if (shown) {
       lastMove = [shown.uci.slice(0, 2), shown.uci.slice(2, 4)];
-      feedback = t('guess.theMoveWas', { san: shown.san });
+      feedback = t('guess.theMoveWas', { san: shown.san }) + ownSeverityNote(shown as PlyAnalysis | null);
       feedbackKind = '';
     }
     if (guess.done) feedback = t('guess.gameOver', { score: guess.score, guesses: guess.guesses });
@@ -75,6 +131,24 @@
   </p>
 
   {#if mode === 'pick'}
+    <!-- PR-14 (ADR-0072): your own analysed games first — replay yourself, see which of your
+         moves the analysis disliked, then the classics below. -->
+    {#if ownGames.length}
+      <h3 style="color:var(--muted);margin:0.4rem 0 0">{t('guess.ownTitle')}</h3>
+      <div class="games">
+        {#each ownGames as og (og.rec.id)}
+          <button class="game-card" onclick={() => startOwn(og.rec, og.analysis)}>
+            <b>{fmtOwnDate(og.rec.playedAt)}</b>
+            <span class="muted">{t('guess.ownCard', {
+              result: og.rec.result === 'win' ? t('history.resultWin') : og.rec.result === 'loss' ? t('history.resultLoss') : t('history.resultDraw'),
+              elo: og.rec.botElo,
+            })}</span>
+            <span class="muted note">{t('guess.ownNote', { acpl: og.analysis.acpl })}</span>
+          </button>
+        {/each}
+      </div>
+      <h3 style="color:var(--muted);margin:0.6rem 0 0">{t('guess.mastersTitle')}</h3>
+    {/if}
     <div class="games">
       {#each MASTER_GAMES as g}
         <button class="game-card" onclick={() => start(g)}>
@@ -84,9 +158,13 @@
         </button>
       {/each}
     </div>
-  {:else if mode === 'play' && guess && chosen}
+  {:else if mode === 'play' && guess && (chosen || ownActive)}
     <p class="muted">
-      {t('guess.header', { name: chosen.name, white: chosen.white, black: chosen.black, score: guess.score, guesses: guess.guesses })}
+      {#if chosen}
+        {t('guess.header', { name: chosen.name, white: chosen.white, black: chosen.black, score: guess.score, guesses: guess.guesses })}
+      {:else}
+        {t('guess.ownHeader', { score: guess.score, guesses: guess.guesses })}
+      {/if}
     </p>
     <div class="board-wrap">
       <Board

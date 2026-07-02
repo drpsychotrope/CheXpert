@@ -195,6 +195,16 @@ export const tactics: Messages = {
     en: 'Game over — you matched {score}/{guesses} ({pct}).',
   },
   'guess.gameOver': { fr: 'Partie terminée — vous avez trouvé {score}/{guesses}.', en: 'Game over — you matched {score}/{guesses}.' },
+  // PR-14 (ADR-0072): guess-the-move on your own analysed games.
+  'guess.ownTitle': { fr: 'Vos parties analysées', en: 'Your analysed games' },
+  'guess.mastersTitle': { fr: 'Parties de maîtres', en: 'Master games' },
+  'guess.ownCard': { fr: '{result} · bot {elo} Elo', en: '{result} · bot {elo} Elo' },
+  'guess.ownNote': { fr: 'Rejouez-vous — ACPL {acpl}. Devinez vos propres coups.', en: 'Replay yourself — ACPL {acpl}. Guess your own moves.' },
+  'guess.ownHeader': { fr: 'Votre partie · {score}/{guesses} retrouvés', en: 'Your game · {score}/{guesses} matched' },
+  'guess.ownWasClassified': {
+    fr: "Vous l'aviez joué — et l'analyse l'avait classé {severity}.",
+    en: 'You played it — and the analysis classified it {severity}.',
+  },
   'guess.correct': { fr: 'Correct ! ✔', en: 'Correct! ✔' },
   'guess.theMoveWas': { fr: 'Le coup était {san}.', en: 'The move was {san}.' },
   'guess.revealMove': { fr: 'Révéler le coup', en: 'Reveal move' },
