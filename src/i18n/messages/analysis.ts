@@ -158,6 +158,13 @@ export const analysis: Messages = {
   'explorer.notInBookBefore': { fr: 'Pas dans le livre de base (lancez ', en: 'Not in the seed book (run ' },
   'explorer.notInBookAfter': { fr: ' pour le jeu complet).', en: ' for the full set).' },
   'explorer.bookContinuations': { fr: 'Continuations de livre', en: 'Book continuations' },
+  // PR-15 (ADR-0073): your own per-opening results.
+  'explorer.ownStatsTitle': { fr: 'Vos résultats par ouverture', en: 'Your results by opening' },
+  'explorer.ownStatsLine': { fr: '{score} % sur {n} · ACPL ouverture {acpl}', en: '{score}% over {n} · opening ACPL {acpl}' },
+  'explorer.ownStatsNote': {
+    fr: 'Calculé depuis vos parties jouées analysées. Descriptif — un petit n reste un petit n.',
+    en: 'Computed from your analysed played games. Descriptive — a small n is still a small n.',
+  },
 
   // ── Endgames.svelte (endgames.*) ─────────────────────────────────────────
   'endgames.title': { fr: 'Entraîneur de finales', en: 'Endgame trainer' },

@@ -2338,3 +2338,21 @@ paths, best-effort load), `i18n/messages/tactics.ts` (7 keys FR+EN). guess.ts un
 **Tests:** 1030 green unchanged (no new core — the driver was already tested), svelte-check 0/0
 (463 files), build green. **Rollback:** revert — no schema. Cross-links: ADR-0017 (exact-match
 contract kept), ADR-0056 (playerColor source), ADR-0015 (explainPly), `specs/pr-14-guess-own-games-spec.md`.
+
+## ADR-0073 — Your own per-opening results in the Explorer (PR-15 `explorer-own-stats`)
+
+**Decision.** Pure `opening/ownStats.ts`: aggregate analysed PLAYED standard games by named opening
+(namer injected; ECO computed at aggregation — it is deliberately not stored on GameAnalysis) into
+score % (draws = 0.5), sample size, and mean opening-phase ACPL, most-played first; unnamed lines
+are skipped by default (a 1. a3 game says nothing about repertoire choices). Rendered as a "Your
+results by opening" section in the Explorer with the honesty note "a small n is still a small n".
+
+**Why.** The explorer named lines but carried zero personal signal; the original DEFER (openings
+Q-B) wanted a bundled global-stats DB — the local-first answer is cheaper and answers the actual
+question: which openings cost YOU points.
+
+**Files.** `opening/ownStats.ts` + `opening/ownStats.test.ts` (NEW, 3), `ui/Explorer.svelte`
+(best-effort load + list + note), `i18n/messages/analysis.ts` (3 keys FR+EN). **Tests:** 1033 green
+(1030 + 3), svelte-check 0/0 (465 files), build green. **Rollback:** revert — no schema.
+Cross-links: ADR-0028 (explorer + naming), openings Q-B DEFER (answered locally), ADR-0064/0065
+(bulk import feeds the sample), `specs/pr-15-explorer-own-stats-spec.md`.
