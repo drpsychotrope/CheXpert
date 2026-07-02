@@ -48,6 +48,9 @@ export interface GameRecord {
    *  Additive optional — NO DB_VERSION bump. */
   ratingBefore?: number;
   ratingAfter?: number;
+  /** PR-04 (ADR-0062): Glicko RD at the post-fold snapshot — lets the progress graph draw an
+   *  uncertainty band. Additive optional (games persisted between PR-02 and PR-04 lack it). */
+  ratingRdAfter?: number;
 }
 
 export interface PuzzleAttemptRecord {

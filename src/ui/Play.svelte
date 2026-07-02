@@ -785,7 +785,7 @@
     // PR-02 (ADR-0060): capture the player's rating around the fold so the GameRecord carries its
     // own before/after snapshot — the raw series the progress graph (PR-04) reads. Stays null on
     // unrated/override games (no fold → no snapshot, honesty: the rating did not move).
-    let foldRating: { before: number; after: number } | null = null;
+    let foldRating: { before: number; after: number; rdAfter: number } | null = null;
     if (shouldRate(unrated) && gameAdaptsPool(difficultyMode)) {
       if (variant === 'chess960') {
         // Update the chess960 pool — seeded lazily on the first 960 game from classical (AP-960-7).
@@ -796,7 +796,7 @@
         opp.state = nextOpp;
         await opp.applyStrength().catch(() => {});
         m.gameRatings.chess960 = nextRating;
-        foldRating = { before: seed.rating, after: nextRating.rating };
+        foldRating = { before: seed.rating, after: nextRating.rating, rdAfter: nextRating.rd };
         setAdaptLine(prevElo, nextOpp.targetElo);
       } else {
         // Standard path: adjust the SELECTED pool's adaptive bot toward the 55% band (AP-TC-3).
@@ -808,7 +808,7 @@
         opp.state = nextOpp;
         await opp.applyStrength().catch(() => {});
         m.gameRatings[pool] = nextRating;
-        foldRating = { before: prevRating.rating, after: nextRating.rating };
+        foldRating = { before: prevRating.rating, after: nextRating.rating, rdAfter: nextRating.rd };
         setAdaptLine(prevElo, nextOpp.targetElo);
       }
     }
@@ -833,8 +833,8 @@
       botElo,
       playedAt: now,
       coached,
-      // PR-02: rating snapshot around the fold (absent on unrated/override games). Additive.
-      ...(foldRating ? { ratingBefore: foldRating.before, ratingAfter: foldRating.after } : {}),
+      // PR-02/PR-04: rating snapshot around the fold (absent on unrated/override games). Additive.
+      ...(foldRating ? { ratingBefore: foldRating.before, ratingAfter: foldRating.after, ratingRdAfter: foldRating.rdAfter } : {}),
       ...(unrated ? { unrated: true } : {}), // ADR-0058: persist the honest un-counted marker
       // P3 (A6/Q-E): flag the difficulty so history/analysis can tell an override game apart; only an
       // adaptive game moved the pool/rating above. Additive optional — absent reads as legacy adaptive.

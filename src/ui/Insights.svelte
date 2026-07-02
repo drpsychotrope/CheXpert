@@ -10,6 +10,10 @@
   import { motifEfficacy, type EfficacyReadout } from '../analysis/efficacy';
   import { poolRating } from '../store/playerModel';
   import { allAttempts } from '../store/attemptsRepo';
+  import { getAllGames } from '../store/gamesRepo';
+  import { gameRatingSeries, puzzleRatingSeries, availablePools } from '../analysis/progress';
+  import ProgressChart from './ProgressChart.svelte';
+  import type { RatingPool } from '../rating/pools';
   import { calibration, type MetacogAttempt } from '../metacog/metacog';
   import { impulsivity } from '../metacog/impulsivity';
   import { t, fmtPct, fmtNum, getLocale } from '../i18n';
@@ -24,6 +28,13 @@
   // carry `ms` for the impulsivity readout — one load, two derived readouts (T3).
   let attempts = $state<import('../store/db').PuzzleAttemptRecord[]>([]);
   let analysesAll = $state<import('../analysis/types').GameAnalysis[]>([]);
+  // PR-04 (ADR-0062): rating-over-time — played games (PR-02 snapshots) + puzzle attempts.
+  let games = $state<import('../store/db').GameRecord[]>([]);
+  let progressPool = $state<RatingPool>('classical');
+  const pools = $derived(availablePools(games));
+  const gameSeries = $derived(gameRatingSeries(games, progressPool));
+  const puzzleSeries = $derived(puzzleRatingSeries(attempts));
+  const latestRd = $derived(gameSeries.length ? gameSeries[gameSeries.length - 1].rd : undefined);
   // Derived so the calibration readout follows the language switch (recomputes on locale change).
   const cal = $derived(calibration(attempts as MetacogAttempt[], { locale: getLocale() }));
   // T3 impulsivity: descriptive move-time readout over {solved, ms}. Pure; null below the floor.
@@ -49,6 +60,10 @@
       weakest = buildWeaknessProfile(analyses, model ? poolRating(model, 'classical').rating : 1200, getLocale()).weakest;
     }
     attempts = await allAttempts();
+    games = await getAllGames();
+    // Default the pool chip to the first one that actually has a plottable series.
+    const avail = availablePools(games);
+    if (avail.length && !avail.includes(progressPool)) progressPool = avail[0];
     loading = false;
   });
 
@@ -76,7 +91,7 @@
   <h2>{t('insights.title')}</h2>
   {#if loading}
     <p class="muted">{t('insights.loading')}</p>
-  {:else if leaks.length === 0 && trend.length === 0}
+  {:else if leaks.length === 0 && trend.length === 0 && gameSeries.length < 2 && puzzleSeries.length < 2}
     <div class="panel col center">
       <p>{t('insights.noGamesTitle')}</p>
       <p class="muted">{t('insights.noGamesBody')}</p>
@@ -150,6 +165,37 @@
         </div>
       {/each}
     </div>
+
+    <!-- PR-04 (ADR-0062): rating over time — the product's headline promise, finally drawn.
+         Game curve per pool (PR-02 snapshots; unrated/override games never plotted) + puzzle curve
+         (day-bucketed attempts, probes excluded). Sections self-hide under 2 points. -->
+    {#if pools.length || puzzleSeries.length >= 2}
+      <h3>{t('insights.ratingProgress')}</h3>
+      {#if pools.length}
+        {#if pools.length > 1}
+          <div class="row" style="gap:0.35rem;flex-wrap:wrap">
+            {#each pools as p (p)}
+              <button
+                class:ghost={progressPool !== p}
+                style="font-size:0.78rem;padding:0.25rem 0.6rem"
+                onclick={() => (progressPool = p)}
+              >
+                {t(p === 'chess960' ? 'history.chess960' : `history.cat${p.charAt(0).toUpperCase()}${p.slice(1)}`)}
+              </button>
+            {/each}
+          </div>
+        {/if}
+        <ProgressChart
+          title={t('insights.gameRatingCurve', { pool: t(progressPool === 'chess960' ? 'history.chess960' : `history.cat${progressPool.charAt(0).toUpperCase()}${progressPool.slice(1)}`) })}
+          series={gameSeries}
+          latestRd={latestRd}
+        />
+      {/if}
+      {#if puzzleSeries.length >= 2}
+        <ProgressChart title={t('insights.puzzleRatingCurve')} series={puzzleSeries} />
+      {/if}
+      <p class="muted" style="font-size:0.75rem">{t('insights.ratingProgressNote')}</p>
+    {/if}
 
     {#if trend.length >= 2}
       <h3>{t('insights.progress')} <span class="muted" style="font-size:0.8rem">{t('insights.windowsOfGames', { n: trend.length })}</span></h3>

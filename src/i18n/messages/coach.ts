@@ -270,6 +270,15 @@ export const coach: Messages = {
   'insights.min60': { fr: '60 min', en: '60 min' },
   'insights.planItem': { fr: '{minutes} min · {activity}', en: '{minutes}m · {activity}' },
 
+  // PR-04 (ADR-0062): rating-over-time charts.
+  'insights.ratingProgress': { fr: 'Classement dans le temps', en: 'Rating over time' },
+  'insights.gameRatingCurve': { fr: 'Partie — {pool}', en: 'Game — {pool}' },
+  'insights.puzzleRatingCurve': { fr: 'Problèmes (dernier point par jour)', en: 'Puzzles (last point per day)' },
+  'insights.ratingProgressNote': {
+    fr: "Échelle interne (Glicko face au bot local / aux problèmes) : comparez-vous à vous-même dans le temps, pas aux classements FIDE ou en ligne. Les parties non comptées (reprise de coup, difficulté forcée) n'apparaissent pas.",
+    en: 'Internal scale (Glicko vs the local bot / the puzzle pool): compare yourself to yourself over time, not to FIDE or online ratings. Un-counted games (takeback, forced difficulty) are not plotted.',
+  },
+
   'insights.progress': { fr: 'Progression', en: 'Progress' },
   'insights.windowsOfGames': { fr: '({n} fenêtres de parties)', en: '({n} windows of games)' },
   'insights.scorePerWindow': {

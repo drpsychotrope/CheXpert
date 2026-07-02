@@ -2062,3 +2062,32 @@ explains WHY the bot adapts (55% band = progression zone), not a grade.
 build green. **Rollback:** revert — no schema, pure-additive UI/core. Cross-links: ADR-0060 (trace +
 rating snapshot it consumes), ADR-0036 (55% band), roadmap I6 (RecapCard reuse by PR-09),
 `specs/pr-03-postgame-debrief-spec.md`.
+
+## ADR-0062 — Rating-over-time charts in Insights (PR-04 `progress-graph`)
+
+**Decision.** Insights gains a "Rating over time" section: one game-rating curve per pool (chips when
+several pools have ≥2 points) drawn from the PR-02 `GameRecord.ratingAfter` snapshots, and a
+puzzle-rating curve bucketed to the LAST attempt of each local day (coach probes excluded — they
+deliberately never move the rating, AP-COACH-8). Pure selectors + geometry in `analysis/progress.ts`
+(`poolOfGame`, `gameRatingSeries`, `availablePools`, `puzzleRatingSeries`, `toPolyline`); one
+presentational `ui/ProgressChart.svelte` (polyline + REAL observation dots on sparse series + last
+value ±RD + n). A third additive field `ratingRdAfter` joins the PR-02 snapshot (stamped at the
+fold) so the chart can state uncertainty — an accepted small deviation from PR-02's shipped shape,
+added by its first consumer.
+
+**Why.** The README's line-1 promise ("make you stronger per hour") had no "you are getting
+stronger" visualization anywhere; the data already existed (PR-02 snapshots; `puzzleAttempts.
+ratingBefore/After` persisted since v1, verified db.ts:53-54).
+
+**Honesty (roadmap I9).** The chart carries a mandatory note: internal self-referential scale
+(Glicko vs the local bot / puzzle pool) — comparable to yourself over time, NOT to FIDE/online
+ratings; un-counted games (takeback ADR-0058, difficulty override P3) are not plotted because their
+rating never moved. Flat series widen their y-window so a ±2 wobble can't render as a cliff; no
+smoothing, no extrapolation. Day-bucketing the puzzle curve avoids plotting raw Glicko noise.
+
+**Files.** `analysis/progress.ts` + `analysis/progress.test.ts` (NEW, 6), `ui/ProgressChart.svelte`
+(NEW), `ui/Insights.svelte` (section + widened empty-state gate), `store/db.ts` (+`ratingRdAfter`),
+`ui/Play.svelte` (rd in the fold snapshot), `i18n/messages/coach.ts` (4 keys FR+EN). **Tests:** 990
+green (984 + 6), svelte-check 0/0 (446 files), build green. **Rollback:** revert — additive field
+only. Cross-links: ADR-0060 (snapshot source), ADR-0036 (per-pool ratings), roadmap I9,
+`specs/pr-04-progress-graph-spec.md`.
