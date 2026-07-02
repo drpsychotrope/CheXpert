@@ -88,6 +88,18 @@ export const analysis: Messages = {
   },
   'replay.jumpHere': { fr: 'Voir dans le rejeu', en: 'View in replay' },
 
+  // PR-13 (ADR-0071): your-own-repertoire deviation.
+  'analysisResult.youLeftLine': {
+    fr: 'Vous avez quitté votre ligne « {line} » au coup {move} : {played} au lieu de {expected}.',
+    en: 'You left your line "{line}" at move {move}: {played} instead of {expected}.',
+  },
+  'analysisResult.oppLeftLine': {
+    fr: "L'adversaire est sorti de votre ligne « {line} » au coup {move} ({played}) — l'occasion de l'étendre.",
+    en: 'Your opponent left your line "{line}" at move {move} ({played}) — a chance to extend it.',
+  },
+  'analysisResult.reviewLine': { fr: 'Revoir cette ligne', en: 'Review this line' },
+  'analysisResult.extendLine': { fr: 'Étendre la ligne', en: 'Extend the line' },
+
   // ── AnalysisResult.svelte (analysisResult.*) ─────────────────────────────
   'analysisResult.yourAcpl': { fr: 'votre ACPL', en: 'your ACPL' },
   'analysisResult.blunders': { fr: 'gaffes', en: 'blunders' },

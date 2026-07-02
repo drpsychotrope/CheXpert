@@ -9,7 +9,8 @@
   import { explainPly } from '../analysis/explain';
   import { criticalMoments } from '../analysis/criticalMoments';
   import { describeOpening, localizedOpeningName, type OpeningName } from '../opening/eco';
-  import { buildLine, saveLine } from '../repertoire/repertoire';
+  import { buildLine, saveLine, listLines } from '../repertoire/repertoire';
+  import { findDeviation, type Deviation } from '../repertoire/deviation';
   import type { GameAnalysis } from '../analysis/types';
   import { t, tn, fmtPct, getLocale } from '../i18n';
 
@@ -34,8 +35,22 @@
   // Opening naming + repertoire-gap (ADR-0028).
   let opening = $state<OpeningName | null>(null);
   let repAdded = $state(false);
+  // PR-13 (ADR-0071): cross-check the game against YOUR OWN committed lines — the last big
+  // unconnected silo. Best-effort; no lines / no match → nothing renders.
+  let deviation = $state<Deviation | null>(null);
   onMount(async () => {
     opening = await describeOpening(analysis.plies.map((p) => p.uci));
+    try {
+      const lines = await listLines(analysis.playerColor);
+      deviation = findDeviation(
+        lines,
+        analysis.plies.map((p) => p.uci),
+        analysis.plies.map((p) => p.san),
+        analysis.playerColor,
+      );
+    } catch {
+      deviation = null;
+    }
   });
   async function addToRepertoire() {
     if (!opening) return;
@@ -64,6 +79,21 @@
       <button class="link" onclick={addToRepertoire}>{t('analysisResult.addLineToRep')}</button>
     {/if}
   </p>
+{/if}
+
+<!-- PR-13 (ADR-0071): your own repertoire vs the game actually played. Two honest cases:
+     YOU left your line (review the card) vs the OPPONENT left it (extend the line). -->
+{#if deviation}
+  <div class="panel" style="font-size:0.85rem">
+    {#if deviation.byPlayer}
+      {t('analysisResult.youLeftLine', { line: deviation.lineName, move: deviation.moveNumber, played: deviation.playedSan, expected: deviation.expectedSan })}
+      <button class="link" onclick={() => { selectedPly = deviation ? deviation.ply : -1; }}>{t('replay.jumpHere')}</button>
+      <button class="link" onclick={() => app.go('repertoire')}>{t('analysisResult.reviewLine')}</button>
+    {:else}
+      {t('analysisResult.oppLeftLine', { line: deviation.lineName, move: deviation.moveNumber, played: deviation.playedSan })}
+      <button class="link" onclick={() => app.go('repertoire')}>{t('analysisResult.extendLine')}</button>
+    {/if}
+  </div>
 {/if}
 
 <EvalGraph {analysis} selected={selectedPly >= 0 ? selectedPly : null} onSelect={(i) => (selectedPly = i)} />

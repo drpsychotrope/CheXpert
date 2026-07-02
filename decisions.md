@@ -2298,3 +2298,23 @@ new FENs passed the legality sweep first run), svelte-check 0/0 (461 files), bui
 **Rollback:** revert — no schema; a merged profile stays shape-valid. Cross-links: ADR-0030
 (scenario library), ADR-0048 (probe scoring), coach-program-v2 D2 (lifted), ratified Q-D=a + I10,
 `specs/pr-12-coach-probes-v3-spec.md`.
+
+## ADR-0071 — Own-repertoire deviation detection (PR-13 `repertoire-deviation`)
+
+**Decision.** Pure `repertoire/deviation.ts`: cross-check an analysed game's UCI list against the
+player's OWN committed lines (their colour only), pick the DEEPEST line in play (≥2 matched plies —
+a floor so "1. e4" can't spam matches), and report the first divergence with an honest split:
+`byPlayer` true → "You left your line at move N: {played} instead of {expected}" + review route;
+false → "Your opponent left your line — a chance to extend it" (an opportunity, never a fault).
+Full-line-followed and game-ended-inside cases return null — success stays silent. Rendered as a
+panel in AnalysisResult with a jump into the PR-08 replay at the divergence ply.
+
+**Why.** The analysis always named where a game left the GENERAL book (ADR-0028) but the
+repertoire ↔ real-games silo was the loop's last big unconnected pair: you could commit lines and
+never learn you abandoned them in actual play.
+
+**Files.** `repertoire/deviation.ts` + `repertoire/deviation.test.ts` (NEW, 5),
+`ui/AnalysisResult.svelte` (best-effort load + two-case panel), `i18n/messages/analysis.ts` (4 keys
+FR+EN). **Tests:** 1030 green (1025 + 5), svelte-check 0/0 (463 files), build green. **Rollback:**
+revert — no schema. Cross-links: ADR-0028 (general book naming), ADR-0011 (repertoire lines),
+ADR-0066 (replay jump), `specs/pr-13-repertoire-deviation-spec.md`.
