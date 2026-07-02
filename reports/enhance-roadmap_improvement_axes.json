@@ -1,0 +1,31 @@
+{
+  "spec": "specs/enhance-roadmap-spec.md",
+  "date": "2026-07-02",
+  "axes": {
+    "A1_capability": [
+      { "id": "I1", "finding": "PR-20 herite %clk (PR-02) + replay annote (PR-08) pour 960", "verdict": "FOLD" },
+      { "id": "I2", "finding": "PR-01 posture explicite cache Syzygy (DB separee, exclue car re-fetchable)", "verdict": "FOLD" }
+    ],
+    "A2_observabilite": [
+      { "id": "I3", "finding": "tableau d'avancement roadmap (PR / spec fille / statut / merge)", "verdict": "FOLD" }
+    ],
+    "A3_fidelite": [ { "finding": "couvert par I1; PR-04 deja honnete", "verdict": "CLEAN" } ],
+    "A4_robustesse": [
+      { "id": "I4", "finding": "PR-02 timestamps au coup (pas rAF) + clamp/flag aberrants", "verdict": "FOLD" },
+      { "id": "I5", "finding": "PR-01 garde de version au restore", "verdict": "FOLD" }
+    ],
+    "A5_reutilisation": [
+      { "id": "I6", "finding": "PR-09 reutilise la carte de recap PR-03 (defaut, divergence justifiable)", "verdict": "FOLD_softened" },
+      { "id": "I7", "finding": "PR-05 sons via couches partagees Board/gameSession", "verdict": "FOLD" }
+    ],
+    "A6_extensibilite": [
+      { "id": "I8", "finding": "sessionLog nait avec programId?/day? additifs (PR-18 sans re-migration)", "verdict": "FOLD" }
+    ],
+    "A7_symetrie": [ { "finding": "PR-13 couvre deja les deux cotes", "verdict": "CLEAN" } ],
+    "A8_cadrage": [
+      { "id": "I9", "finding": "note echelle interne auto-referentielle sur graphe PR-04", "verdict": "FOLD" },
+      { "id": "I10", "finding": "label descriptif 'mesure a chaud' sur re-probe precoce PR-12", "verdict": "FOLD_softened" }
+    ]
+  },
+  "totals": { "fold": 10, "defer": 0, "reject": 0, "clean": 2 }
+}

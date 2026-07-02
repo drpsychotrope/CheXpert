@@ -305,6 +305,11 @@ The **only** feature that makes a network call is the endgame trainer's Syzygy t
 only the board position (a FEN — no identity, no account), and caches every result so a position is
 fetched at most once. With it off, endgame drills still work against the engine.
 
+Because everything lives in browser storage, Settings → *Your data* offers a full local
+**backup/restore**: one JSON file with every store (games, analyses, ratings, SRS, repertoire,
+settings). The bundled puzzle set and the Syzygy cache are excluded — both re-download automatically.
+Restoring replaces all current data after an explicit confirmation (ADR-0059).
+
 ---
 
 ## Licensing

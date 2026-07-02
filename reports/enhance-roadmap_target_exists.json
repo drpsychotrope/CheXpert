@@ -1,0 +1,40 @@
+{
+  "check": "target-existence + reuse-hook verification (§2.1)",
+  "date": "2026-07-02",
+  "head": "396b4c5",
+  "note": "25 product findings from the /enhance session (2026-07-02). Hooks verified by direct read/grep in THIS session unless marked agent-verified.",
+  "verifiedHooks": {
+    "F1_progress_graph": "no ratingHistory anywhere in src/store (grep=0); GameRecord{playedAt,result,botElo} exists src/store/db.ts:21-45; Insights sparklines exist (weaknessTrend)",
+    "F2_postgame_debrief": "rating delta computed-then-dropped src/ui/Play.svelte:723-737; rollingWinRate exported src/engine/AdaptiveOpponent.ts:35-38 (never rendered); adaptLine only post-game line Play.svelte:1118",
+    "F3_clock_capture": "zero clockMs/clk/secondsSpent in src/game (grep=0); analysis consumers exist src/analysis/pgn.ts:64-68 + weakness.ts:159-176; GameRecord has no per-move times",
+    "F4_bulk_import": "multi-game detected but FIRST-only analyzed src/ui/Import.svelte:156-160; sequential batch runner exists (analyzeBacklogNow) src/ui/Play.svelte:1156-1162",
+    "F5_sessionLog": "reflection DISPLAY-ONLY comment src/ui/Session.svelte:6-8; mastery met never persisted (agent-verified x2)",
+    "F6_sound": "zero Audio|mp3|ogg|wav|AudioContext in src (grep=0)",
+    "F7_annotated_replay": "per-ply cpLoss/bestUci/winProbLoss stored src/analysis/types.ts; EvalGraph.svelte + explain.ts exist; no per-move list UI (agent-verified)",
+    "F8_metacog_routing": "calibration verdict + selfTag + impulsivity computed src/metacog/metacog.ts:104-115; descriptive-only, zero routing (agent-verified)",
+    "F9_coach_probes": "COACH_PROBES uses 2 scenarios src/coach/probes.ts:32-46; CORRECTION: IMBALANCE_LIBRARY has 7 scenarios total (grep 'id:' = 7), NOT '100+' as agent claimed — broadening requires AUTHORING new scenarios",
+    "F10_chess960": "auto-analysis excluded src/ui/Play.svelte:774; always-White Play.svelte:251-252; untimed :321-326; ADR-0041",
+    "F11_coach_multiday": "ADR-0045 explicit DEFER 'multi-day scheduling'; program built whole src/coach/program.ts:169",
+    "F12_repertoire_deviation": "repertoire store exists src/repertoire/{repertoire.ts,types.ts}; analyses store SAN per ply; no cross-check exists (agent-verified)",
+    "F13_guess_own_games": "MASTER_GAMES hardcoded src/guess/games.ts; driver takes pgn+guessColor (read); GameRecord.pgn + playerColor persisted",
+    "F14_insights_actionable": "scenarioForFocus exported src/coach/program.ts:19; app signals conceptFocusMotif + sparringScenarioId exist src/state/app.svelte.ts:52-77; leaks/efficacy have no such links (agent-verified)",
+    "F15_explorer_own_stats": "CORRECTION: no opening/ECO field on GameAnalysis (src/analysis/types.ts grep=0) — stats must be computed at aggregation from stored PGNs + ECO namer",
+    "F16_interactive_cards": "ADR-0040 §11 explicit DEFER 'now you try mini-puzzle'; ConceptCard.svelte + SolutionReveal.svelte exist",
+    "F17_endgame_drills_from_games": "byPhase boundaries stored src/analysis/types.ts:76; sparring runner + syzygy client exist (README/ADR-0012)",
+    "F18_radar_honesty": "CoachProfile.motifs[].n + dimensions[].detail stored src/coach/types.ts, never rendered (agent-verified); Radar.svelte exists",
+    "F19_lichess_fetch": "consent-gate + cache precedent src/endgame/syzygy.ts (ADR-0012); no fetch code exists (grep import paths = paste-only)",
+    "F20_premove_alert": "README line 53 'pre-move alerts come in Phase 2'; on-demand checkMove exists src/ui/Play.svelte:1143-1145; threshold helper src/engine/opponentAgency.ts:82-85",
+    "F21_backup_restore": "Settings exports ONLY coach profile src/ui/Settings.svelte:74-77 (verified); no full export/import; downloadText primitive exists",
+    "F22_play_out_puzzle": "sparring accepts arbitrary scenario FEN (IMBALANCE_LIBRARY pattern); no post-solve play-out (agent-verified)",
+    "F23_srs_concept_cards": "ADR-0040 §11 explicit DEFER; srs/ module + per-square vision precedent (ADR-0043)",
+    "F24_secondBestCp": "CORRECTION: BatchAnalyzer.ts has NO multipv (grep=0) — main batch pass is single-PV; persisting secondBestCp requires MultiPV>=2 => real perf cost on ~20s/game budget; DEFER source: critical-moment spec §11",
+    "F25_board_line_reeval": "analysis-board DEFER Q-B (reports/analysis-board_arbitrages.md); engine.analyzeLines exists (used by pickHumanMove)"
+  },
+  "killedDuringEnhance": [
+    "dailyGoal never displayed — FALSE (Tactics.svelte:339-341)",
+    "woodpecker-from-misses missing — FALSE (Review.svelte:209)",
+    "steering note disappears post-game — FALSE (Play.svelte:1122 shows at status!=='idle')",
+    "ECO stored on GameAnalysis — FALSE (computed at display)"
+  ],
+  "verdict": "ALL 25 premises stand after correction of F9 (library size) and F24 (single-PV baseline); no stale path"
+}

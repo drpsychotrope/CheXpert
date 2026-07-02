@@ -71,6 +71,32 @@ export const settings: Messages = {
   'settings.rerunCoach': { fr: "Refaire l'évaluation du coach", en: 'Re-run coaching assessment' },
   'settings.deleteData': { fr: 'Supprimer toutes mes données', en: 'Delete all my data' },
 
+  // PR-01 data-backup (ADR-0059): full-profile export / replace-everything restore.
+  'settings.exportAll': { fr: 'Exporter toutes mes données (JSON)', en: 'Export all my data (JSON)' },
+  'settings.exportAllHint': {
+    fr: "Sauvegarde locale complète : parties, analyses, classements, historique de problèmes, SRS, répertoire, réglages. Les problèmes du set intégré et le cache de finales (re-téléchargeables) n'en font pas partie.",
+    en: 'Complete local backup: games, analyses, ratings, puzzle history, SRS, repertoire, settings. The bundled puzzle set and the endgame cache (both re-downloadable) are not included.',
+  },
+  'settings.importAll': { fr: 'Restaurer depuis une sauvegarde…', en: 'Restore from a backup…' },
+  'settings.importTitle': { fr: 'Restaurer cette sauvegarde ?', en: 'Restore this backup?' },
+  'settings.importBody': {
+    fr: 'Cela remplace TOUTES les données locales actuelles par le contenu de la sauvegarde (parties, classements, historique, réglages). Irréversible. Les problèmes du set intégré se rechargeront automatiquement.',
+    en: 'This replaces ALL current local data with the backup contents (games, ratings, history, settings). This cannot be undone. The bundled puzzle set reloads automatically.',
+  },
+  'settings.importConfirm': { fr: 'Restaurer', en: 'Restore' },
+  'settings.importErrNotBackup': {
+    fr: "Ce fichier n'est pas une sauvegarde Chess Trainer.",
+    en: 'This file is not a Chess Trainer backup.',
+  },
+  'settings.importErrNewer': {
+    fr: "Sauvegarde créée par une version plus récente de l'app — mettez d'abord l'app à jour.",
+    en: 'Backup created by a newer app version — update the app first.',
+  },
+  'settings.importErrMalformed': {
+    fr: 'Sauvegarde illisible (fichier corrompu ou incomplet).',
+    en: 'Unreadable backup (corrupted or incomplete file).',
+  },
+
   'settings.wipeTitle': { fr: 'Tout supprimer ?', en: 'Delete all data?' },
   'settings.wipeBody': {
     fr: 'Cela supprime définitivement TOUTES les données locales — classements, parties, historique de problèmes et réglages. Irréversible.',

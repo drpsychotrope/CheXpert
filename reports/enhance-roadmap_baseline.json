@@ -1,0 +1,40 @@
+{
+  "check": "empirical baseline (§2.2)",
+  "date": "2026-07-02",
+  "head": "396b4c5 (merge PR #33)",
+  "branch": "claude/elated-mendeleev-a3adf6 (worktree)",
+  "codebase": {
+    "tsAndSvelteFiles": 242,
+    "uiViews": 33,
+    "views": 23,
+    "adrCount": 58,
+    "dbSchema": "IndexedDB v4 + additive fields (no DB_VERSION bump pattern established, README 'Data model')",
+    "i18n": "FR default + EN, all UI strings through t()/tn() (ADR-0053)",
+    "testClaim": "README: full Vitest suite green, svelte-check 0 errors (audit v2 measured 478 tests; NOT re-run here: node_modules absent in worktree — executor pre-flight must re-verify)"
+  },
+  "keyNumbers": {
+    "imbalanceLibraryScenarios": 7,
+    "coachProbesUsed": 2,
+    "conceptCardFamilies": 7,
+    "guessMasterGames": 3,
+    "batchAnalyzerPv": 1,
+    "openPrs": 0,
+    "leaksCap": 8,
+    "assessWindow": 10,
+    "adaptiveWindow": 8,
+    "targetWinrate": 0.55
+  },
+  "conventions": {
+    "decisionLog": "decisions.md — append-only ADRs, cross-link supersedence, next free number ADR-0059",
+    "antiPatterns": "AP-<AREA>-<N> greppable naming",
+    "phaseOrder": "code -> tests -> verification -> docs (Phase Z last)",
+    "specLayout": "specs/<pr-name>-spec.md + reports/<pr-name>_*.{json,md}",
+    "doctrine": [
+      "honesty: descriptive, no grades, no causal claims, sample-size floors",
+      "local-only: single egress = consent-gated + cached (Syzygy precedent ADR-0012)",
+      "no LLM; assets CC0; active recall over passive display",
+      "additive schema fields, migrations in load path, never drop data",
+      "every non-obvious choice -> new ADR"
+    ]
+  }
+}

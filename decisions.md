@@ -1971,3 +1971,38 @@ over/engine-fail/export edits, the Home card, the Onboarding offer, the Settings
 keys; nothing to undo in IndexedDB. Cross-links: ADR-0045 (coach mode), ADR-0053 (bilingual), ADR-0054/0056
 (F5 download), C1 (shares the freshness predicate for its staleness nudge — §11), F5 (PGN export — now folded
 onto the one primitive), `specs/coach-funnel-robustness-spec.md`, `enhancements-architecture-spec.md` (C8).
+
+## ADR-0059 — Full-profile backup/restore (PR-01 `data-backup`, roadmap enhance V1)
+
+**Decision.** Settings → *Your data* gains a full local **export** (one JSON file: every object store of
+the main DB) and a **replace-everything restore** behind a themed confirmation. New module
+`src/store/backup.ts`: pure `validateBackup` (typed errors `not-a-backup` / `newer-schema` / `malformed`)
++ pure `backupFilename(now)` + `exportAll(now)` / `importAll(backup)` at the IDB boundary.
+
+**Why.** The app is local-only and its IndexedDB is keyed to the origin (ADR-0049): one browser-storage
+wipe destroys months of training history with no recourse. This PR is the safety net for the whole
+enhance roadmap and merges first (roadmap §4 vague 0).
+
+**Shape.**
+- Export iterates `db.objectStoreNames` dynamically (precedent: `clearAllData`, ADR-0013) so future
+  stores are covered automatically (AP-BACKUP-1).
+- `puzzles` is filtered to `source==='personal'` — the ~80k curated rows are a re-seedable shipped
+  asset (`PuzzleRepo.init()` re-seeds when `curatedCount===0`) and would bloat the file ~15–20 MB
+  (AP-BACKUP-4). The Syzygy cache (`chess-trainer-tbcache`, separate DB) is excluded: re-fetchable
+  cache, not profile data (I2); the wipe still clears it.
+- Restore = **replace-everything** (clear every live store, then write the backup's rows): the restored
+  state reproduces the backup, never a hybrid (AP-BACKUP-2). Unknown store names are skipped and
+  reported. `invalidateAnalysesCache()` mirrors the wipe; the caller reloads the app.
+- Version guard (I5): a backup whose `schema` exceeds the running `DB_VERSION` is refused with a clear
+  message (AP-BACKUP-3) — additive migrations only run forward. Older backups load fine (absent stores
+  end empty; absent fields read `?? default`).
+- `Date.now()` stays at the Settings boundary; the store core takes `now` injected (AP-BACKUP-5).
+
+**Files.** `store/backup.ts` (NEW), `store/backup.test.ts` (NEW, 7), `ui/Settings.svelte` (Export/Restore
+buttons, hidden file input, 3-state ConfirmDialog copy), `i18n/messages/settings.ts` (9 keys FR+EN).
+**Tests:** validate taxonomy + newer-schema guard + filename purity + round-trip export→wipe→import
+deep-equal (curated excluded, personal kept) + replace-everything + unknown-store skip → **968 green**
+(961 + 7), svelte-check **0/0** (438 files), build green. **Rollback:** revert the commit — no schema
+change (DB_VERSION intact, zero new fields). Cross-links: ADR-0013 (wipe), ADR-0049 (origin-keyed
+storage), ADR-0054/0056 (`downloadText` primitive), `specs/pr-01-data-backup-spec.md`,
+`specs/enhance-roadmap-spec.md` (PR-01, I2, I5).
