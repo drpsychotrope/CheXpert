@@ -2398,3 +2398,24 @@ the missing piece was one signal, one gate, and the bot-to-move kick.
 the tested runner — 1036 green unchanged, svelte-check 0/0 (465 files), build green. **Rollback:**
 revert — no schema. Cross-links: ADR-0030 (sparring runner), ADR-0074 (player-to-move contract),
 `specs/pr-17-puzzle-playout-spec.md`.
+
+## ADR-0076 — Multi-day coach program (PR-18 `coach-multiday`, lifts the ADR-0045 deferral)
+
+**Decision.** Pure `coach/multiday.ts`: `splitProgramDays` greedy-fills days within the daily
+budget preserving worst-first order (day 1 gets the biggest weakness; an item longer than the
+budget keeps its own day; overflow at maxDays spills into the LAST day — never dropped),
+`programIdOf` is stable on assessedAt, and progress is DERIVED from the PR-09 sessionLog via the
+born-additive I8 stamps (`attemptedDays`/`nextProgramDay` — a finished session marks the day
+attempted; partial completion re-surfaces through PR-09's deprioritizeFocus, and "attempted" is
+the honest word while masteryMet has no evaluator). UI: a "Spread: one session / 3 / 5 days"
+selector next to the budget; the split persists as additive `coachProfile.programDays`; launching
+a day stamps `programId`/`day` onto the session (PR-09 writes them to the log); "Start program"
+on the saved card resumes at the first unattempted day; Home shows "Coach program: day X/N →".
+
+**Files.** `coach/multiday.ts` + `coach/multiday.test.ts` (NEW, 5), `coach/types.ts`
+(+programDays?), `state/app.svelte.ts` (+programId?/day?), `ui/Session.svelte` (log stamps),
+`ui/Coach.svelte` (selector + split + day-resume), `ui/Home.svelte` (program card),
+`i18n/messages/coach.ts` (6 keys FR+EN). **Tests:** 1041 green (1036 + 5), svelte-check 0/0
+(467 files), build green. **Rollback:** revert — additive field ignored by older code.
+Cross-links: ADR-0045 (deferral lifted), ADR-0067 (sessionLog + I8 fields), ratified I8,
+`specs/pr-18-coach-multiday-spec.md`.

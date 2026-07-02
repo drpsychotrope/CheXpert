@@ -1,7 +1,11 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { app } from '../state/app.svelte';
   import { poolRating } from '../store/playerModel';
   import { shouldOfferCoach } from '../coach/funnel';
+  import { programIdOf, attemptedDays, nextProgramDay } from '../coach/multiday';
+  import { recentSessionLogs } from '../store/sessionLogRepo';
+  import { buildSession } from '../analysis/session';
   import { t, tn } from '../i18n';
 
   const model = $derived(app.model);
@@ -16,6 +20,38 @@
   // outcomes AND no fresh profile (staleness guard); the Date.now() boundary lives HERE (the core
   // takes `now`, AP-CFUNNEL-2). Dismissible + an in-memory cooldown so it never re-nags (AP-CFUNNEL-1).
   const showRoughPatch = $derived(!app.coachOfferDismissed && shouldOfferCoach(model ?? null, Date.now()));
+
+  // PR-18 (ADR-0076): the multi-day program card — "day X/N" derived from the sessionLog stamps
+  // (I8), never duplicated state. Best-effort: a log-read hiccup just hides the card.
+  let programNext = $state<{ day: number; total: number } | null>(null);
+  onMount(async () => {
+    const prof = app.model?.coachProfile;
+    if (!prof?.programDays?.length) return;
+    try {
+      const attempted = attemptedDays(await recentSessionLogs(100), programIdOf(prof));
+      const day = nextProgramDay(prof.programDays.length, attempted);
+      programNext = day === null ? null : { day, total: prof.programDays.length };
+    } catch {
+      programNext = null;
+    }
+  });
+
+  function startProgramDayFromHome() {
+    const prof = app.model?.coachProfile;
+    if (!prof?.programDays || !programNext) return;
+    const items = prof.programDays[programNext.day] ?? [];
+    const dayMin = items.reduce((s, i) => s + i.minutes, 0);
+    app.activeSession = {
+      plan: buildSession(items),
+      current: 0,
+      startedAt: Date.now(),
+      reflection: '',
+      budgetMin: dayMin || 30,
+      programId: programIdOf(prof),
+      day: programNext.day,
+    };
+    app.go('session');
+  }
 </script>
 
 <section class="home">
@@ -57,6 +93,13 @@
           <button class="link-inline" onclick={() => app.go('coach')}>{t('home.roughPatchCta')}</button>
           <button class="link-inline muted-link" onclick={() => (app.coachOfferDismissed = true)}>{t('home.roughPatchDismiss')}</button>
         </span>
+      </div>
+    {/if}
+    <!-- PR-18 (ADR-0076): the coach program's next day, one click away. -->
+    {#if programNext}
+      <div class="rough-patch">
+        <span>{t('home.programDay', { day: programNext.day + 1, total: programNext.total })}</span>
+        <button class="link-inline" onclick={startProgramDayFromHome}>{t('home.programGo')}</button>
       </div>
     {/if}
   {/if}

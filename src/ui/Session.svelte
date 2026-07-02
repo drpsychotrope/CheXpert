@@ -189,6 +189,10 @@
         budgetMin: s.budgetMin ?? 30,
         steps,
         ...(reflection ? { reflection } : {}),
+        // PR-18 (ADR-0076): a multi-day coach session stamps its program identity (I8 fields) so
+        // the program's progress derives from the log itself.
+        ...(s.programId ? { programId: s.programId } : {}),
+        ...(s.day != null ? { day: s.day } : {}),
       });
     } catch {
       /* storage hiccup — the recap still shows; the log is best-effort */

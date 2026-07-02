@@ -273,6 +273,13 @@ export const coach: Messages = {
   // PR-10 (ADR-0068): honesty badges + actionable Insights.
   'radar.noData': { fr: 'Pas encore mesuré (aucune donnée)', en: 'Not measured yet (no data)' },
   'coach.sampleSizes': { fr: 'Échantillons par motif :', en: 'Sample sizes per motif:' },
+  // PR-18 (ADR-0076): multi-day program.
+  'coach.spreadLabel': { fr: 'Étaler :', en: 'Spread:' },
+  'coach.spread1': { fr: 'une session', en: 'one session' },
+  'coach.spreadN': { fr: 'sur {n} jours', en: 'over {n} days' },
+  'home.programDay': { fr: 'Programme coach : jour {day}/{total}', en: 'Coach program: day {day}/{total}' },
+  'home.programGo': { fr: 'Lancer →', en: 'Start →' },
+
   // PR-12 (ADR-0070): targeted motif re-probe + hot-measure label (I10).
   'coach.reprobe': { fr: 'Re-vérifier {motif}', en: 'Re-check {motif}' },
   'coach.reprobeDone': {

@@ -67,6 +67,10 @@ class AppState {
      *  plan.steps; missing entry = never reached). In-memory like the rest; persisted as a
      *  SessionLogRecord when the session finishes. */
     stepResults?: Array<{ done: boolean; capReached: boolean }>;
+    /** PR-18 (ADR-0076): stamped when this session IS one day of a multi-day coach program —
+     *  written into the sessionLog (the I8 fields) so program progress derives from the log. */
+    programId?: string;
+    day?: number;
   } | null>(null);
   /** In-progress coach assessment (C8/CF4, in-memory; survives view swaps; NOT persisted by default
    *  — mirrors `activeSession`). Lets the wizard RESUME after navigating away mid-assessment instead
