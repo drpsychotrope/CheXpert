@@ -2036,3 +2036,29 @@ best-effort annotation), `store/db.ts` (2 additive fields), `store/repos.test.ts
 additive fields only, zero migration. Cross-links: ADR-0036 (TimeControl deferral lifted),
 ADR-0058 (takeback un-count), `specs/pr-02-play-telemetry-spec.md`, `specs/enhance-roadmap-spec.md`
 (PR-02, I1/I4), PR-04 (consumer of the rating series), PR-03 (consumer of the clock stats).
+
+## ADR-0061 — Post-game debrief card (PR-03 `postgame-debrief`)
+
+**Decision.** Game end renders a **debrief card**: rating before→after (+signed delta), recent form
+("X% over your last N — target ~55%", with a one-line explanation of the adaptive band), the opening
+actually played (local ECO naming, FR-localized), and per-side time + avg s/move derived from the
+PR-02 %clk trace. New shared primitive `ui/RecapCard.svelte` (label/value rows; empty value = row
+skipped) — the session recap (PR-09) reuses it (roadmap I6). Pure core `game/debrief.ts`
+(`clockSummary`/`fmtDuration`/`avgSecPerMove`/`ratingDelta`); `GameSession` gains a read-only
+`uciMoves` getter for the naming.
+
+**Why.** Every number was already computed at that exact moment and dropped: the fold's rating delta
+(Play.svelte fold block), `rollingWinRate` (recordGame's own input, never rendered), the played UCIs
+(book steering's input), the clock trace (PR-02). The most attentive moment of the loop said nothing.
+
+**Honesty.** No fold (unrated takeback ADR-0058 / difficulty override P3) → NO rating and NO form
+row: the rating did not move, the pool did not roll — nothing to claim. Untimed → no time row; 960 →
+no opening row. Opening naming is async best-effort (never blocks or fails the finish). The form note
+explains WHY the bot adapts (55% band = progression zone), not a grade.
+
+**Files.** `game/debrief.ts` + `game/debrief.test.ts` (NEW, 7), `ui/RecapCard.svelte` (NEW),
+`game/gameSession.ts` (uciMoves getter), `ui/Play.svelte` (assembly + rows + render),
+`i18n/messages/play.ts` (9 keys FR+EN). **Tests:** 984 green (977 + 7), svelte-check 0/0 (443 files),
+build green. **Rollback:** revert — no schema, pure-additive UI/core. Cross-links: ADR-0060 (trace +
+rating snapshot it consumes), ADR-0036 (55% band), roadmap I6 (RecapCard reuse by PR-09),
+`specs/pr-03-postgame-debrief-spec.md`.

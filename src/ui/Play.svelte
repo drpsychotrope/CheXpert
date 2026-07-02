@@ -3,7 +3,7 @@
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
   import { ChessGame } from '../game/ChessGame';
-  import { AdaptiveOpponent, initOpponentState, type GameOutcome } from '../engine/AdaptiveOpponent';
+  import { AdaptiveOpponent, initOpponentState, rollingWinRate, TARGET_WINRATE, type GameOutcome } from '../engine/AdaptiveOpponent';
   import type { GameRecord } from '../store/db';
   import { putGame, getAllGames, getAnalyzedGameIds } from '../store/gamesRepo';
   import { poolRating, poolOpponent } from '../store/playerModel';
@@ -28,6 +28,9 @@
   import { resolveColor, type ColorChoice } from '../game/color';
   import { applyGameResult, botMovetime, flagOutcome, shouldRate, canTakeBackInPlay } from '../game/playSession';
   import { pgnWithClocks, timeControlTag } from '../game/clockTrace';
+  import { clockSummary, fmtDuration, avgSecPerMove, ratingDelta, type DebriefData } from '../game/debrief';
+  import { describeOpening } from '../opening/eco';
+  import RecapCard from './RecapCard.svelte';
   import {
     difficultyTargetElo, decideResign, decideAcceptDraw, resignThreshold, coachedBlunderThreshold,
     adaptationDirection, gameAdaptsPool, DRAW_CP, type DifficultyMode,
@@ -36,7 +39,8 @@
   import { createGameSession, type GameSession } from '../game/gameSession';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import { downloadPgn, pgnFilename } from './pgnDownload';
-  import { t, tn } from '../i18n';
+  import { t, tn, getLocale } from '../i18n';
+  import { localizedOpeningName } from '../opening/eco';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   // The DOM-free controller (F6, ADR-0057) owns the move/engine/end loop + the rules-truth game.
@@ -123,6 +127,10 @@
   // PR-02 (ADR-0060): per-ply clock snapshots for the %clk-annotated persisted PGN. Plain array —
   // nothing renders from it; reset in newGame, popped by takeBack, consumed once in finishGame.
   let clockTrace: import('../game/clockTrace').PlyClockSnap[] = [];
+  // PR-03 (ADR-0061): the post-game debrief card data — assembled once in finishGame from numbers
+  // that were already computed there (fold snapshot, rolling win-rate, %clk trace); the opening
+  // name arrives async (describeOpening) and patches in. Null while a game is live.
+  let debrief = $state<DebriefData | null>(null);
   // The full stored record of the just-finished game — fed to the shared analysis core for the
   // single-game button + the opt-in auto-run (P1, play-loop-closure §4.6). Its playerColor is in
   // scope at write so no provenance issue (AP-PLAYLOOP-12).
@@ -282,6 +290,7 @@
     drawOffered = false;
     adaptLine = '';
     clockTrace = []; // PR-02: fresh per-ply clock capture for the new game (rematch flows through here)
+    debrief = null; // PR-03: clear the previous game's debrief card
 
     if (variant === 'chess960') {
       // Distinguish an invalid entry from a deliberate 0: NaN → random, not silently SP 0 (audit W6).
@@ -485,6 +494,49 @@
   );
   // The on-demand blunder check is offered on the player's turn while the game is live.
   const canCheckMove = $derived(status === 'playing' && turnColor() === playerColor && !coachOpen && !thinking);
+
+  // PR-03 (ADR-0061): debrief card rows from the optional fields — RecapCard skips empty values,
+  // so absent data (unrated → no rating/form; untimed → no time; 960 → no opening) just drops rows.
+  const debriefRows = $derived(
+    !debrief
+      ? []
+      : [
+          {
+            label: t('play.debrief.rating'),
+            value:
+              debrief.ratingBefore != null && debrief.ratingAfter != null
+                ? `${Math.round(debrief.ratingBefore)} → ${Math.round(debrief.ratingAfter)} (${ratingDelta(debrief.ratingBefore, debrief.ratingAfter)})`
+                : '',
+          },
+          {
+            label: t('play.debrief.winRate'),
+            value:
+              debrief.winRate != null
+                ? t('play.debrief.winRateVal', {
+                    pct: Math.round(debrief.winRate * 100),
+                    n: debrief.recentN ?? 0,
+                    target: Math.round(TARGET_WINRATE * 100),
+                  })
+                : '',
+          },
+          {
+            label: t('play.debrief.opening'),
+            value: debrief.openingName
+              ? `${localizedOpeningName({ name: debrief.openingName }, getLocale())}${debrief.eco ? ` (${debrief.eco})` : ''}`
+              : '',
+          },
+          {
+            label: t('play.debrief.clock'),
+            value: debrief.clock
+              ? t('play.debrief.clockVal', {
+                  you: fmtDuration(debrief.clock.playerSpentMs),
+                  avg: avgSecPerMove(debrief.clock.playerSpentMs, debrief.clock.playerMoves),
+                  bot: fmtDuration(debrief.clock.botSpentMs),
+                })
+              : '',
+          },
+        ],
+  );
 
   // Auto-follow the latest ply: keyed on the move count so it scrolls the newest row into view as the
   // game progresses (and when reading back after it ends). `block:'nearest'` avoids jumping the page.
@@ -803,6 +855,30 @@
     await putGame(rec);
     lastGame = { id: rec.id, pgn: rec.pgn, playedAt: rec.playedAt, result: rec.result };
     lastGameRec = rec;
+    // PR-03 (ADR-0061): assemble the debrief card from what THIS function just computed. Every row
+    // optional: no fold → no rating/win-rate rows (nothing moved — honesty); untimed → no clock row;
+    // 960 → no opening row. The win-rate is read AFTER the fold, so this game is included.
+    const summary = clock
+      ? clockSummary(clockTrace, initialSecOf(selectedTC) * 1000, incrementSecOf(selectedTC) * 1000, playerColor[0] as 'w' | 'b')
+      : null;
+    debrief = {
+      ...(foldRating
+        ? {
+            ratingBefore: foldRating.before,
+            ratingAfter: foldRating.after,
+            winRate: rollingWinRate(opp.state.recent),
+            recentN: opp.state.recent.length,
+          }
+        : {}),
+      ...(summary ? { clock: summary } : {}),
+    };
+    if (variant !== 'chess960') {
+      // Best-effort async: name the opening from the played UCIs (no full analysis needed). Patches
+      // into the card when it lands; a fetch failure just leaves the row absent.
+      void describeOpening(session?.uciMoves ?? []).then((o) => {
+        if (o && debrief) debrief = { ...debrief, openingName: o.name, eco: o.eco };
+      }).catch(() => {});
+    }
     await app.persistModel(now);
     await refreshBacklog(); // the just-finished game is now counted until analysed (F-P1-3)
     // Opt-in: analyse JUST this game on finish (never the backlog — Q-C / AP-PLAYLOOP-3). 960 never
@@ -1161,6 +1237,16 @@
 
   {#if steerNote && status !== 'idle'}
     <p class="muted" style="font-size:0.82rem">{steerNote}</p>
+  {/if}
+
+  <!-- PR-03 (ADR-0061): the post-game debrief — rating move, recent form vs the 55% band, opening
+       played, per-side time. Rendered only when at least one row has data. -->
+  {#if debrief && status === 'over' && debriefRows.some((r) => r.value)}
+    <RecapCard
+      title={t('play.debrief.title')}
+      rows={debriefRows}
+      note={debrief.winRate != null ? t('play.debrief.note') : ''}
+    />
   {/if}
 
   <div class="row center">

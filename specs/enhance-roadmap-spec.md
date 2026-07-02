@@ -128,7 +128,7 @@ Tout le reste : parallélisable dans sa vague.
 |---|---|---|---|
 | PR-01 `data-backup` | [`pr-01-data-backup-spec.md`](pr-01-data-backup-spec.md) | **livré** (ADR-0059) | 2026-07-02 |
 | PR-02 `play-telemetry` | [`pr-02-play-telemetry-spec.md`](pr-02-play-telemetry-spec.md) | **livré** (ADR-0060) | 2026-07-02 |
-| PR-03 `postgame-debrief` | — | à drafter | — |
+| PR-03 `postgame-debrief` | [`pr-03-postgame-debrief-spec.md`](pr-03-postgame-debrief-spec.md) | **livré** (ADR-0061) | 2026-07-02 |
 | PR-04 `progress-graph` | — | à drafter | — |
 | PR-05 `sound-celebration` | — | à drafter | — |
 | PR-06 `bulk-import` | — | à drafter | — |
