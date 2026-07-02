@@ -1,11 +1,12 @@
 // IndexedDB persistence via idb (spec AP-CHESS-3: never localStorage for volume).
 //
-// Schema v4. The upgrade() switch is a fallthrough ladder so each phase appends
+// Schema v5. The upgrade() switch is a fallthrough ladder so each phase appends
 // cases without rewriting earlier ones. Migrations must never drop existing data.
 //   v1 (Phase 1): games, puzzleAttempts, puzzles, playerModel, settings
 //   v2 (Phase 2): importedGames, gameAnalyses
 //   v3 (Phase 3): srsCards, repertoire
 //   v4 (Phase 4): woodpeckerSets
+//   v5 (PR-09, ADR-0067): sessionLog
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Rating } from '../rating/glicko2';
@@ -165,6 +166,32 @@ export interface SettingsRecord {
   schemaRev?: number;
 }
 
+/** One finished practice session (PR-09 `session-log`, ADR-0067 — supersedes ADR-0039 Q-B's
+ *  display-only reflection). What the plan promised vs what actually happened, so the NEXT plan
+ *  can read completions and the recap can tell the truth. */
+export interface SessionLogRecord {
+  id: string; // `s:${startedAt}`
+  startedAt: number;
+  endedAt: number;
+  budgetMin: number;
+  steps: Array<{
+    kind: string;
+    focus: string;
+    minutes: number;
+    /** True when the user clicked "Done / Next" (vs skipped / session ended early). */
+    done: boolean;
+    /** The step's time cap had elapsed when it was advanced (measurable today). A real
+     *  `masteryMet?` needs a criterion evaluator that does not exist yet — deliberately NOT
+     *  fabricated (doctrine honnêteté); the field arrives with its evaluator. */
+    capReached?: boolean;
+  }>;
+  /** The end-of-session note, persisted opt-in (empty → absent). */
+  reflection?: string;
+  /** I8 (ratified): born-additive fields consumed by PR-18 (multi-day coach) without re-migration. */
+  programId?: string;
+  day?: number;
+}
+
 /** A PGN brought in for analysis (Phase 2). Raw source + which side the user was. */
 export interface ImportedGameRecord {
   id: string;
@@ -186,14 +213,16 @@ interface TrainerDB extends DBSchema {
   srsCards: { key: string; value: SrsCardRecord; indexes: { due: number; kind: string } };
   repertoire: { key: string; value: RepertoireLine; indexes: { color: string } };
   woodpeckerSets: { key: string; value: WoodpeckerSet; indexes: { createdAt: number } };
+  sessionLog: { key: string; value: SessionLogRecord; indexes: { endedAt: number } };
 }
 
 export const DB_NAME = 'chess-trainer';
 // Migration policy (audit W13):
 //  - ADDITIVE change (new optional field on an existing store) → add the field + bump the
 //    record's `schemaRev`, backfilled in the load path (playerModel.ts). NO DB_VERSION bump.
+//  - NEW STORE → bump DB_VERSION + append an `upgrade` case (the v1→v5 ladder; roadmap §8.2).
 //  - DESTRUCTIVE change (drop/rename/reindex a store) → bump DB_VERSION + add an `upgrade` block.
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 /** Thrown when IndexedDB cannot be opened (private browsing, storage disabled by
  *  policy, quota, or a failed upgrade). The boot path catches it to degrade with an
@@ -270,6 +299,11 @@ function createDB(): Promise<IDBPDatabase<TrainerDB>> {
       if (oldVersion < 4) {
         const wp = db.createObjectStore('woodpeckerSets', { keyPath: 'id' });
         wp.createIndex('createdAt', 'createdAt');
+      }
+      // v5 — PR-09 sessionLog (ADR-0067). Additive only; prior data preserved.
+      if (oldVersion < 5) {
+        const sl = db.createObjectStore('sessionLog', { keyPath: 'id' });
+        sl.createIndex('endedAt', 'endedAt');
       }
     },
   });

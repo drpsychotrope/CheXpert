@@ -2197,3 +2197,31 @@ the "only move" badge to this surface; PR-20's 960 analysis inherits it (roadmap
 (455 files), build green. **Rollback:** revert — pure-additive UI/core. Cross-links: ADR-0060
 (secondsSpent), ADR-0038 (no-engine-at-drill doctrine), ADR-0021 (win% curve it completes), PR-21
 (only-move consumer), `specs/pr-08-annotated-replay-spec.md`.
+
+## ADR-0067 — sessionLog store (v5) + session recap + completion-aware plan (PR-09 `session-log`)
+
+**Decision.** New `sessionLog` object store — the roadmap's ONE schema bump (v4→v5, the
+new-store ladder pattern; policy comment updated in db.ts). A finished session persists a
+`SessionLogRecord`: per-step outcomes recorded at advance time ("Done" and "Skip" finally diverge —
+they used to call the same advance()), `capReached` (measurable today), the optional reflection
+(SUPERSEDES ADR-0039 Q-B display-only), and the born-additive `programId?`/`day?` (ratified I8) that
+PR-18 consumes without re-migration. Ending a session shows a RecapCard (PR-03 primitive, ratified
+I6) — steps done, streak, notes-saved — and a full completion earns the milestone cue (the PR-05
+promise). The NEXT session's plan reads the last log: `buildStudyPlan.deprioritizeFocus` moves
+completed focuses to the END (stable partition, never dropped — the leak is still real; the
+no-option path stays byte-identical for Insights).
+
+**Honesty decision.** `masteryMet` is NOT persisted: no criterion evaluator exists (the C7 nudge is
+time-based) and fabricating the measurement would violate doctrine. The field ships with its
+evaluator (spec §11).
+
+**Files.** `store/db.ts` (v5 ladder case + SessionLogRecord + bump policy), `store/sessionLogRepo.ts`
+(NEW), `store/sessionLog.test.ts` (NEW, 4), `state/app.svelte.ts` (in-memory stepResults),
+`ui/Session.svelte` (advance(done), finish→log+recap+cue, plan reads last log),
+`analysis/studyPlan.ts` (deprioritizeFocus), i18n (notesSaved supersedes notesNotSaved + 9 recap
+keys). Version-pinned tests updated CONSCIOUSLY (db.test v1→v5 ladder + store list; metacog/player
+pins → 5 with rationale — the guard worked as designed). PR-01's backup covers the new store
+automatically (dynamic objectStoreNames iteration, AP-BACKUP-1 paying off). **Tests:** 1016 green,
+svelte-check 0/0 (457 files), build green. **Rollback:** revert — an empty v5 store remains
+(harmless; IDB never downgrades). Cross-links: ADR-0039 Q-B (superseded), I6/I8 (ratified),
+ADR-0063 (milestone cue), PR-18 (programId/day consumer), `specs/pr-09-session-log-spec.md`.

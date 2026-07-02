@@ -12,10 +12,10 @@ import { resetDb } from '../test/resetDb';
 describe('IndexedDB store', () => {
   beforeEach(resetDb);
 
-  it('creates all stores at the declared (v4) version', async () => {
+  it('creates all stores at the declared (v5) version', async () => {
     const db = await openTrainerDB();
     expect(db.version).toBe(DB_VERSION);
-    expect(DB_VERSION).toBe(4);
+    expect(DB_VERSION).toBe(5); // PR-09 (ADR-0067): +sessionLog — bump reserved for NEW stores
     expect([...db.objectStoreNames].sort()).toEqual(
       [
         'gameAnalyses',
@@ -25,6 +25,7 @@ describe('IndexedDB store', () => {
         'puzzleAttempts',
         'puzzles',
         'repertoire',
+        'sessionLog',
         'settings',
         'srsCards',
         'woodpeckerSets',
@@ -92,7 +93,7 @@ describe('IndexedDB store', () => {
     }
   });
 
-  it('migrates v1 → v4 without dropping existing data (G3)', async () => {
+  it('migrates v1 → v5 without dropping existing data (G3)', async () => {
     // Build a real v1 database by hand, seed a row, close it, then open at the
     // current version and confirm the old row survived + new stores exist.
     const { openDB } = await import('idb');
@@ -113,15 +114,16 @@ describe('IndexedDB store', () => {
     await v1.put('games', { id: 'old', pgn: '1. e4', result: 'win', botElo: 1500, playedAt: 1, coached: false });
     v1.close();
 
-    // Now the app opens at v4 via the real upgrade ladder (v1→v2→v3→v4).
+    // Now the app opens at v5 via the real upgrade ladder (v1→v2→v3→v4→v5).
     const upgraded = await openTrainerDB();
-    expect(upgraded.version).toBe(4);
+    expect(upgraded.version).toBe(5);
     expect(await upgraded.get('games', 'old')).toBeTruthy(); // v1 data preserved
     expect(upgraded.objectStoreNames.contains('importedGames')).toBe(true); // v2
     expect(upgraded.objectStoreNames.contains('gameAnalyses')).toBe(true); // v2
     expect(upgraded.objectStoreNames.contains('srsCards')).toBe(true); // v3
     expect(upgraded.objectStoreNames.contains('repertoire')).toBe(true); // v3
     expect(upgraded.objectStoreNames.contains('woodpeckerSets')).toBe(true); // v4
+    expect(upgraded.objectStoreNames.contains('sessionLog')).toBe(true); // v5 (PR-09)
   });
 
   it('migrates a legacy single-gameRating record to per-pool ratings on load (no version bump)', async () => {
@@ -145,6 +147,6 @@ describe('IndexedDB store', () => {
     expect(m.gameRatings.classical?.rd).toBeGreaterThanOrEqual(150);
     expect(m.opponentByPool.rapid).toEqual({ targetElo: 1480, recent: ['win', 'loss'] });
     expect((m as unknown as { gameRating?: unknown }).gameRating).toBeUndefined();
-    expect(db.version).toBe(4); // NO bump
+    expect(db.version).toBe(DB_VERSION); // load-path migration — never its own bump
   });
 });

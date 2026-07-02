@@ -9,7 +9,7 @@ describe('metacognition schema (additive — no version bump)', () => {
   });
 
   it('DB_VERSION stays 4 (additive fields need no bump — AP-META-7)', () => {
-    expect(DB_VERSION).toBe(4);
+    expect(DB_VERSION).toBe(5); // v5 = +sessionLog (PR-09, ADR-0067); additive fields still never bump
   });
 
   it('a PuzzleAttemptRecord persists confidence + selfTag round-trip', async () => {
@@ -62,7 +62,7 @@ describe('T3 usedHint schema (additive — no version bump, AP-TINTEG-6)', () =>
   });
 
   it('DB_VERSION stays 4 (usedHint is additive-optional)', () => {
-    expect(DB_VERSION).toBe(4);
+    expect(DB_VERSION).toBe(5); // v5 = +sessionLog (PR-09, ADR-0067); additive fields still never bump
   });
 
   it('a PuzzleAttemptRecord persists usedHint round-trip', async () => {

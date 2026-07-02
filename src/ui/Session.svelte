@@ -22,6 +22,9 @@
   import { dueCount, dueCards } from '../srs/SrsStore';
   import { weakSquares } from '../vision/weakSquares';
   import { poolRating } from '../store/playerModel';
+  import { putSessionLog, recentSessionLogs } from '../store/sessionLogRepo';
+  import RecapCard from './RecapCard.svelte';
+  import { playSound } from './sound';
   import { t, getLocale } from '../i18n';
 
   let loading = $state(true);
@@ -84,7 +87,16 @@
         const visionCards = await dueCards(nowMs, 'vision-square', 200);
         const weak = weakSquares(visionCards, nowMs, 12);
         app.visionWeakSquares = weak.length ? weak : null;
-        const plan = buildStudyPlan(leaks, weakest, minutes, { visionWeakSquares: weak, locale: getLocale() });
+        // PR-09 (ADR-0067): the plan reads the LAST session's completions — focuses done last
+        // time are deprioritized (moved last, never dropped) so today leads with what's left.
+        let doneFocus: string[] = [];
+        try {
+          const [last] = await recentSessionLogs(1);
+          doneFocus = last ? last.steps.filter((st) => st.done).map((st) => st.focus) : [];
+        } catch {
+          /* no log / storage hiccup — plan builds as before */
+        }
+        const plan = buildStudyPlan(leaks, weakest, minutes, { visionWeakSquares: weak, locale: getLocale(), deprioritizeFocus: doneFocus });
         // Scope the Review gate to the kinds the Review path actually covers (puzzle + repertoire),
         // so due vision-square cards never reserve a Review slot. (Q-A = exclude-vision-only.)
         const includeReview = ((await dueCount(nowMs, 'puzzle')) + (await dueCount(nowMs, 'repertoire'))) > 0;
@@ -116,8 +128,13 @@
     if (view) app.go(view);
   }
 
-  function advance() {
+  /** PR-09 (ADR-0067): Done and Skip finally diverge — the outcome is recorded per step at
+   *  advance time (done + whether the cap had elapsed; a real masteryMet needs an evaluator
+   *  that doesn't exist yet and is deliberately NOT fabricated). */
+  function advance(done: boolean) {
     if (!app.activeSession) return;
+    const results = (app.activeSession.stepResults ??= []);
+    results[app.activeSession.current] = { done, capReached };
     const total = app.activeSession.plan.steps.length;
     const next = app.activeSession.current + 1;
     if (next < total) {
@@ -143,10 +160,43 @@
     reflectTimerId = setTimeout(() => { reflectTimerDone = true; }, 20000);
   }
 
-  function finish() {
-    // Reflection is DISPLAY-ONLY — nothing is persisted (Q-B). Clear session and route back.
+  // PR-09 (ADR-0067, supersedes ADR-0039 Q-B display-only): the finished session persists as a
+  // SessionLogRecord (per-step outcomes + the optional reflection), then a recap card shows what
+  // actually happened. The next plan reads these completions (deprioritizeFocus).
+  let recap = $state<{ done: number; total: number; reflectionSaved: boolean } | null>(null);
+
+  async function finish() {
+    const s = app.activeSession;
+    if (!s) return;
+    const results = s.stepResults ?? [];
+    const trainerSteps = s.plan.steps.filter((st) => st.kind !== 'reflection');
+    const steps = s.plan.steps
+      .map((st, i) => ({
+        kind: st.kind as string,
+        focus: st.focus,
+        minutes: st.minutes,
+        done: results[i]?.done ?? false,
+        ...(results[i]?.capReached ? { capReached: true } : {}),
+      }))
+      .filter((st) => st.kind !== 'reflection');
+    const reflection = s.reflection.trim();
+    const doneCount = steps.filter((st) => st.done).length;
+    try {
+      await putSessionLog({
+        id: `s:${s.startedAt}`,
+        startedAt: s.startedAt,
+        endedAt: Date.now(),
+        budgetMin: s.budgetMin ?? 30,
+        steps,
+        ...(reflection ? { reflection } : {}),
+      });
+    } catch {
+      /* storage hiccup — the recap still shows; the log is best-effort */
+    }
+    recap = { done: doneCount, total: trainerSteps.length, reflectionSaved: !!reflection };
+    // PR-05 promise: the session-mastery celebration lives here — full completion earns the cue.
+    if (doneCount === trainerSteps.length && trainerSteps.length > 0) playSound('milestone');
     app.activeSession = null;
-    app.go('insights');
   }
 </script>
 
@@ -170,7 +220,7 @@
           style="width:100%"></textarea>
         <p class="muted" style="font-size:0.72rem">
           {reflectTimerDone ? t('session.takeYourTime') : t('session.sitWithIt')}
-          {t('session.notesNotSaved')}
+          {t('session.notesSaved')}
         </p>
         <button onclick={finish}>{t('session.finish')}</button>
       </div>
@@ -186,14 +236,26 @@
         {/if}
         <div class="row" style="gap:0.5rem">
           <button onclick={() => launch(step)}>{t('session.openTrainer', { kind: step.kind })}</button>
-          <button onclick={advance}>{t('session.doneNext')}</button>
-          <button onclick={advance}>{t('session.skipStep')}</button>
+          <button onclick={() => advance(true)}>{t('session.doneNext')}</button>
+          <button class="ghost" onclick={() => advance(false)}>{t('session.skipStep')}</button>
         </div>
         <span class="muted" style="font-size:0.72rem">
           {t('session.launchesHint')}
         </span>
       </div>
     {/if}
+  {:else if recap}
+    <!-- PR-09 (ADR-0067): end-of-session recap — the RecapCard primitive from PR-03 (I6). -->
+    <RecapCard
+      title={t('session.recapTitle')}
+      rows={[
+        { label: t('session.recapSteps'), value: t('session.recapStepsVal', { done: recap.done, total: recap.total }) },
+        { label: t('session.recapStreak'), value: (model?.dailyStreak ?? 0) > 0 ? t('session.recapStreakVal', { n: model?.dailyStreak ?? 0 }) : '' },
+        { label: t('session.recapNotes'), value: recap.reflectionSaved ? t('session.recapNotesSaved') : '' },
+      ]}
+      note={recap.done === recap.total && recap.total > 0 ? t('session.recapAllDone') : t('session.recapPartial')}
+    />
+    <button onclick={() => app.go('insights')}>{t('session.backToInsights')}</button>
   {:else}
     <p class="muted">{t('session.noSession')}</p>
     <button onclick={() => app.go('insights')}>{t('session.backToInsights')}</button>

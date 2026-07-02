@@ -57,7 +57,17 @@ class AppState {
    *  `budgetMin` (C7/CO5): the chosen coach budget (15/30/60), so Session.svelte honours the toggle
    *  instead of a hardcoded 30 (AP-CPROG-1). Optional — Insights' generic session path omits it
    *  (Session falls back to 30). In-memory only → no DB_VERSION concern. */
-  activeSession = $state<{ plan: SessionPlan; current: number; startedAt: number; reflection: string; budgetMin?: number } | null>(null);
+  activeSession = $state<{
+    plan: SessionPlan;
+    current: number;
+    startedAt: number;
+    reflection: string;
+    budgetMin?: number;
+    /** PR-09 (ADR-0067): per-step outcomes recorded at advance time (index-aligned with
+     *  plan.steps; missing entry = never reached). In-memory like the rest; persisted as a
+     *  SessionLogRecord when the session finishes. */
+    stepResults?: Array<{ done: boolean; capReached: boolean }>;
+  } | null>(null);
   /** In-progress coach assessment (C8/CF4, in-memory; survives view swaps; NOT persisted by default
    *  — mirrors `activeSession`). Lets the wizard RESUME after navigating away mid-assessment instead
    *  of silently losing every probe. Carries the wizard cursor: `step`, the built à-la-carte `plan`

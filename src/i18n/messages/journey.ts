@@ -80,9 +80,25 @@ export const journey: Messages = {
     fr: 'Réfléchissez-y ~20 s — puis terminez quand vous êtes prêt.',
     en: 'Sit with it for ~20s — then finish whenever you are ready.',
   },
-  'session.notesNotSaved': {
-    fr: 'Les notes sont affichées ici seulement et ne sont pas enregistrées.',
-    en: 'Notes are shown here only and are not saved.',
+  // PR-09 (ADR-0067, supersedes ADR-0039 Q-B): the note now persists into your session log.
+  'session.notesSaved': {
+    fr: 'Vos notes sont enregistrées dans votre journal de session (local, comme tout le reste).',
+    en: 'Your notes are saved into your session log (local, like everything else).',
+  },
+  'session.recapTitle': { fr: 'Bilan de la session', en: 'Session recap' },
+  'session.recapSteps': { fr: 'Étapes', en: 'Steps' },
+  'session.recapStepsVal': { fr: '{done} / {total} terminées', en: '{done} / {total} done' },
+  'session.recapStreak': { fr: 'Série', en: 'Streak' },
+  'session.recapStreakVal': { fr: '🔥 {n} jours', en: '🔥 {n} days' },
+  'session.recapNotes': { fr: 'Notes', en: 'Notes' },
+  'session.recapNotesSaved': { fr: 'enregistrées ✓', en: 'saved ✓' },
+  'session.recapAllDone': {
+    fr: 'Session complète — la prochaine mènera avec ce qui reste à travailler.',
+    en: 'Full session — the next one will lead with what is left to work on.',
+  },
+  'session.recapPartial': {
+    fr: 'Les étapes terminées sont lues par le prochain plan (elles passent en fin de liste, jamais supprimées).',
+    en: 'Completed steps are read by the next plan (moved to the end of the list, never dropped).',
   },
   'session.finish': { fr: 'Terminer', en: 'Finish' },
   'session.stepHeader': { fr: '{minutes} min · {kind}', en: '{minutes}m · {kind}' },
