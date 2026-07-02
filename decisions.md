@@ -2249,3 +2249,24 @@ wiring over already-tested hooks — 1016 green unchanged, svelte-check 0/0 (457
 preview smoke clean. **Rollback:** revert — no schema, no core. Cross-links: ADR-0040 (cards),
 ADR-0030 (sparring scenarios), coach-program-v2 E1b REJECT (no auto-reorder — respected),
 `specs/pr-10-insights-actionable-spec.md`.
+
+## ADR-0069 — Metacog routing nudges (PR-11 `metacog-routing`)
+
+**Decision.** New pure `metacog/nudges.ts`: derive AT MOST ONE soft routing suggestion from the
+EXISTING calibration readout — a dominant (≥30%) self-diagnosed cause routes to its trainer
+('rushed' → timed tactics, 'unfamiliar-pattern' → the concepts library); otherwise an
+'overconfident' verdict earns a habit sentence WITHOUT a button (no honest route exists — saying so
+beats inventing one). Below the calibration sample floor (readout null) nothing is asserted. One
+Insights box under the calibration panel with an explicit disclaimer ("a suggestion from your own
+tags — never a grade; nothing changes without your click").
+
+**Doctrine.** AP-META-1 intact (descriptive, never a grade, never an auto-switch); the C5
+coach-intake REJECT (no measurement biasing) untouched — nudges route TRAINING, never measurement;
+causes without an honest route ('miscalculated', 'wrong-plan'…) never fabricate a nudge; nudges
+never stack (priority order tested).
+
+**Files.** `metacog/nudges.ts` + `metacog/nudges.test.ts` (NEW, 6), `ui/Insights.svelte` (nudge box
++ timed-tactics route), `i18n/messages/coach.ts` (6 keys FR+EN). **Tests:** 1022 green (1016 + 6),
+svelte-check 0/0 (459 files), build green. **Rollback:** revert — no schema. Cross-links: ADR-0037
+(metacog collection), ADR-0036 (timed tactics), ADR-0040 (concepts), coach-intake C5 REJECT
+(respected), `specs/pr-11-metacog-routing-spec.md`.

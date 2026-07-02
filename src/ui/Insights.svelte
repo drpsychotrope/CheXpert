@@ -18,6 +18,7 @@
   import { impulsivity } from '../metacog/impulsivity';
   import { loadConcepts, cardForThemes, type ConceptCard } from '../concepts/concepts';
   import { scenarioForFocus } from '../coach/program';
+  import { metacogNudge } from '../metacog/nudges';
   import { t, fmtPct, fmtNum, getLocale } from '../i18n';
   import { motifLabelOrRaw, labelOrRaw } from '../i18n/gen';
 
@@ -41,6 +42,14 @@
   const cal = $derived(calibration(attempts as MetacogAttempt[], { locale: getLocale() }));
   // T3 impulsivity: descriptive move-time readout over {solved, ms}. Pure; null below the floor.
   const imp = $derived(impulsivity(attempts));
+  // PR-11 (ADR-0069): at most ONE soft routing suggestion from the existing readouts.
+  const nudge = $derived(metacogNudge(cal));
+
+  function nudgeTimedTactics() {
+    app.tacticsFilterThemes = null;
+    app.tacticsTimed = true;
+    app.go('tactics');
+  }
 
   // Descriptive before/after miss-rate for the top ~3 leaks (Q-D windows + minMoves gate).
   const efficacy = $derived<EfficacyReadout[]>(
@@ -292,6 +301,23 @@
         </div>
       {:else}
         <p class="muted">{t('insights.calibrationNeedsMore', { reported: cal.reportedAttempts })}</p>
+      {/if}
+
+      <!-- PR-11 (ADR-0069): ONE soft routing suggestion derived from the readout above — a
+           suggestion, never a grade or an auto-switch (AP-META-1); the user clicks or ignores. -->
+      {#if nudge}
+        <div class="panel col" style="gap:0.4rem">
+          {#if nudge.kind === 'rushed'}
+            <p style="font-size:0.85rem">{t('insights.nudgeRushed', { pct: fmtPct((nudge.pct ?? 0) * 100) })}</p>
+            <button style="align-self:flex-start" onclick={nudgeTimedTactics}>{t('insights.nudgeRushedCta')}</button>
+          {:else if nudge.kind === 'unfamiliar'}
+            <p style="font-size:0.85rem">{t('insights.nudgeUnfamiliar', { pct: fmtPct((nudge.pct ?? 0) * 100) })}</p>
+            <button style="align-self:flex-start" onclick={() => app.go('concepts')}>{t('insights.nudgeUnfamiliarCta')}</button>
+          {:else}
+            <p style="font-size:0.85rem">{t('insights.nudgeOverconfident')}</p>
+          {/if}
+          <p class="muted" style="font-size:0.72rem">{t('insights.nudgeDisclaimer')}</p>
+        </div>
       {/if}
     {/if}
 

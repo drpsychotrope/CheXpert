@@ -277,6 +277,26 @@ export const coach: Messages = {
   'insights.sparTargeted': { fr: 'Sparring ciblé', en: 'Targeted sparring' },
   'insights.redrill': { fr: 'Re-driller ce motif', en: 'Re-drill this motif' },
 
+  // PR-11 (ADR-0069): one soft metacog routing nudge (suggestion, never a grade).
+  'insights.nudgeRushed': {
+    fr: 'Vous taggez « précipité » sur {pct} de vos ratés — les tactiques chronométrées entraînent exactement ça : décider vite SANS se précipiter.',
+    en: 'You tag "rushed" on {pct} of your misses — timed tactics train exactly that: deciding fast WITHOUT rushing.',
+  },
+  'insights.nudgeRushedCta': { fr: 'Essayer les tactiques chronométrées', en: 'Try timed tactics' },
+  'insights.nudgeUnfamiliar': {
+    fr: 'Vous taggez « pattern inconnu » sur {pct} de vos ratés — parcourir les cartes-concepts avant de driller aide à les reconnaître.',
+    en: 'You tag "unfamiliar pattern" on {pct} of your misses — browsing the concept cards before drilling helps recognition.',
+  },
+  'insights.nudgeUnfamiliarCta': { fr: 'Voir les concepts', en: 'Browse the concepts' },
+  'insights.nudgeOverconfident': {
+    fr: 'Votre calibration penche vers la surconfiance : sur « sûr », vérifiez une réfutation de plus avant de jouer. (Pas de bouton — c\'est une habitude, pas un mode.)',
+    en: 'Your calibration leans overconfident: on "sure", check one more refutation before moving. (No button — it is a habit, not a mode.)',
+  },
+  'insights.nudgeDisclaimer': {
+    fr: 'Suggestion issue de vos propres tags — jamais une note, rien ne change sans votre clic.',
+    en: 'A suggestion from your own tags — never a grade; nothing changes without your click.',
+  },
+
   // PR-04 (ADR-0062): rating-over-time charts.
   'insights.ratingProgress': { fr: 'Classement dans le temps', en: 'Rating over time' },
   'insights.gameRatingCurve': { fr: 'Partie — {pool}', en: 'Game — {pool}' },
