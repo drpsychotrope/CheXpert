@@ -262,6 +262,17 @@ export const generators: Messages = {
   'weakness.resilienceUnmeasured': { fr: 'Rarement en difficulté — pas assez pour évaluer la récupération', en: 'Rarely behind — not enough to assess recovery' },
 
   // ── scenarios.ts (weakness-derived; library names/goals carry nameFr/goalFr inline) ──
+  // PR-16 (ADR-0074): failed-endgame scenarios from your own games.
+  'scenario.endgConvertName': { fr: 'Votre finale : convertir (partie du {date})', en: 'Your endgame: convert ({date} game)' },
+  'scenario.endgConvertGoal': {
+    fr: "Vous étiez gagnant en entrant dans cette finale et le point s'est échappé. Rejouez-la contre un bot à votre niveau — convertissez cette fois.",
+    en: 'You were winning entering this endgame and the point slipped. Replay it against a bot at your level — convert this time.',
+  },
+  'scenario.endgHoldName': { fr: 'Votre finale : tenir (partie du {date})', en: 'Your endgame: hold ({date} game)' },
+  'scenario.endgHoldGoal': {
+    fr: "Cette finale était tenable et vous l'avez perdue. Rejouez-la — tenez la nulle cette fois.",
+    en: 'This endgame was holdable and you lost it. Replay it — hold the draw this time.',
+  },
   'scenario.weakName': { fr: 'Votre fuite : {motif}', en: 'Your leak: {motif}' },
   'scenario.weakGoal': {
     fr: "Vous vous êtes trompé ici ({motif}). Trouvez la bonne continuation contre un bot à votre niveau.",

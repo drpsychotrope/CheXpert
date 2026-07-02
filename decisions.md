@@ -2356,3 +2356,25 @@ question: which openings cost YOU points.
 (1030 + 3), svelte-check 0/0 (465 files), build green. **Rollback:** revert — no schema.
 Cross-links: ADR-0028 (explorer + naming), openings Q-B DEFER (answered locally), ADR-0064/0065
 (bulk import feeds the sample), `specs/pr-15-explorer-own-stats-spec.md`.
+
+## ADR-0074 — Your failed endgames become exact sparring drills (PR-16 `endgame-from-games`)
+
+**Decision.** Pure `scenariosFromFailedEndgames` in analysis/scenarios.ts: for each analysed game
+(newest first, capped 6), take the position at YOUR first endgame-phase move (guaranteed your side
+to move — the sparring start contract) and flag it when the stored entry eval (player-POV
+bestWhiteCp) says winning (≥ +150) but the game was not won → "convert", or holdable (|cp| < 100)
+but lost → "hold". Between the bands nothing is claimed; games without a stored result are skipped
+(no result, no claim). The scenarios lead the Sparring picker (dated FR/EN names/goals) as a third
+source next to the imbalance library and the leak-derived positions.
+
+**Documented deviation.** The roadmap row's "Syzygy feedback" does not apply here: real endgame
+entries almost always exceed 7 pieces, and sparring is an outcome-graded play-out vs the bot, not
+per-move grading — the Syzygy drill remains the Endgames trainer (spec §11: offer the tablebase
+when ≤7 pieces).
+
+**Files.** `analysis/scenarios.ts` (+extractor + exported thresholds), `ui/Sparring.svelte`
+(third source, best-effort), `i18n/messages/generators.ts` (4 gt keys FR+EN),
+`analysis/scenarios.test.ts` (+3: convert/hold/between-bands/no-result, Black POV, cap + recency).
+**Tests:** 1036 green (1033 + 3), svelte-check 0/0 (465 files), build green. **Rollback:** revert —
+no schema. Cross-links: ADR-0030 (sparring), ADR-0060 (stored evals), ADR-0012 (Syzygy stays in
+Endgames), `specs/pr-16-endgame-from-games-spec.md`.

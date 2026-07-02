@@ -109,6 +109,54 @@ export const IMBALANCE_LIBRARY: Scenario[] = [
   },
 ];
 
+// ── PR-16 (ADR-0074): your failed endgames become exact drills ─────────────
+/** Player-POV centipawns at a ply's position (bestWhiteCp is White-POV). */
+function povCp(whiteCp: number, color: 'w' | 'b'): number {
+  return color === 'w' ? whiteCp : -whiteCp;
+}
+
+/** Entry eval thresholds: ≥ +150 = you were winning (a failed conversion if you didn't win);
+ *  |cp| < 100 = holdable (a failed hold if you lost). Between the two bands nothing is claimed. */
+export const ENDG_WINNING_CP = 150;
+export const ENDG_HOLDABLE_CP = 100;
+
+/**
+ * Failed endgames from your analysed games (newest first, capped): the position at YOUR first
+ * endgame-phase move (guaranteed your side to move — the sparring contract) when the stored entry
+ * eval says you were winning-but-didn't-win ('convert') or equal-but-lost ('hold').
+ * `results` maps gameId → outcome (the caller reads GameRecords); games without a result are
+ * skipped — no result, no claim.
+ */
+export function scenariosFromFailedEndgames(
+  analyses: GameAnalysis[],
+  results: Map<string, 'win' | 'loss' | 'draw'>,
+  locale: Locale = 'fr',
+  max = 6,
+): Scenario[] {
+  const out: Scenario[] = [];
+  const sorted = [...analyses].sort((a, b) => b.analyzedAt - a.analyzedAt);
+  for (const a of sorted) {
+    if (out.length >= max) break;
+    const result = results.get(a.gameId);
+    if (!result) continue;
+    const entry = a.plies.find((p) => p.phase === 'endgame' && p.color === a.playerColor);
+    if (!entry) continue;
+    const cp = povCp(entry.bestWhiteCp, a.playerColor);
+    const kind = cp >= ENDG_WINNING_CP && result !== 'win' ? 'convert' : Math.abs(cp) < ENDG_HOLDABLE_CP && result === 'loss' ? 'hold' : null;
+    if (!kind) continue;
+    const date = new Date(a.analyzedAt).toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US');
+    out.push({
+      id: `endg:${a.gameId}`,
+      name: gt(kind === 'convert' ? 'scenario.endgConvertName' : 'scenario.endgHoldName', locale, { date }),
+      category: 'weakness',
+      fen: entry.fenBefore,
+      sideToTrain: a.playerColor,
+      goal: gt(kind === 'convert' ? 'scenario.endgConvertGoal' : 'scenario.endgHoldGoal', locale),
+    });
+  }
+  return out;
+}
+
 /** Positions from your own recurring leaks (most-impactful first); empty if no analyses.
  * Names/goals are localized at build time in `locale` (V2-W18). */
 export function scenariosFromWeakness(analyses: GameAnalysis[], locale: Locale = 'fr'): Scenario[] {

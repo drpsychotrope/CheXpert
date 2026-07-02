@@ -8,7 +8,8 @@
   import { AdaptiveOpponent, initOpponentState } from '../engine/AdaptiveOpponent';
   import { poolOpponent } from '../store/playerModel';
   import { loadAllAnalyses } from '../analysis/runAnalysis';
-  import { IMBALANCE_LIBRARY, scenariosFromWeakness, type Scenario } from '../analysis/scenarios';
+  import { IMBALANCE_LIBRARY, scenariosFromWeakness, scenariosFromFailedEndgames, type Scenario } from '../analysis/scenarios';
+  import { getAllGames } from '../store/gamesRepo';
   import { t, getLocale } from '../i18n';
 
   // Library scenarios carry nameFr/goalFr (reactive); weakness-derived ones are localized at build.
@@ -31,8 +32,18 @@
 
   onMount(async () => {
     try {
-      const w = scenariosFromWeakness(await loadAllAnalyses(), getLocale());
-      scenarios = [...IMBALANCE_LIBRARY, ...w];
+      const analyses = await loadAllAnalyses();
+      const w = scenariosFromWeakness(analyses, getLocale());
+      // PR-16 (ADR-0074): your failed endgames (winning-but-didn't-win / holdable-but-lost)
+      // become exact play-out drills. Results read from the games store; no result → no claim.
+      let endg: Scenario[] = [];
+      try {
+        const results = new Map((await getAllGames()).map((g) => [g.id, g.result] as const));
+        endg = scenariosFromFailedEndgames(analyses, results, getLocale());
+      } catch {
+        /* games store hiccup — the other sources still work */
+      }
+      scenarios = [...endg, ...IMBALANCE_LIBRARY, ...w];
     } catch {
       /* library still works */
     }
