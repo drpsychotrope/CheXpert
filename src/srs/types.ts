@@ -6,7 +6,11 @@
 
 // 'vision-square' (ADR-0043): per-square board-vision retention. refId = the algebraic
 // square ("e4"); id = `vision-square:e4`. Graded by the coordinate↔square and blindfold drills.
-export type SrsItemKind = 'puzzle' | 'repertoire' | 'vision-square';
+// 'concept' (PR-19b, ADR-0077): per-motif concept-card retention. refId = the motif key
+// ("fork"); id = `concept:fork`. Graded by the card's "your turn" example (solved → Good,
+// revealed → Again). Additive union value — NO DB_VERSION bump; excluded from the Review badge
+// (it counts 'puzzle' + 'repertoire' explicitly) and resurfaced in the Concepts library.
+export type SrsItemKind = 'puzzle' | 'repertoire' | 'vision-square' | 'concept';
 
 export interface SrsCardRecord {
   /** Unique card id: `${kind}:${refId}`. */

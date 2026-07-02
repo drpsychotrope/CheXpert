@@ -1,11 +1,12 @@
 // IndexedDB persistence via idb (spec AP-CHESS-3: never localStorage for volume).
 //
-// Schema v4. The upgrade() switch is a fallthrough ladder so each phase appends
+// Schema v5. The upgrade() switch is a fallthrough ladder so each phase appends
 // cases without rewriting earlier ones. Migrations must never drop existing data.
 //   v1 (Phase 1): games, puzzleAttempts, puzzles, playerModel, settings
 //   v2 (Phase 2): importedGames, gameAnalyses
 //   v3 (Phase 3): srsCards, repertoire
 //   v4 (Phase 4): woodpeckerSets
+//   v5 (PR-09, ADR-0067): sessionLog
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Rating } from '../rating/glicko2';
@@ -42,6 +43,15 @@ export interface GameRecord {
    *  A non-adaptive (Easier/Harder/Fixed) game is flagged here and does NOT move the adaptive pool or
    *  the Glicko rating — only adaptive games fold (honesty). Additive optional — NO DB_VERSION bump. */
   difficultyMode?: import('../engine/opponentAgency').DifficultyMode;
+  /** PR-02 (ADR-0060): the player's Glicko rating around this game's fold — the raw series the
+   *  progress graph (PR-04) reads. Absent on legacy records AND on games that did not move the
+   *  rating (unrated takeback ADR-0058, difficulty-override P3): no fold → no snapshot, honesty.
+   *  Additive optional — NO DB_VERSION bump. */
+  ratingBefore?: number;
+  ratingAfter?: number;
+  /** PR-04 (ADR-0062): Glicko RD at the post-fold snapshot — lets the progress graph draw an
+   *  uncertainty band. Additive optional (games persisted between PR-02 and PR-04 lack it). */
+  ratingRdAfter?: number;
 }
 
 export interface PuzzleAttemptRecord {
@@ -144,8 +154,42 @@ export interface SettingsRecord {
    *  when Fixed is first selected (never blank/NaN). Clamped to [1320,3190] at apply time via
    *  difficultyTargetElo. Additive optional; absent reads as a sensible pool seed. NO DB_VERSION bump. */
   fixedElo?: number;
+  /** PR-05 (ADR-0063): synthesized UI sounds (moves, game end, milestones). ON by default
+   *  (Q-F=a) — a legacy/absent value reads `?? true`; one-click kill-switch in Settings.
+   *  Additive optional — NO DB_VERSION bump (mirrors `metacogEnabled?`). */
+  soundEnabled?: boolean;
+  /** PR-07 (ADR-0065): the Lichess username used by the opt-in games fetch, persisted for reuse.
+   *  Only ever SENT to lichess.org when the user clicks Fetch AND `allowNetwork` is on
+   *  (ADR-0012 consent). Additive optional — NO DB_VERSION bump. */
+  lichessUsername?: string;
   /** Data-shape revision (audit W13). See PlayerModel.schemaRev. */
   schemaRev?: number;
+}
+
+/** One finished practice session (PR-09 `session-log`, ADR-0067 — supersedes ADR-0039 Q-B's
+ *  display-only reflection). What the plan promised vs what actually happened, so the NEXT plan
+ *  can read completions and the recap can tell the truth. */
+export interface SessionLogRecord {
+  id: string; // `s:${startedAt}`
+  startedAt: number;
+  endedAt: number;
+  budgetMin: number;
+  steps: Array<{
+    kind: string;
+    focus: string;
+    minutes: number;
+    /** True when the user clicked "Done / Next" (vs skipped / session ended early). */
+    done: boolean;
+    /** The step's time cap had elapsed when it was advanced (measurable today). A real
+     *  `masteryMet?` needs a criterion evaluator that does not exist yet — deliberately NOT
+     *  fabricated (doctrine honnêteté); the field arrives with its evaluator. */
+    capReached?: boolean;
+  }>;
+  /** The end-of-session note, persisted opt-in (empty → absent). */
+  reflection?: string;
+  /** I8 (ratified): born-additive fields consumed by PR-18 (multi-day coach) without re-migration. */
+  programId?: string;
+  day?: number;
 }
 
 /** A PGN brought in for analysis (Phase 2). Raw source + which side the user was. */
@@ -169,14 +213,16 @@ interface TrainerDB extends DBSchema {
   srsCards: { key: string; value: SrsCardRecord; indexes: { due: number; kind: string } };
   repertoire: { key: string; value: RepertoireLine; indexes: { color: string } };
   woodpeckerSets: { key: string; value: WoodpeckerSet; indexes: { createdAt: number } };
+  sessionLog: { key: string; value: SessionLogRecord; indexes: { endedAt: number } };
 }
 
 export const DB_NAME = 'chess-trainer';
 // Migration policy (audit W13):
 //  - ADDITIVE change (new optional field on an existing store) → add the field + bump the
 //    record's `schemaRev`, backfilled in the load path (playerModel.ts). NO DB_VERSION bump.
+//  - NEW STORE → bump DB_VERSION + append an `upgrade` case (the v1→v5 ladder; roadmap §8.2).
 //  - DESTRUCTIVE change (drop/rename/reindex a store) → bump DB_VERSION + add an `upgrade` block.
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 /** Thrown when IndexedDB cannot be opened (private browsing, storage disabled by
  *  policy, quota, or a failed upgrade). The boot path catches it to degrade with an
@@ -253,6 +299,11 @@ function createDB(): Promise<IDBPDatabase<TrainerDB>> {
       if (oldVersion < 4) {
         const wp = db.createObjectStore('woodpeckerSets', { keyPath: 'id' });
         wp.createIndex('createdAt', 'createdAt');
+      }
+      // v5 — PR-09 sessionLog (ADR-0067). Additive only; prior data preserved.
+      if (oldVersion < 5) {
+        const sl = db.createObjectStore('sessionLog', { keyPath: 'id' });
+        sl.createIndex('endedAt', 'endedAt');
       }
     },
   });

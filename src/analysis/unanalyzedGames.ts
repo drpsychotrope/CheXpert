@@ -13,11 +13,11 @@
 import type { GameRecord } from '../store/db';
 
 /**
- * Standard (non-960) played games not yet analysed that carry a known player side, newest-first
- * by `playedAt`.
+ * Played games not yet analysed that carry a known player side, newest-first by `playedAt`.
  *
- * - Excludes chess960 games — the analysis pipeline assumes standard rules/opening theory, so 960
- *   is never analysed (AP-960-4 / AP-PLAYLOOP-4).
+ * - Chess960 games are INCLUDED when they carry their `startFen` (PR-20/ADR-0078: the shim
+ *   parser + UCI_Chess960 analyse them now); a 960 record WITHOUT a startFen (defensive —
+ *   ADR-0041 always stored it) stays excluded because it cannot be replayed.
  * - Excludes games with no `playerColor` (legacy pre-P1 records): the batch runner analyses each
  *   game from the stored POV, and a played PGN has no `[White]/[Black]` headers to recover the side
  *   from (AP-PLAYLOOP-12). Such games stay analysable per-game from the Play tail / history where
@@ -32,6 +32,11 @@ export function unanalyzedPlayedGames(
   analyzedIds: Set<string>,
 ): GameRecord[] {
   return games
-    .filter((g) => g.variant !== 'chess960' && g.playerColor != null && !analyzedIds.has(g.id))
+    .filter(
+      (g) =>
+        (g.variant !== 'chess960' || g.startFen != null) &&
+        g.playerColor != null &&
+        !analyzedIds.has(g.id),
+    )
     .sort((a, b) => b.playedAt - a.playedAt);
 }

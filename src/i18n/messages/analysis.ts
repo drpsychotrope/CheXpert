@@ -29,14 +29,82 @@ export const analysis: Messages = {
   'import.analysedIn': { fr: 'Analysé en {seconds}s ({ms}ms/coup)', en: 'Analysed in {seconds}s ({ms}ms/ply)' },
   // Status / error notices (set in script)
   'import.detectedGames': {
-    fr: '{n} parties détectées — analyse de la première. Collez une partie à la fois pour les autres.',
-    en: 'Detected {n} games — analysing the first. Paste one game at a time for the rest.',
+    fr: '{n} parties détectées — analysez tout ou seulement la première.',
+    en: 'Detected {n} games — analyse them all, or just the first.',
   },
+  // PR-06 (ADR-0064): bulk multi-game import.
+  'import.loadFile': { fr: 'Charger un fichier .pgn…', en: 'Load a .pgn file…' },
+  'import.analyseAll': { fr: 'Analyser les {n} parties', en: 'Analyse all {n} games' },
+  'import.analyseFirstOnly': { fr: 'Seulement la 1ʳᵉ', en: 'First only' },
+  'import.bulkProgress': { fr: 'Partie {i} / {n}…', en: 'Game {i} / {n}…' },
+  'import.bulkCancel': { fr: 'Arrêter après cette partie', en: 'Stop after this game' },
+  'import.bulkDoneTitle': { fr: 'Import terminé', en: 'Import finished' },
+  'import.bulkDoneLine': {
+    fr: '{analyzed} parties analysées · {puzzles} puzzles personnels créés',
+    en: '{analyzed} games analysed · {puzzles} personal puzzles created',
+  },
+  'import.bulkSkippedColor': {
+    fr: "{n} ignorées : couleur indéterminable (renseignez votre pseudo tel qu'il apparaît dans le PGN, puis réessayez — jamais devinée).",
+    en: '{n} skipped: colour undeterminable (set your name as it appears in the PGN and retry — never guessed).',
+  },
+  'import.bulkSkippedDup': { fr: '{n} déjà analysées (ignorées).', en: '{n} already analysed (skipped).' },
+  'import.bulkFailed': { fr: '{n} en échec (PGN illisible ou erreur moteur) — le lot a continué.', en: '{n} failed (unreadable PGN or engine error) — the batch continued.' },
+  // PR-07 (ADR-0065): opt-in Lichess fetch.
+  'import.lichessTitle': { fr: 'Récupérer depuis Lichess', en: 'Fetch from Lichess' },
+  'import.lichessUserLabel': { fr: 'Pseudo Lichess', en: 'Lichess username' },
+  'import.lichessMaxLabel': { fr: 'Parties', en: 'Games' },
+  'import.lichessFetch': { fr: 'Récupérer', en: 'Fetch' },
+  'import.lichessFetching': { fr: 'Récupération…', en: 'Fetching…' },
+  'import.lichessHint': {
+    fr: 'Envoie uniquement ce pseudo à lichess.org (API publique, aucun compte requis) et récupère vos dernières parties avec leurs pendules — elles alimentent aussi le diagnostic de gestion du temps.',
+    en: 'Sends only this username to lichess.org (public API, no account needed) and fetches your latest games with their clocks — they feed the time-management diagnosis too.',
+  },
+  'import.lichessNeedsNetwork': {
+    fr: "La récupération Lichess nécessite l'accès réseau (désactivé par défaut).",
+    en: 'The Lichess fetch needs network access (off by default).',
+  },
+  'import.lichessOpenSettings': { fr: 'Ouvrir les Réglages', en: 'Open Settings' },
+  'import.lichessErrInvalid': { fr: 'Pseudo Lichess invalide (2-30 caractères, lettres/chiffres/_/-).', en: 'Invalid Lichess username (2-30 chars, letters/digits/_/-).' },
+  'import.lichessErrNotFound': { fr: 'Utilisateur introuvable sur Lichess — vérifiez le pseudo.', en: 'User not found on Lichess — check the username.' },
+  'import.lichessErrRate': { fr: 'Lichess limite le débit — réessayez dans une minute.', en: 'Lichess is rate-limiting — retry in a minute.' },
+  'import.lichessErrNetwork': { fr: 'Erreur réseau en contactant Lichess.', en: 'Network error reaching Lichess.' },
+  'import.lichessErrEmpty': { fr: 'Aucune partie renvoyée pour ce pseudo.', en: 'No games returned for this username.' },
   'import.noMoves': { fr: 'Aucun coup trouvé dans ce PGN.', en: 'No moves found in this PGN.' },
   'import.colorNotDetected': {
     fr: "Impossible de détecter automatiquement votre couleur (Blancs : « {white} », Noirs : « {black} »). Tapez votre nom tel qu'il apparaît dans le PGN, ou choisissez Blancs/Noirs ci-dessus, puis relancez Analyser.",
     en: 'Couldn\'t auto-detect your colour (White: "{white}", Black: "{black}"). Type your name as it appears in the PGN, or pick White/Black above, then Analyse again.',
   },
+
+  // PR-08 (ADR-0066): annotated move-by-move replay.
+  'replay.region': { fr: 'Rejeu annoté — flèches pour naviguer', en: 'Annotated replay — arrow keys to navigate' },
+  'replay.first': { fr: 'Position initiale', en: 'Starting position' },
+  'replay.prev': { fr: 'Coup précédent', en: 'Previous move' },
+  'replay.next': { fr: 'Coup suivant', en: 'Next move' },
+  'replay.last': { fr: 'Dernier coup', en: 'Last move' },
+  'replay.spent': { fr: '{s} s de réflexion', en: '{s}s thought' },
+  'replay.startHint': {
+    fr: 'Cliquez un coup (ou utilisez les flèches) — annotations ?!/?/?? , évaluation et temps par coup.',
+    en: 'Click a move (or use the arrows) — ?!/?/?? annotations, eval and time per move.',
+  },
+  'replay.jumpHere': { fr: 'Voir dans le rejeu', en: 'View in replay' },
+  // PR-21 (ADR-0079): measured only-move badge.
+  'replay.onlyMove': { fr: 'seul coup', en: 'only move' },
+  'whenToThink.onlyMove': {
+    fr: "Il n'y avait qu'un coup ici : toutes les alternatives perdaient nettement (mesuré).",
+    en: 'There was only one move here: every alternative lost clearly (measured).',
+  },
+
+  // PR-13 (ADR-0071): your-own-repertoire deviation.
+  'analysisResult.youLeftLine': {
+    fr: 'Vous avez quitté votre ligne « {line} » au coup {move} : {played} au lieu de {expected}.',
+    en: 'You left your line "{line}" at move {move}: {played} instead of {expected}.',
+  },
+  'analysisResult.oppLeftLine': {
+    fr: "L'adversaire est sorti de votre ligne « {line} » au coup {move} ({played}) — l'occasion de l'étendre.",
+    en: 'Your opponent left your line "{line}" at move {move} ({played}) — a chance to extend it.',
+  },
+  'analysisResult.reviewLine': { fr: 'Revoir cette ligne', en: 'Review this line' },
+  'analysisResult.extendLine': { fr: 'Étendre la ligne', en: 'Extend the line' },
 
   // ── AnalysisResult.svelte (analysisResult.*) ─────────────────────────────
   'analysisResult.yourAcpl': { fr: 'votre ACPL', en: 'your ACPL' },
@@ -96,6 +164,13 @@ export const analysis: Messages = {
   'explorer.notInBookBefore': { fr: 'Pas dans le livre de base (lancez ', en: 'Not in the seed book (run ' },
   'explorer.notInBookAfter': { fr: ' pour le jeu complet).', en: ' for the full set).' },
   'explorer.bookContinuations': { fr: 'Continuations de livre', en: 'Book continuations' },
+  // PR-15 (ADR-0073): your own per-opening results.
+  'explorer.ownStatsTitle': { fr: 'Vos résultats par ouverture', en: 'Your results by opening' },
+  'explorer.ownStatsLine': { fr: '{score} % sur {n} · ACPL ouverture {acpl}', en: '{score}% over {n} · opening ACPL {acpl}' },
+  'explorer.ownStatsNote': {
+    fr: 'Calculé depuis vos parties jouées analysées. Descriptif — un petit n reste un petit n.',
+    en: 'Computed from your analysed played games. Descriptive — a small n is still a small n.',
+  },
 
   // ── Endgames.svelte (endgames.*) ─────────────────────────────────────────
   'endgames.title': { fr: 'Entraîneur de finales', en: 'Endgame trainer' },

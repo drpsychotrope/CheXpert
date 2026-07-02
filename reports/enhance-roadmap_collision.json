@@ -1,0 +1,13 @@
+{
+  "check": "parallel-session-collision (§2.4)",
+  "date": "2026-07-02",
+  "method": "gh pr list --state open/--state merged",
+  "openPrs": 0,
+  "lastMerged": {
+    "number": 33,
+    "title": "Enhancements portfolio: Coach + Trainer + Play (21 PRs)",
+    "mergedAt": "2026-06-30T22:15:46Z",
+    "overlap": "none — the 25 /enhance findings were derived AFTER and against this merged state (HEAD 396b4c5)"
+  },
+  "verdict": "PROCEED — no open or recent PR collides with any of the 25 findings"
+}

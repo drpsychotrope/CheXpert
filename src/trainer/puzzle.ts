@@ -16,6 +16,9 @@ export interface Puzzle {
   source: 'curated' | 'personal';
   /** Optional: opening tag / source game for personal puzzles (Phase 2). */
   meta?: Record<string, string>;
+  /** PR-20 (ADR-0078): set on puzzles mined from Chess960 games (castling-rights-free positions
+   *  only, so the standard drill engine plays them fine). Additive — absent = standard. */
+  variant?: 'chess960';
 }
 
 /** Coarse phase bucket from a FEN, for theme/phase filtering (spec §3 trainer). */

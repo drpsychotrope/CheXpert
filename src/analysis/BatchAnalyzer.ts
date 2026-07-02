@@ -65,15 +65,17 @@ export async function analyzeGame(
   const plies = game.plies;
   const n = plies.length;
 
-  // Evaluate position before each ply, plus the final resulting position.
+  // Evaluate position before each ply, plus the final resulting position. PR-20 (ADR-0078):
+  // a 960 ply carries an X-FEN engineFenBefore/After the engine needs; standard plies never
+  // set it and behave byte-identically.
   const total = n + 1;
   const evals: PositionEval[] = [];
   for (let i = 0; i < n; i++) {
-    evals.push(await evaluator.evaluatePosition(plies[i].fenBefore));
+    evals.push(await evaluator.evaluatePosition(plies[i].engineFenBefore ?? plies[i].fenBefore));
     opts.onProgress?.(i + 1, total);
   }
   if (n > 0) {
-    evals.push(await evaluator.evaluatePosition(plies[n - 1].fenAfter));
+    evals.push(await evaluator.evaluatePosition(plies[n - 1].engineFenAfter ?? plies[n - 1].fenAfter));
     opts.onProgress?.(total, total);
   }
 

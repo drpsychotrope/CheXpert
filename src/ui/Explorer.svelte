@@ -5,6 +5,8 @@
   import { onMount } from 'svelte';
   import { Chess } from 'chess.js';
   import { loadEco, nameOpening, localizedOpeningName, type EcoEntry, type OpeningName } from '../opening/eco';
+  import { ownOpeningStats, type OwnOpeningStat } from '../opening/ownStats';
+  import { getAllGames, getAnalyzedGameIds, getAnalysis } from '../store/gamesRepo';
   import { t, getLocale } from '../i18n';
 
   let input = $state('1. e4 c5 2. Nf3 d6');
@@ -13,9 +15,21 @@
   let conts = $state<EcoEntry[]>([]);
   let err = $state('');
   let done = $state(false);
+  // PR-15 (ADR-0073): YOUR results by opening — computed from analysed played games at load.
+  let ownStats = $state<OwnOpeningStat[]>([]);
 
   onMount(async () => {
     table = await loadEco();
+    try {
+      const [games, analyzedIds] = await Promise.all([getAllGames(), getAnalyzedGameIds()]);
+      const played = games.filter((g) => analyzedIds.has(g.id) && (g.variant ?? 'standard') === 'standard');
+      const items = (
+        await Promise.all(played.map(async (g) => ({ analysis: await getAnalysis(g.id), result: g.result })))
+      ).filter((x): x is { analysis: NonNullable<typeof x.analysis>; result: typeof x.result } => !!x.analysis);
+      ownStats = ownOpeningStats(items, table);
+    } catch {
+      ownStats = []; // storage hiccup — the explorer still works
+    }
   });
 
   function look() {
@@ -61,5 +75,19 @@
     <ul>
       {#each conts as c (c.name)}<li>{localizedOpeningName(c, getLocale())} <span class="muted">({c.eco})</span></li>{/each}
     </ul>
+  {/if}
+
+  <!-- PR-15 (ADR-0073): your own results by opening — which lines actually cost you points. -->
+  {#if ownStats.length}
+    <h4>{t('explorer.ownStatsTitle')}</h4>
+    <div class="col" style="gap:0.25rem">
+      {#each ownStats as s (s.eco + s.name)}
+        <div class="row panel" style="justify-content:space-between;gap:0.8rem;font-size:0.85rem;padding:0.4rem 0.7rem">
+          <span><b>{localizedOpeningName(s, getLocale())}</b> <span class="muted">({s.eco})</span></span>
+          <span class="muted">{t('explorer.ownStatsLine', { score: s.scorePct, n: s.n, acpl: s.avgOpeningAcpl })}</span>
+        </div>
+      {/each}
+    </div>
+    <p class="muted" style="font-size:0.75rem">{t('explorer.ownStatsNote')}</p>
   {/if}
 </section>

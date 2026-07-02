@@ -1971,3 +1971,545 @@ over/engine-fail/export edits, the Home card, the Onboarding offer, the Settings
 keys; nothing to undo in IndexedDB. Cross-links: ADR-0045 (coach mode), ADR-0053 (bilingual), ADR-0054/0056
 (F5 download), C1 (shares the freshness predicate for its staleness nudge — §11), F5 (PGN export — now folded
 onto the one primitive), `specs/coach-funnel-robustness-spec.md`, `enhancements-architecture-spec.md` (C8).
+
+## ADR-0059 — Full-profile backup/restore (PR-01 `data-backup`, roadmap enhance V1)
+
+**Decision.** Settings → *Your data* gains a full local **export** (one JSON file: every object store of
+the main DB) and a **replace-everything restore** behind a themed confirmation. New module
+`src/store/backup.ts`: pure `validateBackup` (typed errors `not-a-backup` / `newer-schema` / `malformed`)
++ pure `backupFilename(now)` + `exportAll(now)` / `importAll(backup)` at the IDB boundary.
+
+**Why.** The app is local-only and its IndexedDB is keyed to the origin (ADR-0049): one browser-storage
+wipe destroys months of training history with no recourse. This PR is the safety net for the whole
+enhance roadmap and merges first (roadmap §4 vague 0).
+
+**Shape.**
+- Export iterates `db.objectStoreNames` dynamically (precedent: `clearAllData`, ADR-0013) so future
+  stores are covered automatically (AP-BACKUP-1).
+- `puzzles` is filtered to `source==='personal'` — the ~80k curated rows are a re-seedable shipped
+  asset (`PuzzleRepo.init()` re-seeds when `curatedCount===0`) and would bloat the file ~15–20 MB
+  (AP-BACKUP-4). The Syzygy cache (`chess-trainer-tbcache`, separate DB) is excluded: re-fetchable
+  cache, not profile data (I2); the wipe still clears it.
+- Restore = **replace-everything** (clear every live store, then write the backup's rows): the restored
+  state reproduces the backup, never a hybrid (AP-BACKUP-2). Unknown store names are skipped and
+  reported. `invalidateAnalysesCache()` mirrors the wipe; the caller reloads the app.
+- Version guard (I5): a backup whose `schema` exceeds the running `DB_VERSION` is refused with a clear
+  message (AP-BACKUP-3) — additive migrations only run forward. Older backups load fine (absent stores
+  end empty; absent fields read `?? default`).
+- `Date.now()` stays at the Settings boundary; the store core takes `now` injected (AP-BACKUP-5).
+
+**Files.** `store/backup.ts` (NEW), `store/backup.test.ts` (NEW, 7), `ui/Settings.svelte` (Export/Restore
+buttons, hidden file input, 3-state ConfirmDialog copy), `i18n/messages/settings.ts` (9 keys FR+EN).
+**Tests:** validate taxonomy + newer-schema guard + filename purity + round-trip export→wipe→import
+deep-equal (curated excluded, personal kept) + replace-everything + unknown-store skip → **968 green**
+(961 + 7), svelte-check **0/0** (438 files), build green. **Rollback:** revert the commit — no schema
+change (DB_VERSION intact, zero new fields). Cross-links: ADR-0013 (wipe), ADR-0049 (origin-keyed
+storage), ADR-0054/0056 (`downloadText` primitive), `specs/pr-01-data-backup-spec.md`,
+`specs/enhance-roadmap-spec.md` (PR-01, I2, I5).
+
+## ADR-0060 — Play telemetry: per-move %clk in the persisted PGN + rating snapshot on GameRecord (PR-02)
+
+**Decision.** Timed standard games persist a **%clk-annotated PGN** (one `[%clk H:MM:SS]` comment per
+ply — the mover's remaining time after the press, post-increment — plus the `TimeControl` header,
+lifting that ADR-0036 deferral), and every COUNTED game stamps `ratingBefore`/`ratingAfter` (additive
+fields, no DB_VERSION bump) around the Glicko fold.
+
+**Why.** The analysis pipeline already consumes `%clk` (parsePgn → `clockMs`/`secondsSpent` →
+the time-management radar dimension), but only imported PGNs carried clocks — the player's own
+games, the app's main data source, contributed zero to the time dimension. And the rating delta was
+computed then dropped at game end; the snapshot series is what the progress graph (PR-04) reads.
+
+**Shape.** Pure core `game/clockTrace.ts` (`msToClk` defensive clamp, `timeControlTag`,
+`pgnWithClocks` — chess.js replay + `setComment`; a side-mismatched snapshot is SKIPPED: absent
+beats wrong). Play snapshots at the two press sites from the Clock STATE MACHINE (advanced by
+`performance.now()` deltas — never rAF paint counts, I4; precedent: audit v2 saw the coach dialog
+freeze the rAF clock). Takeback splices the last 2 snapshots so the trace tracks the history; the
+clock itself is not rewound (ADR-0058 honesty). Annotation is best-effort: any failure keeps the
+plain PGN (AP-TELEM-1 — never lose the record over telemetry). Untimed/960 games stay plain
+(PR-20 inherits the variant-agnostic accumulator, I1). No snapshot on unrated/override games —
+no fold, no rating movement, nothing to claim (AP-TELEM-3).
+
+**Files.** `game/clockTrace.ts` (NEW pure), `game/clockTrace.test.ts` (NEW, 8 — includes the
+producer→parsePgn round-trip with secondsSpent derivation), `ui/Play.svelte` (trace + fold capture +
+best-effort annotation), `store/db.ts` (2 additive fields), `store/repos.test.ts` (+1).
+**Tests:** 977 green (968 + 9), svelte-check 0/0 (440 files), build green. **Rollback:** revert —
+additive fields only, zero migration. Cross-links: ADR-0036 (TimeControl deferral lifted),
+ADR-0058 (takeback un-count), `specs/pr-02-play-telemetry-spec.md`, `specs/enhance-roadmap-spec.md`
+(PR-02, I1/I4), PR-04 (consumer of the rating series), PR-03 (consumer of the clock stats).
+
+## ADR-0061 — Post-game debrief card (PR-03 `postgame-debrief`)
+
+**Decision.** Game end renders a **debrief card**: rating before→after (+signed delta), recent form
+("X% over your last N — target ~55%", with a one-line explanation of the adaptive band), the opening
+actually played (local ECO naming, FR-localized), and per-side time + avg s/move derived from the
+PR-02 %clk trace. New shared primitive `ui/RecapCard.svelte` (label/value rows; empty value = row
+skipped) — the session recap (PR-09) reuses it (roadmap I6). Pure core `game/debrief.ts`
+(`clockSummary`/`fmtDuration`/`avgSecPerMove`/`ratingDelta`); `GameSession` gains a read-only
+`uciMoves` getter for the naming.
+
+**Why.** Every number was already computed at that exact moment and dropped: the fold's rating delta
+(Play.svelte fold block), `rollingWinRate` (recordGame's own input, never rendered), the played UCIs
+(book steering's input), the clock trace (PR-02). The most attentive moment of the loop said nothing.
+
+**Honesty.** No fold (unrated takeback ADR-0058 / difficulty override P3) → NO rating and NO form
+row: the rating did not move, the pool did not roll — nothing to claim. Untimed → no time row; 960 →
+no opening row. Opening naming is async best-effort (never blocks or fails the finish). The form note
+explains WHY the bot adapts (55% band = progression zone), not a grade.
+
+**Files.** `game/debrief.ts` + `game/debrief.test.ts` (NEW, 7), `ui/RecapCard.svelte` (NEW),
+`game/gameSession.ts` (uciMoves getter), `ui/Play.svelte` (assembly + rows + render),
+`i18n/messages/play.ts` (9 keys FR+EN). **Tests:** 984 green (977 + 7), svelte-check 0/0 (443 files),
+build green. **Rollback:** revert — no schema, pure-additive UI/core. Cross-links: ADR-0060 (trace +
+rating snapshot it consumes), ADR-0036 (55% band), roadmap I6 (RecapCard reuse by PR-09),
+`specs/pr-03-postgame-debrief-spec.md`.
+
+## ADR-0062 — Rating-over-time charts in Insights (PR-04 `progress-graph`)
+
+**Decision.** Insights gains a "Rating over time" section: one game-rating curve per pool (chips when
+several pools have ≥2 points) drawn from the PR-02 `GameRecord.ratingAfter` snapshots, and a
+puzzle-rating curve bucketed to the LAST attempt of each local day (coach probes excluded — they
+deliberately never move the rating, AP-COACH-8). Pure selectors + geometry in `analysis/progress.ts`
+(`poolOfGame`, `gameRatingSeries`, `availablePools`, `puzzleRatingSeries`, `toPolyline`); one
+presentational `ui/ProgressChart.svelte` (polyline + REAL observation dots on sparse series + last
+value ±RD + n). A third additive field `ratingRdAfter` joins the PR-02 snapshot (stamped at the
+fold) so the chart can state uncertainty — an accepted small deviation from PR-02's shipped shape,
+added by its first consumer.
+
+**Why.** The README's line-1 promise ("make you stronger per hour") had no "you are getting
+stronger" visualization anywhere; the data already existed (PR-02 snapshots; `puzzleAttempts.
+ratingBefore/After` persisted since v1, verified db.ts:53-54).
+
+**Honesty (roadmap I9).** The chart carries a mandatory note: internal self-referential scale
+(Glicko vs the local bot / puzzle pool) — comparable to yourself over time, NOT to FIDE/online
+ratings; un-counted games (takeback ADR-0058, difficulty override P3) are not plotted because their
+rating never moved. Flat series widen their y-window so a ±2 wobble can't render as a cliff; no
+smoothing, no extrapolation. Day-bucketing the puzzle curve avoids plotting raw Glicko noise.
+
+**Files.** `analysis/progress.ts` + `analysis/progress.test.ts` (NEW, 6), `ui/ProgressChart.svelte`
+(NEW), `ui/Insights.svelte` (section + widened empty-state gate), `store/db.ts` (+`ratingRdAfter`),
+`ui/Play.svelte` (rd in the fold snapshot), `i18n/messages/coach.ts` (4 keys FR+EN). **Tests:** 990
+green (984 + 6), svelte-check 0/0 (446 files), build green. **Rollback:** revert — additive field
+only. Cross-links: ADR-0060 (snapshot source), ADR-0036 (per-pool ratings), roadmap I9,
+`specs/pr-04-progress-graph-spec.md`.
+
+## ADR-0063 — Synthesized sound layer + sober celebrations (PR-05 `sound-celebration`)
+
+**Decision.** A WebAudio-synthesized sound layer (`ui/sound.ts`) — move / capture / check / win /
+loss / draw / milestone, all data-driven `RECIPES` (notes ≤250 ms, whole cue ≤500 ms, gain ≤0.2) —
+**ON by default** with a one-click Settings kill-switch (`SettingsRecord.soundEnabled ?? true`,
+additive, ratified Q-F=a). Move sounds are wired at ONE shared site (roadmap I7): a `Board.svelte`
+effect that fires only when the position changes WITH a non-null `lastMove` — so every game mode,
+drill and replay sounds for free, while static boards (vision prompts, diagrams) stay silent by
+construction. Celebrations stay sober (AP-ROADMAP-7): a game-end cue per outcome, a "new personal
+best {rating}" line + cue when the post-fold rating beats every prior pool snapshot (first snapshot
+is not a record), and a milestone cue when the day-streak crosses {3,7,14,30,60,100}. Session
+mastery celebration is deferred to PR-09 (its recap owns that moment).
+
+**Why.** Zero audio existed anywhere (grep = 0); a silent chess app reads as broken and audit v2
+scored UX 5/10. Synthesis keeps the repo asset-free and license-clean.
+
+**Robustness.** `playSound` is feature-detected + fully try/catch'd — audio can never break a move
+(AP-SOUND-1); jsdom no-throw is tested. Classification is pure (`moveSoundEvent`: check > capture >
+move; capture = strict piece-count drop, which covers en passant). The module flag is synced at boot
+and on toggle so play sites never read Settings.
+
+**Files.** `ui/sound.ts` + `ui/sound.test.ts` (NEW, 4), `ui/Board.svelte` (one effect, null-sentinel
+mount guard), `ui/Play.svelte` (outcome cue + personal-best line), `ui/Tactics.svelte` (streak
+milestone), `store/db.ts` (+`soundEnabled?`), `state/app.svelte.ts` (boot sync),
+`ui/Settings.svelte` (Sons panel), i18n (4 keys FR+EN). **Tests:** 994 green (990 + 4), svelte-check
+0/0 (448 files), build green; preview smoke: clean boot, toggle ON by default, zero console errors.
+**Rollback:** revert — additive setting only. Cross-links: Q-F=a + I7 (roadmap), ADR-0062 (pool
+snapshots the record check reads), PR-09 (mastery celebration), `specs/pr-05-sound-celebration-spec.md`.
+
+## ADR-0064 — Bulk multi-game PGN import (PR-06 `bulk-import`)
+
+**Decision.** The Import screen now handles a multi-game PGN as a first-class flow: detection offers
+an EXPLICIT choice ("Analyse all N" / "First only" — the old silent first-only is gone), a `.pgn`
+file can be loaded directly, and the batch runs through a new sequential, cancellable loop
+(`analysis/bulkImport.ts` — `splitPgnGames`, `shortHash`/`importGameId` extracted from Import.svelte
+as the single id authority, and `importBulk` with injectable seams, mirroring `analyzeBacklog`).
+Per game: parse → empty movetext counted failed (L21) → colour inferred PER GAME from the headers
+vs the player name, undeterminable → **skipped and counted, never guessed** (audit v2 C-3) → dedup
+via the content-addressed id → persist → analyse → mark analysed; each game try/catch'd so one bad
+PGN never aborts the batch (F-P1-4). The end panel reports analysed / colour-skipped / dups /
+failures / personal puzzles created.
+
+**Why.** Only the first game of a paste was analysed (audit v2 P1-10 workaround), so a new user
+with a 200-game archive started empty — the personalised loop only became real around game 20.
+This is the cold-start unlock; PR-07 (Lichess fetch) feeds the same queue.
+
+**Files.** `analysis/bulkImport.ts` + `analysis/bulkImport.test.ts` (NEW, 8 — all by injection, no
+engine), `ui/Import.svelte` (detect→choice, runBulk, file input, progress + summary panels; local
+shortHash removed in favour of the shared one), `i18n/messages/analysis.ts` (10 keys FR+EN,
+detectedGames reworded). **Tests:** 1002 green (994 + 8), svelte-check 0/0 (450 files), build green.
+**Rollback:** revert — no schema change. Cross-links: audit v2 P1-10/P1-11/C-3, `analyzeBacklog`
+(P1 pattern), PR-07 (consumer), `specs/pr-06-bulk-import-spec.md`.
+
+## ADR-0065 — Opt-in Lichess games fetch (PR-07 `lichess-fetch`)
+
+**Decision.** The Import screen gains "Fetch from Lichess": the app's SECOND network feature ever,
+behind the SAME off-by-default consent switch as Syzygy (ADR-0012 `allowNetwork`). Pure core
+`analysis/lichessFetch.ts` (username validation — an invalid one triggers NO call; export URL with
+`clocks=true&opening=false&evals=false`, max clamped 1–300; injected-fetch mapping to TYPED errors:
+invalid-username / not-found / rate-limited / network / empty). The fetched multi-game PGN lands in
+the paste area and flows through PR-06's detect→bulk queue; the username doubles as the player name
+for per-game colour inference and persists as additive `SettingsRecord.lichessUsername`. `clocks=
+true` means fetched games carry %clk and feed the time-management radar like PR-02's own games.
+
+**Pre-flight (roadmap N3, executed live 2026-07-02).** `GET lichess.org/api/games/user/{u}?max=2&
+clocks=true` → 200 `application/x-chess-pgn`, standard headers + `{ [%clk 0:10:00] }` comments —
+consumed unchanged by splitPgnGames/parsePgn. Public API, no auth, no token.
+
+**Privacy.** Settings network hint + README Privacy rewritten to honestly list BOTH egress features
+(Syzygy: a FEN; Lichess fetch: the typed username — nothing else). Network off → endgames still work
+vs the engine and import still works by file/paste; the fetch panel explains and links to Settings.
+
+**Files.** `analysis/lichessFetch.ts` + `.test.ts` (NEW, 6), `ui/Import.svelte` (gated panel),
+`store/db.ts` (+`lichessUsername?`), `i18n/messages/analysis.ts` (12 keys FR+EN),
+`i18n/messages/settings.ts` (networkHint reworded), README Privacy. **Tests:** 1008 green (1002+6),
+svelte-check 0/0 (452 files), build green. **Rollback:** revert — additive setting only.
+Cross-links: ADR-0012 (consent pattern), ADR-0064 (bulk queue consumer), ADR-0060 (%clk consumers),
+`specs/pr-07-lichess-fetch-spec.md`.
+
+## ADR-0066 — Annotated move-by-move replay (PR-08 `annotated-replay`)
+
+**Decision.** `AnalysisResult` gains a standard game-review surface: `ui/AnnotatedReplay.svelte` — a
+NAG-annotated paired move list (?!/?/?? colored, the analysed player's moves bolded), a driven
+view-only board (fenAfter + last-move highlight), ⏮◀▶⏭ + keyboard navigation (arrows/Home/End on a
+labeled region), and a per-move detail line (post-move eval in pawns White-POV, −cp lost, seconds
+thought from PR-02, rule-based explanation + "better was" on classified moves, explore-position
+link). ONE parent-owned ply cursor drives the eval graph, the critical-moment buttons, the
+mistakes list ("View in replay") and the replay; the old single-moment board block is subsumed.
+Pure selectors in `analysis/replay.ts` (`nagFor` — silent on best/good, `evalLabel`, `moveRows`,
+`clampIndex`).
+
+**Why.** Every per-ply field was stored since Phase 2 (severity, evals, cpLoss, explanations —
+plus secondsSpent since ADR-0060) but the UI only showed aggregates + critical moments: the
+review experience every chess tool ships was missing while all its pieces existed.
+
+**Doctrine.** No engine at replay time — everything read from the stored analysis (ADR-0038
+precedent). Replays sound for free via the PR-05 Board integration (lastMove set). PR-21 will add
+the "only move" badge to this surface; PR-20's 960 analysis inherits it (roadmap I1).
+
+**Files.** `analysis/replay.ts` + `analysis/replay.test.ts` (NEW, 4), `ui/AnnotatedReplay.svelte`
+(NEW), `ui/AnalysisResult.svelte` (single cursor, moment-board absorbed, jump links),
+`i18n/messages/analysis.ts` (9 keys FR+EN). **Tests:** 1012 green (1008 + 4), svelte-check 0/0
+(455 files), build green. **Rollback:** revert — pure-additive UI/core. Cross-links: ADR-0060
+(secondsSpent), ADR-0038 (no-engine-at-drill doctrine), ADR-0021 (win% curve it completes), PR-21
+(only-move consumer), `specs/pr-08-annotated-replay-spec.md`.
+
+## ADR-0067 — sessionLog store (v5) + session recap + completion-aware plan (PR-09 `session-log`)
+
+**Decision.** New `sessionLog` object store — the roadmap's ONE schema bump (v4→v5, the
+new-store ladder pattern; policy comment updated in db.ts). A finished session persists a
+`SessionLogRecord`: per-step outcomes recorded at advance time ("Done" and "Skip" finally diverge —
+they used to call the same advance()), `capReached` (measurable today), the optional reflection
+(SUPERSEDES ADR-0039 Q-B display-only), and the born-additive `programId?`/`day?` (ratified I8) that
+PR-18 consumes without re-migration. Ending a session shows a RecapCard (PR-03 primitive, ratified
+I6) — steps done, streak, notes-saved — and a full completion earns the milestone cue (the PR-05
+promise). The NEXT session's plan reads the last log: `buildStudyPlan.deprioritizeFocus` moves
+completed focuses to the END (stable partition, never dropped — the leak is still real; the
+no-option path stays byte-identical for Insights).
+
+**Honesty decision.** `masteryMet` is NOT persisted: no criterion evaluator exists (the C7 nudge is
+time-based) and fabricating the measurement would violate doctrine. The field ships with its
+evaluator (spec §11).
+
+**Files.** `store/db.ts` (v5 ladder case + SessionLogRecord + bump policy), `store/sessionLogRepo.ts`
+(NEW), `store/sessionLog.test.ts` (NEW, 4), `state/app.svelte.ts` (in-memory stepResults),
+`ui/Session.svelte` (advance(done), finish→log+recap+cue, plan reads last log),
+`analysis/studyPlan.ts` (deprioritizeFocus), i18n (notesSaved supersedes notesNotSaved + 9 recap
+keys). Version-pinned tests updated CONSCIOUSLY (db.test v1→v5 ladder + store list; metacog/player
+pins → 5 with rationale — the guard worked as designed). PR-01's backup covers the new store
+automatically (dynamic objectStoreNames iteration, AP-BACKUP-1 paying off). **Tests:** 1016 green,
+svelte-check 0/0 (457 files), build green. **Rollback:** revert — an empty v5 store remains
+(harmless; IDB never downgrades). Cross-links: ADR-0039 Q-B (superseded), I6/I8 (ratified),
+ADR-0063 (milestone cue), PR-18 (programId/day consumer), `specs/pr-09-session-log-spec.md`.
+
+## ADR-0068 — Actionable Insights + radar honesty badges (PR-10 `insights-actionable`)
+
+**Decision.** Three pure wire-ups plus two honesty surfaces, zero new logic (cluster ratified
+Q-B=a): each Insights leak row exposes "Learn the pattern" (rendered ONLY when a concept card
+actually exists for the motif — no dead links) and "Targeted sparring" (ONLY for endgame-target
+leaks → the rook-up conversion scenario; mapping a tactical motif onto IQP would be semantically
+wrong, so it is not offered — honest routing); each efficacy row gains "Re-drill this motif"
+(tactics filtered on the motif key — the readout finally has a next action). The Radar surfaces the
+`DimensionScore.detail` string + `n=X` it always computed as a native SVG `<title>` tooltip per
+axis (n/a axes say "not measured yet"), and both Coach radars (saved profile + fresh result) list
+per-motif sample sizes from `MotifScore.n` — a 2-puzzle diagnosis now reads as thin.
+
+**Why.** The routing signals (`conceptFocusMotif`, `sparringScenarioId`, `scenarioForFocus`,
+`cardForThemes`) and the honesty data (`detail`, `n`) all existed — computed, stored, and never
+shown. This closes three loops and aligns the UI with the measurement doctrine at the cost of
+~40 lines of glue.
+
+**Files.** `ui/Insights.svelte` (links + gating + concepts load), `ui/Radar.svelte` (tooltips),
+`ui/Coach.svelte` (sample-size lines ×2), `i18n/messages/coach.ts` (5 keys FR+EN). **Tests:** pure
+wiring over already-tested hooks — 1016 green unchanged, svelte-check 0/0 (457 files), build green,
+preview smoke clean. **Rollback:** revert — no schema, no core. Cross-links: ADR-0040 (cards),
+ADR-0030 (sparring scenarios), coach-program-v2 E1b REJECT (no auto-reorder — respected),
+`specs/pr-10-insights-actionable-spec.md`.
+
+## ADR-0069 — Metacog routing nudges (PR-11 `metacog-routing`)
+
+**Decision.** New pure `metacog/nudges.ts`: derive AT MOST ONE soft routing suggestion from the
+EXISTING calibration readout — a dominant (≥30%) self-diagnosed cause routes to its trainer
+('rushed' → timed tactics, 'unfamiliar-pattern' → the concepts library); otherwise an
+'overconfident' verdict earns a habit sentence WITHOUT a button (no honest route exists — saying so
+beats inventing one). Below the calibration sample floor (readout null) nothing is asserted. One
+Insights box under the calibration panel with an explicit disclaimer ("a suggestion from your own
+tags — never a grade; nothing changes without your click").
+
+**Doctrine.** AP-META-1 intact (descriptive, never a grade, never an auto-switch); the C5
+coach-intake REJECT (no measurement biasing) untouched — nudges route TRAINING, never measurement;
+causes without an honest route ('miscalculated', 'wrong-plan'…) never fabricate a nudge; nudges
+never stack (priority order tested).
+
+**Files.** `metacog/nudges.ts` + `metacog/nudges.test.ts` (NEW, 6), `ui/Insights.svelte` (nudge box
++ timed-tactics route), `i18n/messages/coach.ts` (6 keys FR+EN). **Tests:** 1022 green (1016 + 6),
+svelte-check 0/0 (459 files), build green. **Rollback:** revert — no schema. Cross-links: ADR-0037
+(metacog collection), ADR-0036 (timed tactics), ADR-0040 (concepts), coach-intake C5 REJECT
+(respected), `specs/pr-11-metacog-routing-spec.md`.
+
+## ADR-0070 — Scenario library ×2.6 + targeted motif re-probe + hot-measure label (PR-12)
+
+**Decision.** (a) `IMBALANCE_LIBRARY` grows 5 → 13 (ratified Q-D=a; the roadmap's "7" counted the
+weakness template — corrected): knight-vs-bad-bishop, queen-vs-two-rooks, outside majority,
+exchange-up, opposite-bishops attack, space advantage, two-minors-vs-rook, minority attack — each
+FEN validated by the auto-iterating scenarios test (legal + side-to-move == sideToTrain), FR+EN
+goals; Sparring lists them automatically (library-driven). (b) Targeted re-probe (lifts
+coach-program-v2 D2): "↻ Re-check {motif}" chips on the saved-profile card for every WEAK motif
+(delta<0) run `singleMotifPlan(theme)` through the wizard's ladder, then merge SURGICALLY: only
+that MotifScore moves (baseline kept = the profile's, so deltas stay comparable); the full old
+profile becomes coachProfilePrev (the trend shows old→new for that motif); dimensions/assessedAt/
+strengths-weaknesses labels deliberately untouched (refresh at the next full assessment — stated in
+the UI). `saveAssessment` is a no-op during a re-probe so a parked scoped run can never resume into
+a FULL-profile commit. (c) Ratified I10: pure `isHotMeasure` (non-probe attempts on the theme
+within 6h) → a descriptive "hot measure" label on the result — never a gate.
+
+**Placement (documented deviation).** The button lives on the PROFILE card, not the result-step
+efficacy lines — the real moment of need is returning after drilling; efficacy lines stay
+descriptive.
+
+**Files.** `analysis/scenarios.ts` (+8), `coach/probePlan.ts` (+singleMotifPlan),
+`coach/hotMeasure.ts` + `coach/hotMeasure.test.ts` (NEW, 3), `ui/Coach.svelte` (re-probe flow +
+resume guard + chips), `i18n/messages/coach.ts` (4 keys). **Tests:** 1025 green (1022 + 3; all 8
+new FENs passed the legality sweep first run), svelte-check 0/0 (461 files), build green.
+**Rollback:** revert — no schema; a merged profile stays shape-valid. Cross-links: ADR-0030
+(scenario library), ADR-0048 (probe scoring), coach-program-v2 D2 (lifted), ratified Q-D=a + I10,
+`specs/pr-12-coach-probes-v3-spec.md`.
+
+## ADR-0071 — Own-repertoire deviation detection (PR-13 `repertoire-deviation`)
+
+**Decision.** Pure `repertoire/deviation.ts`: cross-check an analysed game's UCI list against the
+player's OWN committed lines (their colour only), pick the DEEPEST line in play (≥2 matched plies —
+a floor so "1. e4" can't spam matches), and report the first divergence with an honest split:
+`byPlayer` true → "You left your line at move N: {played} instead of {expected}" + review route;
+false → "Your opponent left your line — a chance to extend it" (an opportunity, never a fault).
+Full-line-followed and game-ended-inside cases return null — success stays silent. Rendered as a
+panel in AnalysisResult with a jump into the PR-08 replay at the divergence ply.
+
+**Why.** The analysis always named where a game left the GENERAL book (ADR-0028) but the
+repertoire ↔ real-games silo was the loop's last big unconnected pair: you could commit lines and
+never learn you abandoned them in actual play.
+
+**Files.** `repertoire/deviation.ts` + `repertoire/deviation.test.ts` (NEW, 5),
+`ui/AnalysisResult.svelte` (best-effort load + two-case panel), `i18n/messages/analysis.ts` (4 keys
+FR+EN). **Tests:** 1030 green (1025 + 5), svelte-check 0/0 (463 files), build green. **Rollback:**
+revert — no schema. Cross-links: ADR-0028 (general book naming), ADR-0011 (repertoire lines),
+ADR-0066 (replay jump), `specs/pr-13-repertoire-deviation-spec.md`.
+
+## ADR-0072 — Guess-the-move on your own analysed games (PR-14 `guess-own-games`)
+
+**Decision.** The Guess screen lists "Your analysed games" (latest 10 standard, newest first) above
+the master classics; picking one runs the UNCHANGED `GuessGame` driver on your PGN with your
+persisted colour (F5). The stored per-ply analysis ENRICHES each correct/revealed move: when the
+move you originally played was classified inaccuracy/mistake/blunder, the feedback says so and
+appends `explainPly`'s better-move line — you rediscover your own mistakes by re-guessing them.
+`side()` now reads the driver's `guessColor` (source-agnostic). The driver's honest exact-match
+scoring contract (ADR-0017) is deliberately untouched: the analysis comments, it never re-grades.
+
+**Why.** Guess-the-move was three hard-coded games, disconnected from everything (the enhance
+audit's F13); the driver already took any (pgn, color) — a whole trainer became personal for one
+data provider and zero core edits.
+
+**Files.** `ui/GuessMove.svelte` (own-games picker, conditional header, severity notes on both
+paths, best-effort load), `i18n/messages/tactics.ts` (7 keys FR+EN). guess.ts untouched.
+**Tests:** 1030 green unchanged (no new core — the driver was already tested), svelte-check 0/0
+(463 files), build green. **Rollback:** revert — no schema. Cross-links: ADR-0017 (exact-match
+contract kept), ADR-0056 (playerColor source), ADR-0015 (explainPly), `specs/pr-14-guess-own-games-spec.md`.
+
+## ADR-0073 — Your own per-opening results in the Explorer (PR-15 `explorer-own-stats`)
+
+**Decision.** Pure `opening/ownStats.ts`: aggregate analysed PLAYED standard games by named opening
+(namer injected; ECO computed at aggregation — it is deliberately not stored on GameAnalysis) into
+score % (draws = 0.5), sample size, and mean opening-phase ACPL, most-played first; unnamed lines
+are skipped by default (a 1. a3 game says nothing about repertoire choices). Rendered as a "Your
+results by opening" section in the Explorer with the honesty note "a small n is still a small n".
+
+**Why.** The explorer named lines but carried zero personal signal; the original DEFER (openings
+Q-B) wanted a bundled global-stats DB — the local-first answer is cheaper and answers the actual
+question: which openings cost YOU points.
+
+**Files.** `opening/ownStats.ts` + `opening/ownStats.test.ts` (NEW, 3), `ui/Explorer.svelte`
+(best-effort load + list + note), `i18n/messages/analysis.ts` (3 keys FR+EN). **Tests:** 1033 green
+(1030 + 3), svelte-check 0/0 (465 files), build green. **Rollback:** revert — no schema.
+Cross-links: ADR-0028 (explorer + naming), openings Q-B DEFER (answered locally), ADR-0064/0065
+(bulk import feeds the sample), `specs/pr-15-explorer-own-stats-spec.md`.
+
+## ADR-0074 — Your failed endgames become exact sparring drills (PR-16 `endgame-from-games`)
+
+**Decision.** Pure `scenariosFromFailedEndgames` in analysis/scenarios.ts: for each analysed game
+(newest first, capped 6), take the position at YOUR first endgame-phase move (guaranteed your side
+to move — the sparring start contract) and flag it when the stored entry eval (player-POV
+bestWhiteCp) says winning (≥ +150) but the game was not won → "convert", or holdable (|cp| < 100)
+but lost → "hold". Between the bands nothing is claimed; games without a stored result are skipped
+(no result, no claim). The scenarios lead the Sparring picker (dated FR/EN names/goals) as a third
+source next to the imbalance library and the leak-derived positions.
+
+**Documented deviation.** The roadmap row's "Syzygy feedback" does not apply here: real endgame
+entries almost always exceed 7 pieces, and sparring is an outcome-graded play-out vs the bot, not
+per-move grading — the Syzygy drill remains the Endgames trainer (spec §11: offer the tablebase
+when ≤7 pieces).
+
+**Files.** `analysis/scenarios.ts` (+extractor + exported thresholds), `ui/Sparring.svelte`
+(third source, best-effort), `i18n/messages/generators.ts` (4 gt keys FR+EN),
+`analysis/scenarios.test.ts` (+3: convert/hold/between-bands/no-result, Black POV, cap + recency).
+**Tests:** 1036 green (1033 + 3), svelte-check 0/0 (465 files), build green. **Rollback:** revert —
+no schema. Cross-links: ADR-0030 (sparring), ADR-0060 (stored evals), ADR-0012 (Syzygy stays in
+Endgames), `specs/pr-16-endgame-from-games-spec.md`.
+
+## ADR-0075 — Post-puzzle play-out vs the bot (PR-17 `puzzle-playout`)
+
+**Decision.** A one-shot `app.sparringCustomFen {fen, sideToTrain, label}` signal (mirroring the
+existing one-shot signals, never persisted) + a "Play the position out vs the bot" link once a
+puzzle ENDED (solved or failed) and the position still has legal moves (a final mate offers
+nothing). Sparring consumes it into an ad-hoc `custom:playout` scenario (never listed in the
+picker) and — the generic fix — `start()` now kicks ONE engine move when the position is not the
+player's turn: the normal post-solve case (your winning line just ended, opponent to move).
+Library/leak scenarios are player-to-move by contract and never hit that path. Un-counted by
+nature (sparring never rates).
+
+**Why.** The reveal showed the line and stopped; the sparring runner already accepted any FEN —
+the missing piece was one signal, one gate, and the bot-to-move kick.
+
+**Files.** `state/app.svelte.ts` (+signal), `ui/Tactics.svelte` (gated link),
+`ui/Sparring.svelte` (consume + conditional kick), i18n (3 keys FR+EN). **Tests:** pure wiring on
+the tested runner — 1036 green unchanged, svelte-check 0/0 (465 files), build green. **Rollback:**
+revert — no schema. Cross-links: ADR-0030 (sparring runner), ADR-0074 (player-to-move contract),
+`specs/pr-17-puzzle-playout-spec.md`.
+
+## ADR-0076 — Multi-day coach program (PR-18 `coach-multiday`, lifts the ADR-0045 deferral)
+
+**Decision.** Pure `coach/multiday.ts`: `splitProgramDays` greedy-fills days within the daily
+budget preserving worst-first order (day 1 gets the biggest weakness; an item longer than the
+budget keeps its own day; overflow at maxDays spills into the LAST day — never dropped),
+`programIdOf` is stable on assessedAt, and progress is DERIVED from the PR-09 sessionLog via the
+born-additive I8 stamps (`attemptedDays`/`nextProgramDay` — a finished session marks the day
+attempted; partial completion re-surfaces through PR-09's deprioritizeFocus, and "attempted" is
+the honest word while masteryMet has no evaluator). UI: a "Spread: one session / 3 / 5 days"
+selector next to the budget; the split persists as additive `coachProfile.programDays`; launching
+a day stamps `programId`/`day` onto the session (PR-09 writes them to the log); "Start program"
+on the saved card resumes at the first unattempted day; Home shows "Coach program: day X/N →".
+
+**Files.** `coach/multiday.ts` + `coach/multiday.test.ts` (NEW, 5), `coach/types.ts`
+(+programDays?), `state/app.svelte.ts` (+programId?/day?), `ui/Session.svelte` (log stamps),
+`ui/Coach.svelte` (selector + split + day-resume), `ui/Home.svelte` (program card),
+`i18n/messages/coach.ts` (6 keys FR+EN). **Tests:** 1041 green (1036 + 5), svelte-check 0/0
+(467 files), build green. **Rollback:** revert — additive field ignored by older code.
+Cross-links: ADR-0045 (deferral lifted), ADR-0067 (sessionLog + I8 fields), ratified I8,
+`specs/pr-18-coach-multiday-spec.md`.
+
+## ADR-0077 — Interactive concept cards + per-concept SRS (PR-19a/19b, lifts ADR-0040 §11 ×2)
+
+**Decision.** (19a) A concept card's FIRST example is now "your turn": key move hidden, live
+mini-board, exact-match on the stored keyMove (the ADR-0017 honesty contract), miss → position
+held + "Show the move", solved/revealed → the annotated worked example returns; the remaining
+examples stay taught examples — teach-THEN-try. A one-shot `onTryResult(solved)` hook fires when
+the try resolves. (19b — sequenced after 19a, ratified Q-C=b) `SrsItemKind` gains the additive
+`'concept'` value (id `concept:fork`, NO DB_VERSION bump); both card surfaces (Tactics modal +
+library) grade the concept through the EXISTING `reviewItem` (solved → Good, revealed → Again);
+due concepts resurface in the LIBRARY ("Due for a refresh today: …", one click filters to the
+card) — deliberately NOT in the Review badge (it counts puzzle+repertoire explicitly; a concept
+refresh is a library moment, and diluting the badge would hide real due work).
+
+**Why.** The cards were the one PASSIVE surface in an active-recall app — seen once via
+`conceptSeen`, then forgotten. Both halves were explicit ADR-0040 §11 deferrals.
+
+**Files.** `ui/ConceptCard.svelte` (try state machine, per-card reset, hook), `srs/types.ts`
+(+'concept'), `ui/Concepts.svelte` (due strip + grading), `ui/Tactics.svelte` (modal grading),
+i18n (5 keys FR+EN). **Tests:** wiring over the already-tested ensureCard/reviewItem/dueCards —
+1041 green unchanged, svelte-check 0/0 (467 files), build green. **Rollback:** revert — orphan
+`concept:*` cards are harmless (kind-filtered everywhere). Cross-links: ADR-0040 (deferrals
+lifted), ADR-0017 (exact-match), ADR-0010/0043 (SRS + per-square precedent), ratified Q-C=b,
+`specs/pr-19-concept-cards-v2-spec.md`.
+
+## ADR-0078 — Chess960 first-class: analysis + clocks + colour (PR-20, lifts ADR-0041 Q-C/Q-D)
+
+**Decision.** (a) 960 games ANALYSE now: the real blocker was chess.js being unable to replay 960
+castling, so `analysis/pgn960.ts` replays the movetext through the app's own ChessGame shim
+(resolveMove understands king-onto-rook), emitting chess.js/chessground-safe UI FENs plus additive
+`engineFenBefore/After` X-FENs the evaluator prefers; `EngineClient.setChess960()` puts the whole
+pass in UCI_Chess960 with a **finally-reset** (the audit v2 C-1 failure class); the ONE shared
+call-site (`analyzeOnePlayedGame`) routes the Play button, the auto-run AND the backlog batch, and
+the backlog selector now includes 960 records (when they carry their startFen — defensive). A
+desynced replay THROWS loudly (the C-3 doctrine: never a silently wrong analysis). Theory modules
+(ECO naming, book steering, repertoire deviation) disable themselves on 960 UCIs — unmatched
+prefixes return null; no flags needed. (b) Personal puzzles mined from 960 games keep only
+castling-rights-free positions (the drill engine is standard) and carry an additive
+`Puzzle.variant` tag. (c) Clocks apply to 960 (Q-C lifted; timeControl persisted on 960 records —
+poolOfGame still routes them to the chess960 pool) and the colour choice opens up (the ADR-0047
+restriction had no reason once steering is absent). Inherited free (ratified I1): the annotated
+replay and the debrief (opening rows simply absent).
+
+**Deferred (§11).** %clk in persisted 960 PGNs (pgnWithClocks is chess.js-based; a 960-aware
+writer comes later — the 960 time dimension waits).
+
+**Files.** `analysis/pgn960.ts` + tests (NEW, 5 — real SP-0 replay with engine FENs, SP-518
+castling, loud throw, castle derivation), `variant/chess960.ts` (+castleFromStartFen),
+`engine/EngineClient.ts` (+setChess960), `analysis/types.ts` (+engineFen* additive),
+`analysis/BatchAnalyzer.ts` (?? seam), `analysis/runAnalysis.ts` (variant path, finally-reset,
+puzzle filter), `analysis/analyzeBacklog.ts` (variant routing), `analysis/unanalyzedGames.ts`
+(960 included), `trainer/puzzle.ts` (+variant?), `ui/Play.svelte` (auto/button/notice/colour/
+clocks/tc-on-960-recs). **Tests:** 1046 green (1041 + 5), svelte-check 0/0 (469 files), build
+green. **Rollback:** revert — additive fields only; produced 960 analyses stay shape-valid.
+Cross-links: ADR-0041 (Q-C/Q-D lifted; README override supersedes), ADR-0047 (colour restriction
+lifted), audit C-1/C-3 doctrines, ratified I1, `specs/pr-20-chess960-first-class-spec.md`.
+
+## ADR-0079 — Measured "only move": targeted MultiPV re-pass (PR-21 `only-move`, Q-E=c)
+
+**Decision.** The batch pass stays single-PV; after classification, `runAnalysis` runs a TARGETED
+MultiPV=2 re-pass over the player's mistake/blunder plies only (ratified Q-E=c — the badge concerns
+nothing else, so a clean game costs nothing extra) and persists the second line's White-POV eval as
+the additive `PlyAnalysis.secondBestCp`. Pure `analysis/onlyMove.ts` derives the claim:
+mover-POV gap ≥ 120 cp ⇒ "only move"; ABSENT data ⇒ false — no measurement, no claim (pre-PR-21
+analyses simply never show the badge). Best-effort per ply (a failed probe leaves the field absent
+— absent beats wrong); 960 covered via engineFenBefore under the same finally-reset. Consumers:
+an "only move" badge in the annotated replay's detail line (PR-08) and a measured "there was only
+one move here" line on the WhenToThink reveal (`DrillItem.ply` carries the full PlyAnalysis).
+Lifts the critical-moment spec §11 deferral. Deferred consumer (§11): tagging generated puzzles.
+
+**Files.** `analysis/onlyMove.ts` + tests (NEW, 3), `analysis/types.ts` (+secondBestCp),
+`analysis/runAnalysis.ts` (targeted re-pass), `ui/AnnotatedReplay.svelte` (badge),
+`ui/WhenToThink.svelte` (reveal line), i18n (2 keys FR+EN). **Tests:** 1049 green (1046 + 3),
+svelte-check 0/0 (471 files), build green. **Rollback:** revert — additive field. Cross-links:
+ADR-0038 (no engine at drill time — the measurement happens at ANALYSIS time, the drill only
+reads), ADR-0066 (replay surface), ratified Q-E=c, `specs/pr-21-only-move-spec.md`.
+
+## ADR-0080 — Automatic pre-move risk alert in coached slow games (PR-22 `premove-alert`)
+
+**Decision.** Coached mode now runs an AUTOMATIC risk read at the start of the player's turn —
+the README's "pre-move alerts come in Phase 2" promise, delivered by automating the existing
+on-demand checkMove machinery (one shallow coachEvalBad per position via the checkedFen guard;
+the manual button stays coherent — it disables on an already-read position). Structural guards:
+coached mode only (no new toggle — this IS that mode's Phase 2), rapid/classical/untimed only
+(never bullet/blitz — engine budget), only the RISKY badge auto-shows (a permanent "fine" every
+move would be noise), stale results dropped on generation/position/status change, best-effort
+(an engine hiccup alerts nothing). Fire-and-forget after status='playing' — the bot reply never
+waits on it. Per-candidate (hover/drag) evaluation stays deferred (cost ×N).
+
+**Files.** `ui/Play.svelte` (preAlertEligible + preMoveAlert + the applyEngineReply call — the
+single path every bot reply takes). No new i18n (reuses play.checkRisky), no schema. **Tests:**
+1049 green unchanged, svelte-check 0/0 (471 files), build green. **Rollback:** revert — no
+persistent state. Cross-links: PL7/ADR-0058 era checkMove (automated), README Phase-2 promise
+(lifted), `specs/pr-22-premove-alert-spec.md`.

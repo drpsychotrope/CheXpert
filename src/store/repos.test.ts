@@ -37,6 +37,16 @@ describe('gamesRepo (W11)', () => {
     expect(await getAnalysis('nope')).toBeUndefined();
   });
 
+  // PR-02 (ADR-0060): the rating snapshot around the fold — the progress graph's raw series.
+  it('round-trips GameRecord.ratingBefore/ratingAfter; legacy records without them load fine (additive)', async () => {
+    await putGame({ id: 'gr', pgn: '1. e4', result: 'win', botElo: 1500, playedAt: 3, coached: false, ratingBefore: 1500, ratingAfter: 1512 });
+    await putGame({ id: 'gl', pgn: '1. e4', result: 'loss', botElo: 1500, playedAt: 4, coached: false }); // legacy / unrated: no snapshot
+    const db = await openTrainerDB();
+    expect((await db.get('games', 'gr'))?.ratingAfter).toBe(1512);
+    expect((await db.get('games', 'gr'))?.ratingBefore).toBe(1500);
+    expect((await db.get('games', 'gl'))?.ratingAfter).toBeUndefined();
+  });
+
   // P1 (play-loop-closure §5): the batch runner reads GameRecord.playerColor for the correct POV.
   it('round-trips GameRecord.playerColor; a record without it loads fine (additive, no migration)', async () => {
     await putGame({ id: 'gw', pgn: '1. e4', result: 'win', botElo: 1500, playedAt: 1, coached: false, playerColor: 'b' });

@@ -1,0 +1,11 @@
+{
+  "skill": "enrich",
+  "spec": "specs/enhance-roadmap-spec.md",
+  "date": "2026-07-02",
+  "cycle1": { "candidates": 12, "fold": 10, "defer": 0, "reject": 0, "clean": 2 },
+  "cycle2": { "reclassified": 0, "softened": ["I6", "I10"], "foldSet": "10 -> 10 (stable, jamais grossi)" },
+  "cycle3": { "decision": "RUN", "trigger": "user-forced (3 cycles demandés); trigger organique absent", "newFolds": 0, "interactionsResolved": 5 },
+  "haltCheck": "PASS - le set FOLD n'a jamais grossi (AP-ENRICH-6)",
+  "foldApplied": false,
+  "awaiting": "ratification utilisateur (I1..I10) avant fold dans la spec"
+}

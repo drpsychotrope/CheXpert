@@ -14,6 +14,7 @@
     PROMOTION_GLYPH,
     type PromotionPiece,
   } from './promotion';
+  import { playSound, moveSoundEvent } from './sound';
   import { t } from '../i18n';
 
   interface Props {
@@ -188,6 +189,18 @@
   $effect(() => {
     if (!cg) return;
     cg.set(config());
+  });
+
+  // PR-05 (ADR-0063, roadmap I7): ONE move-sound site for every board consumer. Fires only when
+  // the position changes WITH a lastMove present — so replays and every game/drill that reports
+  // moves sound for free, while static boards (vision prompts, diagrams) stay silent by
+  // construction. Classification (check > capture > move) is the pure moveSoundEvent.
+  let sndPrevFen: string | null = null; // null until the first effect run (no sound on mount)
+  $effect(() => {
+    if (sndPrevFen !== null && fen !== sndPrevFen && lastMove) {
+      playSound(moveSoundEvent(sndPrevFen, fen, check));
+    }
+    sndPrevFen = fen;
   });
 
   // Our own coordinate labels, ordered to match `orientation`. White view: files

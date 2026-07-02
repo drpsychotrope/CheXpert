@@ -8,6 +8,8 @@ import type { EngineClient } from '../engine/EngineClient';
 import type { PuzzleRepo } from '../trainer/PuzzleRepo';
 import { openTrainerDB } from '../store/db';
 import { parsePgn } from './pgn';
+import { parse960Pgn } from './pgn960';
+import { onlyMoveTargets } from './onlyMove';
 import { analyzeGame, engineEvaluator } from './BatchAnalyzer';
 import { generatePuzzlesFromAnalysis, engineLineEvaluator } from './generatePuzzles';
 import type { GameAnalysis } from './types';
@@ -22,6 +24,11 @@ export interface RunAnalysisInput {
   now: number;
   movetimeMs?: number;
   onProgress?: (done: number, total: number) => void;
+  /** PR-20 (ADR-0078): Chess960 analysis. Requires `startFen` (the persisted GameRecord field);
+   *  the engine runs in UCI_Chess960 for the whole pass and is reset after (finally — the
+   *  audit C-1 failure class). Absent = standard, byte-identical. */
+  variant?: 'standard' | 'chess960';
+  startFen?: string;
 }
 
 export interface RunAnalysisResult {
@@ -42,21 +49,56 @@ export async function runAnalysis(
   input: RunAnalysisInput,
 ): Promise<RunAnalysisResult> {
   const movetimeMs = input.movetimeMs ?? 200;
-  const game = parsePgn(input.pgn);
+  const is960 = input.variant === 'chess960';
+  if (is960 && !input.startFen) throw new Error('chess960 analysis requires startFen');
 
-  const analysis = await analyzeGame(input.gameId, game, engineEvaluator(engine, movetimeMs), {
-    playerColor: input.playerColor,
-    movetimeMs,
-    source: input.source,
-    onProgress: input.onProgress,
-  });
-  analysis.analyzedAt = input.now;
+  // PR-20 (ADR-0078): 960 replays through the shim parser (chess.js cannot replay 960 castling)
+  // and runs the WHOLE pass in UCI_Chess960 — reset in `finally` so the shared engine can never
+  // stay in the wrong mode (the audit v2 C-1 failure class).
+  const game = is960 ? parse960Pgn(input.pgn, input.startFen!) : parsePgn(input.pgn);
+  if (is960) await engine.setChess960();
+  let analysis: GameAnalysis;
+  let rawPuzzles: Puzzle[];
+  try {
+    analysis = await analyzeGame(input.gameId, game, engineEvaluator(engine, movetimeMs), {
+      playerColor: input.playerColor,
+      movetimeMs,
+      source: input.source,
+      onProgress: input.onProgress,
+    });
+    analysis.analyzedAt = input.now;
 
-  const seen = await seenPersonalFens();
-  const puzzles = await generatePuzzlesFromAnalysis(analysis, engineLineEvaluator(engine), {
-    baseRating: input.baseRating,
-    seenFens: seen,
-  });
+    // PR-21 (ADR-0079, ratified Q-E=c): targeted MultiPV=2 re-pass on the player's
+    // mistake/blunder plies ONLY — the badge concerns nothing else, so the ~20s/game budget is
+    // untouched for clean games. Best-effort per ply: a failed probe just leaves the field
+    // absent (no measurement, no only-move claim).
+    for (const idx of onlyMoveTargets(analysis)) {
+      const p = analysis.plies[idx];
+      try {
+        const lines = await engine.analyzeLines(p.engineFenBefore ?? p.fenBefore, {
+          multipv: 2,
+          movetime: movetimeMs,
+          fullStrength: true,
+        });
+        if (lines.length >= 2) p.secondBestCp = lines[1].whiteCp;
+      } catch {
+        /* absent beats wrong */
+      }
+    }
+
+    const seen = await seenPersonalFens();
+    rawPuzzles = await generatePuzzlesFromAnalysis(analysis, engineLineEvaluator(engine), {
+      baseRating: input.baseRating,
+      seenFens: seen,
+    });
+  } finally {
+    if (is960) await engine.resetVariant().catch(() => {});
+  }
+  // 960 puzzles must be standard-engine-safe at drill time (Tactics runs chess.js/standard):
+  // keep only positions with NO castling rights left; tag the survivors (additive field).
+  const puzzles = is960
+    ? rawPuzzles.filter((p) => p.fen.split(' ')[2] === '-').map((p) => ({ ...p, variant: 'chess960' as const }))
+    : rawPuzzles;
 
   // Persist analysis + puzzles.
   const db = await openTrainerDB();

@@ -8,7 +8,8 @@
   import { AdaptiveOpponent, initOpponentState } from '../engine/AdaptiveOpponent';
   import { poolOpponent } from '../store/playerModel';
   import { loadAllAnalyses } from '../analysis/runAnalysis';
-  import { IMBALANCE_LIBRARY, scenariosFromWeakness, type Scenario } from '../analysis/scenarios';
+  import { IMBALANCE_LIBRARY, scenariosFromWeakness, scenariosFromFailedEndgames, type Scenario } from '../analysis/scenarios';
+  import { getAllGames } from '../store/gamesRepo';
   import { t, getLocale } from '../i18n';
 
   // Library scenarios carry nameFr/goalFr (reactive); weakness-derived ones are localized at build.
@@ -31,8 +32,18 @@
 
   onMount(async () => {
     try {
-      const w = scenariosFromWeakness(await loadAllAnalyses(), getLocale());
-      scenarios = [...IMBALANCE_LIBRARY, ...w];
+      const analyses = await loadAllAnalyses();
+      const w = scenariosFromWeakness(analyses, getLocale());
+      // PR-16 (ADR-0074): your failed endgames (winning-but-didn't-win / holdable-but-lost)
+      // become exact play-out drills. Results read from the games store; no result → no claim.
+      let endg: Scenario[] = [];
+      try {
+        const results = new Map((await getAllGames()).map((g) => [g.id, g.result] as const));
+        endg = scenariosFromFailedEndgames(analyses, results, getLocale());
+      } catch {
+        /* games store hiccup — the other sources still work */
+      }
+      scenarios = [...endg, ...IMBALANCE_LIBRARY, ...w];
     } catch {
       /* library still works */
     }
@@ -40,6 +51,19 @@
       const seeded = scenarios.find((s) => s.id === app.sparringScenarioId);
       app.sparringScenarioId = null; // consume once
       if (seeded) await start(seeded);
+    }
+    // PR-17 (ADR-0075): ad-hoc play-out position (post-puzzle). Consumed once, never listed.
+    if (app.sparringCustomFen) {
+      const c = app.sparringCustomFen;
+      app.sparringCustomFen = null;
+      await start({
+        id: 'custom:playout',
+        name: c.label,
+        category: 'weakness',
+        fen: c.fen,
+        sideToTrain: c.sideToTrain,
+        goal: t('sparring.playoutGoal'),
+      });
     }
   });
 
@@ -57,6 +81,10 @@
     try {
       await opponent.applyStrength();
       status = 'playing';
+      // PR-17 (ADR-0075): an ad-hoc position may start with the BOT to move (e.g. the final
+      // puzzle position after your winning line) — kick its reply so the play-out actually runs.
+      // Library/leak scenarios are player-to-move by contract and skip this.
+      if (game.turn !== playerSide) await engineMove();
     } catch (e) {
       result = t('sparring.engineFailedToStart', { error: String(e) });
       status = 'over';

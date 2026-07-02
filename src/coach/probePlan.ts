@@ -75,6 +75,12 @@ function timedSpec(): ProbeSpec {
   return { kind: 'timed', key: 'timed', min: COACH_LADDER_MIN, max: COACH_LADDER_MAX };
 }
 
+/** PR-12 (ADR-0070, lifts coach-program-v2 D2): a one-motif re-probe plan — the targeted
+ *  "re-check this motif" run that MERGES into the saved profile instead of replacing it. */
+export function singleMotifPlan(theme: string): ProbeSpec[] {
+  return [motifSpec(theme)];
+}
+
 /**
  * Build the ordered probe plan from the selected areas (CF7).
  *  - selected 'all' / undefined / [] => every area (motifs + endgame buckets, + timed iff includeTimed).

@@ -56,7 +56,106 @@ export const IMBALANCE_LIBRARY: Scenario[] = [
     goal: 'Hold the worse side: a pawn down, activate your rook, keep your king near the pawns, and trade into a drawn ending — don\'t panic.',
     goalFr: 'Tenez le côté inférieur : un pion de moins, activez votre tour, gardez votre roi près des pions et simplifiez vers une finale nulle — ne paniquez pas.',
   },
+  // ── PR-12 (ADR-0070, Q-D=a): eight authored expansions, 5 → 13. Every FEN is validated by
+  // scenarios.test.ts (legal + side-to-move == sideToTrain + playable). Classic instructive
+  // imbalances, deliberately sparse structures so the theme — not a tactic — is the lesson.
+  {
+    id: 'knight-vs-bad-bishop', name: 'Good knight vs bad bishop', nameFr: 'Bon cavalier contre mauvais fou', category: 'imbalance',
+    fen: '8/2b2pk1/4p1p1/4P2p/3N3P/5PP1/6K1/8 w - - 0 1', sideToTrain: 'w',
+    goal: 'The knight owns the light squares and the bishop bites on e5\'s granite. Improve the king, probe both wings, win a pawn.',
+    goalFr: "Le cavalier règne sur les cases claires, le fou mord le granit d'e5. Améliorez le roi, sondez les deux ailes, gagnez un pion.",
+  },
+  {
+    id: 'queen-vs-rooks', name: 'Queen vs two rooks', nameFr: 'Dame contre deux tours', category: 'imbalance',
+    fen: '6k1/5ppp/8/8/8/1r3r2/5PPP/3Q2K1 w - - 0 1', sideToTrain: 'w',
+    goal: 'The queen loves loose pieces and an exposed king: fork threats every move, never let the rooks coordinate on one target.',
+    goalFr: "La dame adore les pièces en l'air et le roi exposé : menacez une fourchette à chaque coup, n'accordez jamais aux tours une cible commune.",
+  },
+  {
+    id: 'outside-majority', name: 'Outside pawn majority', nameFr: 'Majorité de pions extérieure', category: 'imbalance',
+    fen: '8/1pp2kpp/8/8/8/8/PPP1K1PP/8 w - - 0 1', sideToTrain: 'w',
+    goal: 'Three vs two on the far wing: create the outside passer, use it as a decoy, and collect the other side with your king.',
+    goalFr: "Trois contre deux à l'aile éloignée : créez le pion passé extérieur, utilisez-le comme leurre, et récoltez l'autre aile avec le roi.",
+  },
+  {
+    id: 'exchange-up', name: 'Convert an exchange up', nameFr: "Convertir une qualité d'avance", category: 'imbalance',
+    fen: '6k1/3b1ppp/4p3/8/8/8/5PPP/3R2K1 w - - 0 1', sideToTrain: 'w',
+    goal: 'Rook vs bishop for a pawn: open a file, target the pawns the bishop cannot defend, and remember rook endings win by activity.',
+    goalFr: "Tour contre fou pour un pion : ouvrez une colonne, visez les pions que le fou ne défend pas — une tour gagne par l'activité.",
+  },
+  {
+    id: 'opposite-bishops-attack', name: 'Opposite-colored bishops: attack', nameFr: 'Fous de couleurs opposées : attaque', category: 'imbalance',
+    fen: '2r3k1/5ppp/4p3/8/2b5/4B3/5PPP/2R3K1 w - - 0 1', sideToTrain: 'w',
+    goal: 'With rooks on, opposite bishops favour the ATTACKER: your bishop hits squares theirs can never defend. Aim everything at one color complex.',
+    goalFr: "Avec les tours, les fous opposés favorisent l'ATTAQUANT : votre fou vise des cases que le leur ne défendra jamais. Concentrez tout sur un complexe de cases.",
+  },
+  {
+    id: 'space-advantage', name: 'Play with a space advantage', nameFr: "Jouer avec l'avantage d'espace", category: 'imbalance',
+    fen: 'r3r1k1/1pp1qppp/p1n1p3/3pP3/3P4/2N1Q3/PPP2PPP/R3R1K1 w - - 0 1', sideToTrain: 'w',
+    goal: 'The e5 wedge cramps Black. Do NOT release the tension: improve pieces behind the chain, then break with f4–f5 at the right moment.',
+    goalFr: "Le coin e5 étouffe les Noirs. Ne relâchez PAS la tension : améliorez vos pièces derrière la chaîne, puis cassez par f4–f5 au bon moment.",
+  },
+  {
+    id: 'two-minors-vs-rook', name: 'Two minors vs rook', nameFr: 'Deux mineures contre une tour', category: 'imbalance',
+    fen: '5rk1/5ppp/8/8/8/2N2B2/5PPP/6K1 w - - 0 1', sideToTrain: 'w',
+    goal: 'Bishop and knight outnumber the rook on any single square: coordinate them on one weakness and keep the rook passive.',
+    goalFr: "Fou et cavalier surpassent la tour sur chaque case isolée : coordonnez-les sur une faiblesse et gardez la tour passive.",
+  },
+  {
+    id: 'minority-attack', name: 'The minority attack', nameFr: "L'attaque de minorité", category: 'imbalance',
+    fen: 'r4rk1/pp3ppp/2p2n2/8/1P6/P1N1P3/5PPP/R4RK1 w - - 0 1', sideToTrain: 'w',
+    goal: 'Push b4–b5 against the c6 chain: trade into a lasting weakness on c6/b7, then besiege it with rooks and knight.',
+    goalFr: 'Poussez b4–b5 contre la chaîne c6 : échangez vers une faiblesse durable en c6/b7, puis assiégez-la avec tours et cavalier.',
+  },
 ];
+
+// ── PR-16 (ADR-0074): your failed endgames become exact drills ─────────────
+/** Player-POV centipawns at a ply's position (bestWhiteCp is White-POV). */
+function povCp(whiteCp: number, color: 'w' | 'b'): number {
+  return color === 'w' ? whiteCp : -whiteCp;
+}
+
+/** Entry eval thresholds: ≥ +150 = you were winning (a failed conversion if you didn't win);
+ *  |cp| < 100 = holdable (a failed hold if you lost). Between the two bands nothing is claimed. */
+export const ENDG_WINNING_CP = 150;
+export const ENDG_HOLDABLE_CP = 100;
+
+/**
+ * Failed endgames from your analysed games (newest first, capped): the position at YOUR first
+ * endgame-phase move (guaranteed your side to move — the sparring contract) when the stored entry
+ * eval says you were winning-but-didn't-win ('convert') or equal-but-lost ('hold').
+ * `results` maps gameId → outcome (the caller reads GameRecords); games without a result are
+ * skipped — no result, no claim.
+ */
+export function scenariosFromFailedEndgames(
+  analyses: GameAnalysis[],
+  results: Map<string, 'win' | 'loss' | 'draw'>,
+  locale: Locale = 'fr',
+  max = 6,
+): Scenario[] {
+  const out: Scenario[] = [];
+  const sorted = [...analyses].sort((a, b) => b.analyzedAt - a.analyzedAt);
+  for (const a of sorted) {
+    if (out.length >= max) break;
+    const result = results.get(a.gameId);
+    if (!result) continue;
+    const entry = a.plies.find((p) => p.phase === 'endgame' && p.color === a.playerColor);
+    if (!entry) continue;
+    const cp = povCp(entry.bestWhiteCp, a.playerColor);
+    const kind = cp >= ENDG_WINNING_CP && result !== 'win' ? 'convert' : Math.abs(cp) < ENDG_HOLDABLE_CP && result === 'loss' ? 'hold' : null;
+    if (!kind) continue;
+    const date = new Date(a.analyzedAt).toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US');
+    out.push({
+      id: `endg:${a.gameId}`,
+      name: gt(kind === 'convert' ? 'scenario.endgConvertName' : 'scenario.endgHoldName', locale, { date }),
+      category: 'weakness',
+      fen: entry.fenBefore,
+      sideToTrain: a.playerColor,
+      goal: gt(kind === 'convert' ? 'scenario.endgConvertGoal' : 'scenario.endgHoldGoal', locale),
+    });
+  }
+  return out;
+}
 
 /** Positions from your own recurring leaks (most-impactful first); empty if no analyses.
  * Names/goals are localized at build time in `locale` (V2-W18). */

@@ -9,7 +9,8 @@
   import { acceptAltMove, type LineEval } from '../trainer/altMove';
   import type { Puzzle } from '../trainer/puzzle';
   import { putAttempt, getAttempt, attemptsByPuzzle, recordTacticsAttempt, solvedTodayCount } from '../store/attemptsRepo';
-  import { resultToGrade, clampForConfidence, DEFAULT_GRADE_THRESHOLDS } from '../srs/fsrs';
+  import { resultToGrade, clampForConfidence, DEFAULT_GRADE_THRESHOLDS, Grade } from '../srs/fsrs';
+  import { reviewItem } from '../srs/SrsStore';
   import { clampGradeForHint, applyGlickoGain } from '../trainer/hintGrade';
   import { rollStreak, goalProgress, DEFAULT_DAILY_GOAL } from '../trainer/retention';
   import { SELF_TAGS, SELF_TAG_LABELS, type Confidence, type SelfTag } from '../metacog/metacog';
@@ -17,6 +18,7 @@
   import { failCountByPuzzle, isLeech } from '../srs/schedule';
   import { steerFromWeakness } from '../trainer/weaknessSelect';
   import { provenanceOf, bandToQuery, sourceToQuery, type DifficultyBand, type TrainerSource, type PuzzleProvenance } from '../trainer/provenance';
+  import { playSound } from './sound';
   import { t, getLocale } from '../i18n';
   import { motifLabelOrRaw } from '../i18n/gen';
 
@@ -510,9 +512,15 @@
     // and persist dailyStreak/lastTrainedAt INTO the same model snapshot the atomic write commits
     // (mirrors the weaknessCounters fold). Pure rollStreak; no Date in the core (AP-TINTEG-9).
     if (solved) {
-      const rolled = rollStreak({ dailyStreak: model.dailyStreak ?? 0, lastTrainedAt: model.lastTrainedAt ?? 0 }, now);
+      const prevStreak = model.dailyStreak ?? 0;
+      const rolled = rollStreak({ dailyStreak: prevStreak, lastTrainedAt: model.lastTrainedAt ?? 0 }, now);
       model.dailyStreak = rolled.dailyStreak;
       model.lastTrainedAt = rolled.lastTrainedAt;
+      // PR-05 (ADR-0063): sober milestone cue when the day-streak crosses a landmark. Sound only —
+      // Home already shows the streak; no modal, no interruption (AP-ROADMAP-7).
+      if (rolled.dailyStreak > prevStreak && [3, 7, 14, 30, 60, 100].includes(rolled.dailyStreak)) {
+        playSound('milestone');
+      }
     }
     // IndexedDB cannot structured-clone a Svelte 5 $state proxy ("could not be cloned"),
     // and `puzzle` is $state — its proxied arrays (themes/moves/meta) make these db.put()s
@@ -800,6 +808,22 @@
     </p>
   {/if}
 
+  <!-- PR-17 (ADR-0075): play out the final position vs the adaptive bot (un-counted sparring).
+       Only when the puzzle ENDED and the position still has legal moves (a mate has nothing left). -->
+  {#if trainer && trainer.state.status !== 'solving' && display.dests().size > 0}
+    <button
+      class="link"
+      onclick={() => {
+        app.sparringCustomFen = {
+          fen,
+          sideToTrain: orientation === 'black' ? 'b' : 'w',
+          label: t('tactics.playoutLabel'),
+        };
+        app.go('sparring');
+      }}
+    >{t('tactics.playout')}</button>
+  {/if}
+
   {#if trainer?.state.status === 'failed' && puzzle}
     <!-- F4: opt-in "Show solution" on a miss (Q-D). Non-blocking & Retry-safe (AP-TEACH-4):
          the board reset + Retry above stay; this only animates the line when tapped, with a
@@ -827,7 +851,13 @@
   {/if}
 
   {#if showCard && card}
-    <ConceptCard {card} onClose={() => (showCard = false)} />
+    <!-- PR-19b (ADR-0077): the in-trainer card grades its concept's FSRS card too. -->
+    <ConceptCard
+      {card}
+      onClose={() => (showCard = false)}
+      onTryResult={(solved) =>
+        void reviewItem('concept', card!.motif, solved ? Grade.Good : Grade.Again, Date.now()).catch(() => {})}
+    />
   {/if}
 
   {#if metacog && trainer?.state.status === 'failed'}

@@ -3,7 +3,7 @@
   import { app } from '../state/app.svelte';
   import Board from './Board.svelte';
   import { ChessGame } from '../game/ChessGame';
-  import { AdaptiveOpponent, initOpponentState, type GameOutcome } from '../engine/AdaptiveOpponent';
+  import { AdaptiveOpponent, initOpponentState, rollingWinRate, TARGET_WINRATE, type GameOutcome } from '../engine/AdaptiveOpponent';
   import type { GameRecord } from '../store/db';
   import { putGame, getAllGames, getAnalyzedGameIds } from '../store/gamesRepo';
   import { poolRating, poolOpponent } from '../store/playerModel';
@@ -27,6 +27,12 @@
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
   import { applyGameResult, botMovetime, flagOutcome, shouldRate, canTakeBackInPlay } from '../game/playSession';
+  import { pgnWithClocks, timeControlTag } from '../game/clockTrace';
+  import { clockSummary, fmtDuration, avgSecPerMove, ratingDelta, type DebriefData } from '../game/debrief';
+  import { poolOfGame } from '../analysis/progress';
+  import { playSound } from './sound';
+  import { describeOpening } from '../opening/eco';
+  import RecapCard from './RecapCard.svelte';
   import {
     difficultyTargetElo, decideResign, decideAcceptDraw, resignThreshold, coachedBlunderThreshold,
     adaptationDirection, gameAdaptsPool, DRAW_CP, type DifficultyMode,
@@ -35,7 +41,8 @@
   import { createGameSession, type GameSession } from '../game/gameSession';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import { downloadPgn, pgnFilename } from './pgnDownload';
-  import { t, tn } from '../i18n';
+  import { t, tn, getLocale } from '../i18n';
+  import { localizedOpeningName } from '../opening/eco';
 
   const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   // The DOM-free controller (F6, ADR-0057) owns the move/engine/end loop + the rules-truth game.
@@ -119,6 +126,17 @@
 
   // One-click post-game analysis (ADR-0022): no PGN paste needed.
   let lastGame = $state<{ id: string; pgn: string; playedAt: number; result: 'win' | 'loss' | 'draw' } | null>(null);
+  // PR-02 (ADR-0060): per-ply clock snapshots for the %clk-annotated persisted PGN. Plain array —
+  // nothing renders from it; reset in newGame, popped by takeBack, consumed once in finishGame.
+  let clockTrace: import('../game/clockTrace').PlyClockSnap[] = [];
+  // PR-03 (ADR-0061): the post-game debrief card data — assembled once in finishGame from numbers
+  // that were already computed there (fold snapshot, rolling win-rate, %clk trace); the opening
+  // name arrives async (describeOpening) and patches in. Null while a game is live.
+  let debrief = $state<DebriefData | null>(null);
+  // PR-05 (ADR-0063): "new personal best for this pool" line — set with the milestone cue when the
+  // post-fold rating beats every prior snapshot of the pool (needs ≥1 prior point; a first game is
+  // not a record). Sober: one line + one short sound, no modal.
+  let recordLine = $state('');
   // The full stored record of the just-finished game — fed to the shared analysis core for the
   // single-game button + the opt-in auto-run (P1, play-loop-closure §4.6). Its playerColor is in
   // scope at write so no provenance issue (AP-PLAYLOOP-12).
@@ -248,8 +266,9 @@
 
   async function newGame() {
     if (!model) return;
-    // Chess960 stays White (no opening theory / color choice — ADR-0041/0047).
-    playerColor = variant === 'chess960' ? 'white' : resolveColor(colorChoice);
+    // PR-20 (ADR-0078): colour choice applies to 960 too (the ADR-0041/0047 restriction is lifted
+    // with the analysis unlock — there was never a theory reason once steering is absent).
+    playerColor = resolveColor(colorChoice);
     result = '';
     lastGame = null;
     lastGameRec = null;
@@ -277,6 +296,9 @@
     consecutiveEqualPlies = 0;
     drawOffered = false;
     adaptLine = '';
+    clockTrace = []; // PR-02: fresh per-ply clock capture for the new game (rematch flows through here)
+    debrief = null; // PR-03: clear the previous game's debrief card
+    recordLine = ''; // PR-05: clear the previous game's personal-best line
 
     if (variant === 'chess960') {
       // Distinguish an invalid entry from a deliberate 0: NaN → random, not silently SP 0 (audit W6).
@@ -318,8 +340,8 @@
     const state = initOpponentState(difficultyTargetElo(difficultyMode, adaptiveSeed, fixedElo ?? adaptiveSeed));
     opponent = new AdaptiveOpponent(app.engine, state, variant === 'chess960');
 
-    // Chess960 is always untimed (Q-C); standard respects the selected time control.
-    if (variant === 'chess960' || selectedTC.untimed) {
+    // PR-20 (ADR-0078, lifts ADR-0041 Q-C): 960 respects the selected time control like standard.
+    if (selectedTC.untimed) {
       clock = null;
     } else {
       clock = startClock(initClock(initialSecOf(selectedTC) * 1000, incrementSecOf(selectedTC) * 1000, 'w'));
@@ -481,6 +503,49 @@
   // The on-demand blunder check is offered on the player's turn while the game is live.
   const canCheckMove = $derived(status === 'playing' && turnColor() === playerColor && !coachOpen && !thinking);
 
+  // PR-03 (ADR-0061): debrief card rows from the optional fields — RecapCard skips empty values,
+  // so absent data (unrated → no rating/form; untimed → no time; 960 → no opening) just drops rows.
+  const debriefRows = $derived(
+    !debrief
+      ? []
+      : [
+          {
+            label: t('play.debrief.rating'),
+            value:
+              debrief.ratingBefore != null && debrief.ratingAfter != null
+                ? `${Math.round(debrief.ratingBefore)} → ${Math.round(debrief.ratingAfter)} (${ratingDelta(debrief.ratingBefore, debrief.ratingAfter)})`
+                : '',
+          },
+          {
+            label: t('play.debrief.winRate'),
+            value:
+              debrief.winRate != null
+                ? t('play.debrief.winRateVal', {
+                    pct: Math.round(debrief.winRate * 100),
+                    n: debrief.recentN ?? 0,
+                    target: Math.round(TARGET_WINRATE * 100),
+                  })
+                : '',
+          },
+          {
+            label: t('play.debrief.opening'),
+            value: debrief.openingName
+              ? `${localizedOpeningName({ name: debrief.openingName }, getLocale())}${debrief.eco ? ` (${debrief.eco})` : ''}`
+              : '',
+          },
+          {
+            label: t('play.debrief.clock'),
+            value: debrief.clock
+              ? t('play.debrief.clockVal', {
+                  you: fmtDuration(debrief.clock.playerSpentMs),
+                  avg: avgSecPerMove(debrief.clock.playerSpentMs, debrief.clock.playerMoves),
+                  bot: fmtDuration(debrief.clock.botSpentMs),
+                })
+              : '',
+          },
+        ],
+  );
+
   // Auto-follow the latest ply: keyed on the move count so it scrolls the newest row into view as the
   // game progresses (and when reading back after it ends). `block:'nearest'` avoids jumping the page.
   $effect(() => {
@@ -514,7 +579,13 @@
    *  This interposition (coached gate above + clock press here) is exactly why the controller does
    *  NOT auto-chain applyPlayerMove → engineReply (Q-G / C1-1). */
   async function commitPlayerMove() {
-    if (clock) clock = press(clock, playerSideClock);
+    if (clock) {
+      clock = press(clock, playerSideClock);
+      // PR-02 (ADR-0060): snapshot the mover's remaining ms right after the press (post-increment)
+      // — standard %clk semantics. Values come from the Clock state machine (performance.now()
+      // deltas), never rAF paint counts (I4).
+      clockTrace.push({ side: playerSideClock, remainingMs: playerSideClock === 'w' ? clock.whiteMs : clock.blackMs });
+    }
     if (checkEnd()) return;
     await engineMove();
   }
@@ -663,10 +734,45 @@
       return;
     }
     if ((status as string) === 'over') return; // P1-14: resign landed mid-think; resign() set result/clock
-    if (session.movePlayed && clock) clock = press(clock, botSide);
+    if (session.movePlayed && clock) {
+      clock = press(clock, botSide);
+      // PR-02: mirror of the player-side snapshot — the bot's remaining ms after its press.
+      clockTrace.push({ side: botSide, remainingMs: botSide === 'w' ? clock.whiteMs : clock.blackMs });
+    }
     // Run the end-check side effects (result string + fold/persist); the controller already set
     // status to 'over'/'playing' but Play owns those side effects (AP-CTRL-9).
-    if (!checkEnd()) status = 'playing';
+    if (!checkEnd()) {
+      status = 'playing';
+      // PR-22 (ADR-0080): the README's Phase-2 promise — an automatic risk read at the start of
+      // YOUR turn. Coached mode + slow cadences only; non-blocking; best-effort.
+      void preMoveAlert();
+    }
+  }
+
+  /** PR-22 (ADR-0080): auto pre-move alert. Reuses the on-demand checkMove machinery (one
+   *  shallow eval per position via checkedFen; the manual button stays coherent — it disables on
+   *  the already-checked position). Slow cadences only (never bullet/blitz — engine budget), only
+   *  the RISKY badge auto-shows (a permanent "fine" every move would be noise), stale results
+   *  dropped on generation/position change. */
+  function preAlertEligible(): boolean {
+    if (!coached || status !== 'playing' || turnColor() !== playerColor) return false;
+    if (selectedTC.untimed) return true;
+    const cat = categoryFor(initialSecOf(selectedTC), incrementSecOf(selectedTC));
+    return cat === 'rapid' || cat === 'classical';
+  }
+  async function preMoveAlert() {
+    if (!preAlertEligible()) return;
+    if (checkedFen === game.fen) return; // one read per position (AP-PLAYUX-5)
+    const gen = analyzeGen;
+    const fenAt = game.fen;
+    checkedFen = fenAt;
+    try {
+      const bad = await coachEvalBad();
+      if (gen !== analyzeGen || game.fen !== fenAt || status !== 'playing') return; // stale
+      if (bad) checkVerdict = 'risky';
+    } catch {
+      /* best-effort — no alert on engine hiccup */
+    }
   }
 
   /** Recover from a bot-move engine error: drop any stuck search and try the move again (P1-05).
@@ -715,6 +821,10 @@
     // override (Easier/Harder/Fixed) game still persists a flagged GameRecord below but SKIPS the fold
     // entirely — it must not move the adaptive pool or the Glicko rating. The predicate is the pure
     // `gameAdaptsPool`. The post-game adaptation line (A5) is derived from the fold's prev/next Elo.
+    // PR-02 (ADR-0060): capture the player's rating around the fold so the GameRecord carries its
+    // own before/after snapshot — the raw series the progress graph (PR-04) reads. Stays null on
+    // unrated/override games (no fold → no snapshot, honesty: the rating did not move).
+    let foldRating: { before: number; after: number; rdAfter: number } | null = null;
     if (shouldRate(unrated) && gameAdaptsPool(difficultyMode)) {
       if (variant === 'chess960') {
         // Update the chess960 pool — seeded lazily on the first 960 game from classical (AP-960-7).
@@ -725,53 +835,111 @@
         opp.state = nextOpp;
         await opp.applyStrength().catch(() => {});
         m.gameRatings.chess960 = nextRating;
+        foldRating = { before: seed.rating, after: nextRating.rating, rdAfter: nextRating.rd };
         setAdaptLine(prevElo, nextOpp.targetElo);
       } else {
         // Standard path: adjust the SELECTED pool's adaptive bot toward the 55% band (AP-TC-3).
         const pool = selectedPool;
+        const prevRating = poolRating(m, pool);
         const prevElo = poolOpponent(m, pool).targetElo;
-        const { nextOpp, nextRating } = applyGameResult(poolRating(m, pool), poolOpponent(m, pool), outcome, botElo);
+        const { nextOpp, nextRating } = applyGameResult(prevRating, poolOpponent(m, pool), outcome, botElo);
         m.opponentByPool[pool] = nextOpp;
         opp.state = nextOpp;
         await opp.applyStrength().catch(() => {});
         m.gameRatings[pool] = nextRating;
+        foldRating = { before: prevRating.rating, after: nextRating.rating, rdAfter: nextRating.rd };
         setAdaptLine(prevElo, nextOpp.targetElo);
       }
     }
 
     const now = Date.now();
+    // PR-02 (ADR-0060): persist the %clk-annotated PGN for timed standard games so the analysis
+    // pipeline's existing clock consumers (pgn.ts secondsSpent → time radar) finally see YOUR OWN
+    // games. Best-effort: any annotation failure keeps the plain PGN — never lose the record over
+    // telemetry (AP-TELEM-1). Untimed/960 games (clock === null) stay plain.
+    let pgnOut = game.pgn();
+    if (clock && clockTrace.length && variant !== 'chess960' && !selectedTC.untimed) {
+      try {
+        pgnOut = pgnWithClocks(pgnOut, clockTrace, timeControlTag(initialSecOf(selectedTC), incrementSecOf(selectedTC)));
+      } catch {
+        /* keep the plain PGN */
+      }
+    }
     const rec: GameRecord = {
       id: `g:${now}`,
-      pgn: game.pgn(),
+      pgn: pgnOut,
       result: outcome,
       botElo,
       playedAt: now,
       coached,
+      // PR-02/PR-04: rating snapshot around the fold (absent on unrated/override games). Additive.
+      ...(foldRating ? { ratingBefore: foldRating.before, ratingAfter: foldRating.after, ratingRdAfter: foldRating.rdAfter } : {}),
       ...(unrated ? { unrated: true } : {}), // ADR-0058: persist the honest un-counted marker
       // P3 (A6/Q-E): flag the difficulty so history/analysis can tell an override game apart; only an
       // adaptive game moved the pool/rating above. Additive optional — absent reads as legacy adaptive.
       ...(difficultyMode !== 'adaptive' ? { difficultyMode } : {}),
       playerColor: playerColor[0] as 'w' | 'b', // F5: persist side for correct history re-analysis
-      ...(variant === 'chess960'
-        ? { variant: 'chess960', startFen: startFen960 ?? undefined }
+      // PR-20 (ADR-0078): 960 records carry their time control too (clocks lifted, Q-C).
+      ...(variant === 'chess960' ? { variant: 'chess960' as const, startFen: startFen960 ?? undefined } : {}),
+      timeControl: selectedTC.untimed
+        ? { initialSec: 0, incrementSec: 0, category: 'classical' as const, untimed: true }
         : {
-            timeControl: selectedTC.untimed
-              ? { initialSec: 0, incrementSec: 0, category: 'classical', untimed: true }
-              : {
-                  initialSec: initialSecOf(selectedTC),
-                  incrementSec: incrementSecOf(selectedTC),
-                  category: categoryFor(initialSecOf(selectedTC), incrementSecOf(selectedTC)),
-                },
-          }),
+            initialSec: initialSecOf(selectedTC),
+            incrementSec: incrementSecOf(selectedTC),
+            category: categoryFor(initialSecOf(selectedTC), incrementSecOf(selectedTC)),
+          },
     };
     await putGame(rec);
     lastGame = { id: rec.id, pgn: rec.pgn, playedAt: rec.playedAt, result: rec.result };
     lastGameRec = rec;
+    // PR-03 (ADR-0061): assemble the debrief card from what THIS function just computed. Every row
+    // optional: no fold → no rating/win-rate rows (nothing moved — honesty); untimed → no clock row;
+    // 960 → no opening row. The win-rate is read AFTER the fold, so this game is included.
+    const summary = clock
+      ? clockSummary(clockTrace, initialSecOf(selectedTC) * 1000, incrementSecOf(selectedTC) * 1000, playerColor[0] as 'w' | 'b')
+      : null;
+    debrief = {
+      ...(foldRating
+        ? {
+            ratingBefore: foldRating.before,
+            ratingAfter: foldRating.after,
+            winRate: rollingWinRate(opp.state.recent),
+            recentN: opp.state.recent.length,
+          }
+        : {}),
+      ...(summary ? { clock: summary } : {}),
+    };
+    if (variant !== 'chess960') {
+      // Best-effort async: name the opening from the played UCIs (no full analysis needed). Patches
+      // into the card when it lands; a fetch failure just leaves the row absent.
+      void describeOpening(session?.uciMoves ?? []).then((o) => {
+        if (o && debrief) debrief = { ...debrief, openingName: o.name, eco: o.eco };
+      }).catch(() => {});
+    }
+
+    // PR-05 (ADR-0063): outcome cue — the one game-end sound (finishGame is idempotent-guarded).
+    playSound(outcome === 'win' ? 'win' : outcome === 'loss' ? 'loss' : 'draw');
+    // Sober personal-best celebration: the post-fold rating beats every PRIOR snapshot of this
+    // pool (rec is already stored — exclude it). First-ever snapshot is not a record.
+    if (foldRating) {
+      try {
+        const pool = variant === 'chess960' ? 'chess960' : selectedPool;
+        const prior = (await getAllGames())
+          .filter((g) => g.id !== rec.id && g.ratingAfter != null && poolOfGame(g) === pool)
+          .map((g) => g.ratingAfter as number);
+        if (prior.length && foldRating.after > Math.max(...prior)) {
+          recordLine = t('play.newRatingBest', { rating: Math.round(foldRating.after) });
+          playSound('milestone');
+        }
+      } catch {
+        /* celebration is best-effort */
+      }
+    }
     await app.persistModel(now);
     await refreshBacklog(); // the just-finished game is now counted until analysed (F-P1-3)
-    // Opt-in: analyse JUST this game on finish (never the backlog — Q-C / AP-PLAYLOOP-3). 960 never
-    // auto-runs (it's not in the backlog and the core resets the variant anyway, AP-960-4).
-    if (autoAnalyzeOnFinish && variant !== 'chess960') void autoAnalyzeFinished();
+    // Opt-in: analyse JUST this game on finish (never the backlog — Q-C / AP-PLAYLOOP-3).
+    // PR-20 (ADR-0078): 960 auto-runs too — the shared core routes it through the shim parser.
+    if (autoAnalyzeOnFinish) void autoAnalyzeFinished();
   }
 
   /** P3 (A5): set the post-game adaptation line from the pool's prev/next bot Elo. Pure selection via
@@ -913,6 +1081,10 @@
     const snap = session.takeBackPlayerMove(); // undoes bot reply + player move; recomputes lastMove
     fen = snap.fen;
     lastMove = snap.lastMove;
+    // PR-02: the two undone plies leave the %clk trace too, so it stays aligned with the history.
+    // The clock itself is NOT rewound (time honestly spent) — the re-played move snapshots the
+    // current, lower remaining time.
+    clockTrace.splice(-2, 2);
     // The position changed under the player — invalidate any prior on-demand check verdict.
     checkVerdict = null;
     checkedFen = null;
@@ -998,9 +1170,8 @@
       </select>
     </label>
 
-    {#if variant !== 'chess960'}
-      <ColorPicker bind:value={colorChoice} disabled={live} />
-    {/if}
+    <!-- PR-20 (ADR-0078): colour + clocks now apply to 960 too (Q-C lifted). -->
+    <ColorPicker bind:value={colorChoice} disabled={live} />
 
     {#if variant === 'chess960'}
       <label class="muted" style="font-size:0.85rem">
@@ -1010,30 +1181,28 @@
       </label>
     {/if}
 
-    {#if variant !== 'chess960'}
-      <label class="muted" style="font-size:0.85rem">
-        {t('play.timeLabel')}
-        <select
-          value={selectedTC.id}
-          disabled={live}
-          onchange={(e) => { selectedTC = TIME_CONTROL_PRESETS.find((p) => p.id === e.currentTarget.value) ?? selectedTC; }}
-        >
-          {#each TIME_CONTROL_PRESETS as p (p.id)}
-            <option value={p.id}>{p.label}</option>
-          {/each}
-        </select>
-      </label>
+    <label class="muted" style="font-size:0.85rem">
+      {t('play.timeLabel')}
+      <select
+        value={selectedTC.id}
+        disabled={live}
+        onchange={(e) => { selectedTC = TIME_CONTROL_PRESETS.find((p) => p.id === e.currentTarget.value) ?? selectedTC; }}
+      >
+        {#each TIME_CONTROL_PRESETS as p (p.id)}
+          <option value={p.id}>{p.label}</option>
+        {/each}
+      </select>
+    </label>
 
-      {#if selectedTC.id === 'custom'}
-        <label class="muted" style="font-size:0.85rem">
-          {t('play.customMin')} <input type="number" min="0" style="width:3.5rem" disabled={live}
-            oninput={(e) => { customInitialSec = Math.max(0, Number(e.currentTarget.value) * 60); }}
-            value={customInitialSec / 60} />
-        </label>
-        <label class="muted" style="font-size:0.85rem">
-          {t('play.customInc')} <input type="number" min="0" style="width:3.5rem" bind:value={customIncrementSec} disabled={live} />
-        </label>
-      {/if}
+    {#if selectedTC.id === 'custom'}
+      <label class="muted" style="font-size:0.85rem">
+        {t('play.customMin')} <input type="number" min="0" style="width:3.5rem" disabled={live}
+          oninput={(e) => { customInitialSec = Math.max(0, Number(e.currentTarget.value) * 60); }}
+          value={customInitialSec / 60} />
+      </label>
+      <label class="muted" style="font-size:0.85rem">
+        {t('play.customInc')} <input type="number" min="0" style="width:3.5rem" bind:value={customIncrementSec} disabled={live} />
+      </label>
     {/if}
   </div>
 
@@ -1044,9 +1213,7 @@
     </div>
   {/if}
 
-  {#if variant !== 'chess960'}
-    <p class="muted" style="font-size:0.82rem">{playerColor === 'white' ? t('play.youPlayWhite') : t('play.youPlayBlack')}</p>
-  {/if}
+  <p class="muted" style="font-size:0.82rem">{playerColor === 'white' ? t('play.youPlayWhite') : t('play.youPlayBlack')}</p>
 
   <div class="play-area">
     <div class="board-wrap">
@@ -1118,9 +1285,23 @@
   {#if adaptLine && status === 'over'}
     <p class="muted" style="font-size:0.82rem">{adaptLine}</p>
   {/if}
+  <!-- PR-05 (ADR-0063): sober personal-best line, set with the milestone cue. -->
+  {#if recordLine && status === 'over'}
+    <p style="font-size:0.85rem;color:var(--good)">{recordLine}</p>
+  {/if}
 
   {#if steerNote && status !== 'idle'}
     <p class="muted" style="font-size:0.82rem">{steerNote}</p>
+  {/if}
+
+  <!-- PR-03 (ADR-0061): the post-game debrief — rating move, recent form vs the 55% band, opening
+       played, per-side time. Rendered only when at least one row has data. -->
+  {#if debrief && status === 'over' && debriefRows.some((r) => r.value)}
+    <RecapCard
+      title={t('play.debrief.title')}
+      rows={debriefRows}
+      note={debrief.winRate != null ? t('play.debrief.note') : ''}
+    />
   {/if}
 
   <div class="row center">
@@ -1148,7 +1329,8 @@
         <button class="ghost" onclick={takeBack}>{t('play.takeBack')}</button>
       {/if}
     {/if}
-    {#if status === 'over' && lastGame && variant !== 'chess960'}
+    <!-- PR-20 (ADR-0078): 960 games analyse like standard now (shim parser + UCI_Chess960). -->
+    {#if status === 'over' && lastGame}
       <button class="ghost" onclick={analyzePlayed} disabled={aStatus === 'analyzing'}>
         {aStatus === 'analyzing' ? t('play.analysing') : aResult ? t('play.reanalyse') : t('play.analyseThisGame')}
       </button>
@@ -1170,11 +1352,7 @@
   {#if status === 'over' && autoAnalyzed && !aResult}
     <p class="muted" style="font-size:0.82rem; color:var(--good)">{t('play.loop.autoAnalysed')}</p>
   {/if}
-  {#if status === 'over' && variant === 'chess960'}
-    <p class="muted" style="font-size:0.8rem; max-width:440px">
-      {t('play.chess960NoAnalysis')}
-    </p>
-  {/if}
+  <!-- PR-20 (ADR-0078): the "960 not analysed yet" notice is gone — it analyses now. -->
 
   {#if aStatus === 'analyzing'}
     <div class="panel" style="max-width:420px">

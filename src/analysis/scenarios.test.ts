@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Chess } from 'chess.js';
-import { IMBALANCE_LIBRARY, scenariosFromWeakness } from './scenarios';
+import { IMBALANCE_LIBRARY, scenariosFromWeakness, scenariosFromFailedEndgames, ENDG_WINNING_CP } from './scenarios';
 import type { GameAnalysis, GamePhase, PhaseStat, PlyAnalysis } from './types';
 
 describe('IMBALANCE_LIBRARY', () => {
@@ -36,6 +36,46 @@ function game(plies: PlyAnalysis[]): GameAnalysis {
     acpl: 0, blunders: 0, mistakes: 0, inaccuracies: 0, puzzlesGenerated: 0,
   };
 }
+
+describe('scenariosFromFailedEndgames (PR-16)', () => {
+  const ENTRY_FEN = '8/5pk1/6p1/8/8/1R3PKP/r5P1/8 w - - 0 1'; // white to move
+  const endgGame = (id: string, cp: number, color: 'w' | 'b' = 'w', at = 1): GameAnalysis => ({
+    ...game([ply({ phase: 'endgame', color, bestWhiteCp: cp, fenBefore: ENTRY_FEN })]),
+    gameId: id,
+    playerColor: color,
+    analyzedAt: at,
+  });
+
+  it("flags 'convert' (winning entry, not won) and 'hold' (equal entry, lost) — nothing between", () => {
+    const results = new Map<string, 'win' | 'loss' | 'draw'>([
+      ['a', 'draw'], // entry +200 → failed conversion
+      ['b', 'loss'], // entry 0 → failed hold
+      ['c', 'win'],  // entry +200, won → clean, no scenario
+      ['d', 'loss'], // entry -300 (already lost) → no claim
+    ]);
+    const scen = scenariosFromFailedEndgames(
+      [endgGame('a', 200), endgGame('b', 0), endgGame('c', 200), endgGame('d', -300)],
+      results,
+    );
+    expect(scen.map((s) => s.id).sort()).toEqual(['endg:a', 'endg:b']);
+    expect(scen.every((s) => s.sideToTrain === 'w' && s.fen === ENTRY_FEN)).toBe(true);
+  });
+
+  it('uses player-POV eval for Black and skips games without a result', () => {
+    // bestWhiteCp -200 = +200 for Black → failed conversion when Black only drew.
+    const scen = scenariosFromFailedEndgames([endgGame('bk', -ENDG_WINNING_CP - 50, 'b')], new Map([['bk', 'draw']]));
+    expect(scen.length).toBe(1);
+    expect(scenariosFromFailedEndgames([endgGame('x', 200)], new Map()).length).toBe(0); // no result, no claim
+  });
+
+  it('caps the list and prefers the newest analyses', () => {
+    const games = Array.from({ length: 9 }, (_, i) => endgGame(`g${i}`, 200, 'w', i));
+    const results = new Map(games.map((g) => [g.gameId, 'draw' as const]));
+    const scen = scenariosFromFailedEndgames(games, results, 'fr', 6);
+    expect(scen.length).toBe(6);
+    expect(scen[0].id).toBe('endg:g8'); // newest first
+  });
+});
 
 describe('scenariosFromWeakness', () => {
   it('builds scenarios from fingerprint leak positions', () => {

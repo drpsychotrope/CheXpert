@@ -37,6 +37,9 @@ export const tactics: Messages = {
   'tactics.retryFind': { fr: 'Réessayez — trouvez le coup.', en: 'Retry — find the move.' },
   'tactics.leech': { fr: 'Celui-ci vous résiste sans arrêt.', en: 'This one keeps beating you.' },
   'tactics.learnPattern': { fr: 'Apprendre le motif →', en: 'Learn the pattern →' },
+  // PR-17 (ADR-0075): post-puzzle play-out vs the bot.
+  'tactics.playout': { fr: 'Jouer la position contre le bot →', en: 'Play the position out vs the bot →' },
+  'tactics.playoutLabel': { fr: 'Suite de puzzle', en: 'Puzzle follow-up' },
   'tactics.openInLibrary': { fr: 'ouvrir dans la bibliothèque', en: 'open in library' },
   'tactics.whyMissGroup': { fr: 'Pourquoi avez-vous raté ?', en: 'Why did you miss?' },
   'tactics.whyMiss': { fr: 'Pourquoi avez-vous raté ? (optionnel)', en: 'Why did you miss? (optional)' },
@@ -195,6 +198,16 @@ export const tactics: Messages = {
     en: 'Game over — you matched {score}/{guesses} ({pct}).',
   },
   'guess.gameOver': { fr: 'Partie terminée — vous avez trouvé {score}/{guesses}.', en: 'Game over — you matched {score}/{guesses}.' },
+  // PR-14 (ADR-0072): guess-the-move on your own analysed games.
+  'guess.ownTitle': { fr: 'Vos parties analysées', en: 'Your analysed games' },
+  'guess.mastersTitle': { fr: 'Parties de maîtres', en: 'Master games' },
+  'guess.ownCard': { fr: '{result} · bot {elo} Elo', en: '{result} · bot {elo} Elo' },
+  'guess.ownNote': { fr: 'Rejouez-vous — ACPL {acpl}. Devinez vos propres coups.', en: 'Replay yourself — ACPL {acpl}. Guess your own moves.' },
+  'guess.ownHeader': { fr: 'Votre partie · {score}/{guesses} retrouvés', en: 'Your game · {score}/{guesses} matched' },
+  'guess.ownWasClassified': {
+    fr: "Vous l'aviez joué — et l'analyse l'avait classé {severity}.",
+    en: 'You played it — and the analysis classified it {severity}.',
+  },
   'guess.correct': { fr: 'Correct ! ✔', en: 'Correct! ✔' },
   'guess.theMoveWas': { fr: 'Le coup était {san}.', en: 'The move was {san}.' },
   'guess.revealMove': { fr: 'Révéler le coup', en: 'Reveal move' },

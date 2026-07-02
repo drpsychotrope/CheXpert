@@ -270,6 +270,63 @@ export const coach: Messages = {
   'insights.min60': { fr: '60 min', en: '60 min' },
   'insights.planItem': { fr: '{minutes} min · {activity}', en: '{minutes}m · {activity}' },
 
+  // PR-10 (ADR-0068): honesty badges + actionable Insights.
+  'radar.noData': { fr: 'Pas encore mesuré (aucune donnée)', en: 'Not measured yet (no data)' },
+  'coach.sampleSizes': { fr: 'Échantillons par motif :', en: 'Sample sizes per motif:' },
+  // PR-18 (ADR-0076): multi-day program.
+  'coach.spreadLabel': { fr: 'Étaler :', en: 'Spread:' },
+  'coach.spread1': { fr: 'une session', en: 'one session' },
+  'coach.spreadN': { fr: 'sur {n} jours', en: 'over {n} days' },
+  'home.programDay': { fr: 'Programme coach : jour {day}/{total}', en: 'Coach program: day {day}/{total}' },
+  'home.programGo': { fr: 'Lancer →', en: 'Start →' },
+
+  // PR-12 (ADR-0070): targeted motif re-probe + hot-measure label (I10).
+  'coach.reprobe': { fr: 'Re-vérifier {motif}', en: 'Re-check {motif}' },
+  'coach.reprobeDone': {
+    fr: '{motif} re-mesuré — le profil et la tendance sont à jour (les libellés forces/faiblesses se rafraîchissent à la prochaine évaluation complète).',
+    en: '{motif} re-measured — profile and trend updated (the strengths/weaknesses labels refresh at the next full assessment).',
+  },
+  'coach.reprobeFailed': {
+    fr: 'Re-mesure impossible (aucun problème servi) — réessayez.',
+    en: 'Could not re-measure (no puzzles served) — try again.',
+  },
+  'coach.reprobeHot': {
+    fr: 'Mesure à chaud : ce motif a été drillé il y a moins de 6 h — la récence peut gonfler le score. Descriptif, rien n\'est bloqué.',
+    en: 'Hot measure: this motif was drilled less than 6h ago — recency can inflate the score. Descriptive; nothing is blocked.',
+  },
+  'insights.learnPattern': { fr: 'Apprendre le pattern', en: 'Learn the pattern' },
+  'insights.sparTargeted': { fr: 'Sparring ciblé', en: 'Targeted sparring' },
+  'insights.redrill': { fr: 'Re-driller ce motif', en: 'Re-drill this motif' },
+
+  // PR-11 (ADR-0069): one soft metacog routing nudge (suggestion, never a grade).
+  'insights.nudgeRushed': {
+    fr: 'Vous taggez « précipité » sur {pct} de vos ratés — les tactiques chronométrées entraînent exactement ça : décider vite SANS se précipiter.',
+    en: 'You tag "rushed" on {pct} of your misses — timed tactics train exactly that: deciding fast WITHOUT rushing.',
+  },
+  'insights.nudgeRushedCta': { fr: 'Essayer les tactiques chronométrées', en: 'Try timed tactics' },
+  'insights.nudgeUnfamiliar': {
+    fr: 'Vous taggez « pattern inconnu » sur {pct} de vos ratés — parcourir les cartes-concepts avant de driller aide à les reconnaître.',
+    en: 'You tag "unfamiliar pattern" on {pct} of your misses — browsing the concept cards before drilling helps recognition.',
+  },
+  'insights.nudgeUnfamiliarCta': { fr: 'Voir les concepts', en: 'Browse the concepts' },
+  'insights.nudgeOverconfident': {
+    fr: 'Votre calibration penche vers la surconfiance : sur « sûr », vérifiez une réfutation de plus avant de jouer. (Pas de bouton — c\'est une habitude, pas un mode.)',
+    en: 'Your calibration leans overconfident: on "sure", check one more refutation before moving. (No button — it is a habit, not a mode.)',
+  },
+  'insights.nudgeDisclaimer': {
+    fr: 'Suggestion issue de vos propres tags — jamais une note, rien ne change sans votre clic.',
+    en: 'A suggestion from your own tags — never a grade; nothing changes without your click.',
+  },
+
+  // PR-04 (ADR-0062): rating-over-time charts.
+  'insights.ratingProgress': { fr: 'Classement dans le temps', en: 'Rating over time' },
+  'insights.gameRatingCurve': { fr: 'Partie — {pool}', en: 'Game — {pool}' },
+  'insights.puzzleRatingCurve': { fr: 'Problèmes (dernier point par jour)', en: 'Puzzles (last point per day)' },
+  'insights.ratingProgressNote': {
+    fr: "Échelle interne (Glicko face au bot local / aux problèmes) : comparez-vous à vous-même dans le temps, pas aux classements FIDE ou en ligne. Les parties non comptées (reprise de coup, difficulté forcée) n'apparaissent pas.",
+    en: 'Internal scale (Glicko vs the local bot / the puzzle pool): compare yourself to yourself over time, not to FIDE or online ratings. Un-counted games (takeback, forced difficulty) are not plotted.',
+  },
+
   'insights.progress': { fr: 'Progression', en: 'Progress' },
   'insights.windowsOfGames': { fr: '({n} fenêtres de parties)', en: '({n} windows of games)' },
   'insights.scorePerWindow': {

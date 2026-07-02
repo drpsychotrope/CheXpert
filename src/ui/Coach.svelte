@@ -23,6 +23,7 @@
     buildProbePlan,
     borderlineDepth,
     coarseEndgameSpec,
+    singleMotifPlan,
     COACH_PROBE_MAX_TOTAL,
     type ProbeSpec,
     type ProbeKind,
@@ -46,7 +47,11 @@
   import ColorPicker from './ColorPicker.svelte';
   import { resolveColor, type ColorChoice } from '../game/color';
   import { t, getLocale, fmtPct } from '../i18n';
-  import { labelOrRaw, gt } from '../i18n/gen';
+  import { labelOrRaw, gt, motifLabelOrRaw } from '../i18n/gen';
+  import { isHotMeasure } from '../coach/hotMeasure';
+  import { splitProgramDays, programIdOf, attemptedDays, nextProgramDay } from '../coach/multiday';
+  import { recentSessionLogs } from '../store/sessionLogRepo';
+  import type { PlanItem } from '../analysis/studyPlan';
   import { coachProfileFilename } from '../coach/funnel';
   import { downloadText } from './pgnDownload';
 
@@ -153,6 +158,8 @@
   // user picks). It drives BOTH the preview (below, $derived) AND the launched session (startCoaching/
   // resumeProgram stamp app.activeSession.budgetMin) — never cosmetic (AP-CPROG-1).
   let budget = $state(30);
+  // PR-18 (ADR-0076): spread the launched program over N days (1 = today's single session).
+  let spreadDays = $state(1);
   // CO10/CO17 inputs, loaded once at result time (the UI owns the async eco/analyses reads — the cores
   // stay pure, AP-CPROG-9). `coachAnalyses` is the window the profile was built from (history path) or
   // the single played game; `ecoTable` is the bundled CC0 opening table.
@@ -259,6 +266,9 @@
    *  resumable steps are stored; transient steps clear nothing (the last resumable snapshot stands). */
   function saveAssessment() {
     if (!RESUMABLE_STEPS.has(step)) return;
+    // PR-12: a targeted re-probe (seconds long) is NOT resumable — parking it would make the
+    // resume path commit a one-motif run as a FULL profile. Guard, don't snapshot.
+    if (reprobeTheme) return;
     app.coachAssessment = {
       step,
       plan: $state.snapshot(plan) as ProbeSpec[],
@@ -326,13 +336,42 @@
   /** Resume WITHOUT re-probing (Q-D / AP-CPROF-6): rebuild the program from the saved profile via the
    *  pure buildCoachProgram, then wrap it exactly like startCoaching. Reload-safe — derived from the
    *  persisted profile, not from the in-memory programPreview. No new persisted state (AP-CPROF-5). */
-  function resumeProgram() {
+  async function resumeProgram() {
     if (!saved) return;
+    // PR-18 (ADR-0076): a multi-day program resumes at its first unattempted day (progress derived
+    // from the sessionLog's I8 stamps). A completed program falls through to the classic resume.
+    if (saved.programDays?.length) {
+      try {
+        const attempted = attemptedDays(await recentSessionLogs(100), programIdOf(saved));
+        const day = nextProgramDay(saved.programDays.length, attempted);
+        if (day !== null) return startProgramDay(saved.programDays, day);
+      } catch {
+        /* log read hiccup — classic resume below */
+      }
+    }
     // Resume re-weights from the goal the saved profile was built with (C5 — persisted on the profile).
     // C7/CO5: honour the chosen budget here too (default 30 ⇒ byte-identical) and stamp it on the
     // session so Session.svelte runs the right budget (AP-CPROG-1). No named opening on the intro path.
     const plan = buildCoachProgram(saved, budget, getLocale(), saved.goal);
     app.activeSession = { plan: buildSession(plan), current: 0, startedAt: Date.now(), reflection: '', budgetMin: budget };
+    app.go('session');
+  }
+
+  /** PR-18: launch ONE day of the split program as a session, stamped with the I8 identity. */
+  function startProgramDay(days: PlanItem[][], day: number) {
+    const prof = app.model?.coachProfile;
+    if (!prof) return;
+    const items = days[day] ?? [];
+    const dayMin = items.reduce((s, i) => s + i.minutes, 0);
+    app.activeSession = {
+      plan: buildSession(items),
+      current: 0,
+      startedAt: Date.now(),
+      reflection: '',
+      budgetMin: dayMin || budget,
+      programId: programIdOf(prof),
+      day,
+    };
     app.go('session');
   }
 
@@ -515,12 +554,80 @@
 
   /** After all motif/endgame ladders: run the timed block if it was selected, else offer the game. */
   function afterLadders() {
+    // PR-12 (ADR-0070): a targeted re-probe never continues into timed/game — it merges and exits.
+    if (reprobeTheme) return void commitReprobe();
     if (pickTimed && plan.some((p) => p.kind === 'timed')) {
       startTimedBlock();
     } else {
       step = 'offer-game';
       saveAssessment(); // CF4: resumable at the offer step
     }
+  }
+
+  // ── PR-12 (ADR-0070, lifts coach-program-v2 D2): targeted motif re-probe ──
+  // One themed ladder, then a SURGICAL merge into the saved profile: only that MotifScore moves
+  // (baseline kept = the profile's, so deltas stay comparable); the full old profile becomes
+  // coachProfilePrev so the trend shows old→new for THIS motif (others read flat). Dimensions,
+  // assessedAt and the strengths/weaknesses labels are deliberately untouched — labels refresh at
+  // the next full re-assessment (documented in the spec).
+  let reprobeTheme = $state<string | null>(null);
+  let reprobeDone = $state('');
+  let reprobeHot = $state(false); // I10: the read happened right after drilling that motif
+
+  function startReprobe(theme: string) {
+    if (!saved || app.puzzles.size === 0) return;
+    app.coachAssessment = null; // a parked full assessment must not swallow this scoped run
+    reprobeTheme = theme;
+    reprobeDone = '';
+    reprobeHot = false;
+    plan = singleMotifPlan(theme);
+    themeIdx = 0;
+    totalSpent = 0;
+    probes.length = 0;
+    probeDims.length = 0;
+    probedDims = new Set();
+    activeProbe = null;
+    probeFeedback = '';
+    endgameAnyScored = false;
+    coarseAppended = false;
+    timedDim = null;
+    startNextLadder();
+  }
+
+  async function commitReprobe() {
+    const theme = reprobeTheme;
+    reprobeTheme = null;
+    const m = app.model;
+    const probe = theme ? probes.find((p) => p.theme === theme) : undefined;
+    if (!theme || !m?.coachProfile || !probe || probe.n === 0) {
+      reprobeDone = t('coach.reprobeFailed');
+      step = 'intro';
+      return;
+    }
+    const prof = m.coachProfile;
+    // I10: label (never block) a read taken right after drilling the same motif.
+    try {
+      reprobeHot = isHotMeasure(await allAttempts(), theme, Date.now());
+    } catch {
+      reprobeHot = false;
+    }
+    const merged = {
+      theme,
+      rating: probe.rating,
+      n: probe.n,
+      baseline: prof.puzzleRating, // keep the PROFILE baseline so deltas stay comparable
+      delta: probe.rating - prof.puzzleRating,
+    };
+    m.coachProfilePrev = prof;
+    m.coachProfile = {
+      ...prof,
+      motifs: prof.motifs.some((x) => x.theme === theme)
+        ? prof.motifs.map((x) => (x.theme === theme ? merged : x))
+        : [...prof.motifs, merged],
+    };
+    await app.persistModel(Date.now());
+    reprobeDone = t('coach.reprobeDone', { motif: motifLabelOrRaw(theme, getLocale()) });
+    step = 'intro';
   }
 
   // ── C2/CO15 timed block ──────────────────────────────────────────────────
@@ -844,6 +951,16 @@
 
   function startCoaching() {
     if (!profile) return;
+    // PR-18 (ADR-0076): spread the program across days when asked — split persisted on the
+    // profile (additive), day 1 launches now, progress derives from the sessionLog (I8).
+    if (spreadDays > 1) {
+      const days = splitProgramDays($state.snapshot(programPreview) as PlanItem[], budget, spreadDays);
+      if (app.model?.coachProfile && days.length) {
+        app.model.coachProfile.programDays = days;
+        void app.persistModel(Date.now());
+        return startProgramDay(days, 0);
+      }
+    }
     // C7/CO5: stamp the chosen budget so the launched Session honours it instead of a hardcoded 30
     // (AP-CPROG-1). The program preview already reflects `budget` (it is $derived on it).
     app.activeSession = { plan: buildSession(programPreview), current: 0, startedAt: Date.now(), reflection: '', budgetMin: budget };
@@ -900,6 +1017,33 @@
         </p>
         {#if savedStale}<p class="feedback">{t('coach.staleNudge', { days: COACH_STALE_DAYS })}</p>{/if}
         <Radar dimensions={saved.dimensions} />
+        <!-- PR-10/F18 (ADR-0068): per-motif sample sizes — the stored `n` finally shown, so a
+             thin diagnosis reads as thin (2 puzzles ≠ certainty). -->
+        {#if saved.motifs.length}
+          <p class="muted" style="font-size:0.75rem">
+            {t('coach.sampleSizes')} {saved.motifs.map((m) => `${motifLabelOrRaw(m.theme, getLocale())} ${m.n}`).join(' · ')}
+          </p>
+        {/if}
+        <!-- PR-12 (ADR-0070): targeted re-probe of a WEAK motif — drill it, then re-check just
+             that measurement (merges into the profile; a full re-assess stays one click away). -->
+        {#if saved.motifs.some((m) => m.delta < 0)}
+          <div class="row" style="gap:0.35rem;flex-wrap:wrap;justify-content:center">
+            {#each saved.motifs.filter((m) => m.delta < 0) as m (m.theme)}
+              <button
+                class="ghost"
+                style="font-size:0.75rem;padding:0.2rem 0.55rem"
+                disabled={app.puzzles.size === 0}
+                onclick={() => startReprobe(m.theme)}
+              >↻ {t('coach.reprobe', { motif: motifLabelOrRaw(m.theme, getLocale()) })}</button>
+            {/each}
+          </div>
+        {/if}
+        {#if reprobeDone}
+          <p class="feedback" style="font-size:0.8rem">{reprobeDone}</p>
+          {#if reprobeHot}
+            <p class="muted" style="font-size:0.75rem">{t('coach.reprobeHot')}</p>
+          {/if}
+        {/if}
         <div class="row" style="gap:1.5rem;align-items:flex-start">
           <div class="col"><b>{t('coach.strengths')}</b>{#each saved.strengths as s}<span>✔ {s}</span>{:else}<span class="muted">—</span>{/each}</div>
           <div class="col"><b>{t('coach.focusOn')}</b>{#each saved.weaknesses as w}<span>△ {w}</span>{:else}<span class="muted">—</span>{/each}</div>
@@ -1044,6 +1188,12 @@
     <div class="panel col center" style="gap:0.75rem;width:100%">
       <h3>{t('coach.profileTitle')}</h3>
       <Radar dimensions={profile.dimensions} />
+      <!-- PR-10/F18 (ADR-0068): per-motif sample sizes on the fresh result too. -->
+      {#if profile.motifs.length}
+        <p class="muted" style="font-size:0.75rem">
+          {t('coach.sampleSizes')} {profile.motifs.map((m) => `${motifLabelOrRaw(m.theme, getLocale())} ${m.n}`).join(' · ')}
+        </p>
+      {/if}
       <p class="muted" style="font-size:0.8rem">{t('coach.directional', { source: provenanceSource })}</p>
       <!-- CF8/FOLD-C3: when the calibration game's engine failed to boot, say so HONESTLY — the
            profile is puzzles-only, not the result of a deliberate Skip (AP-CFUNNEL-4). -->
@@ -1093,6 +1243,15 @@
             <option value={15}>{t('insights.min15')}</option>
             <option value={30}>{t('insights.min30')}</option>
             <option value={60}>{t('insights.min60')}</option>
+          </select>
+        </label>
+        <!-- PR-18 (ADR-0076): spread the program over days — one budget-sized session per day. -->
+        <label style="font-size:0.8rem;font-weight:normal" class="muted">
+          {t('coach.spreadLabel')}
+          <select bind:value={spreadDays} style="margin-left:0.3rem">
+            <option value={1}>{t('coach.spread1')}</option>
+            <option value={3}>{t('coach.spreadN', { n: 3 })}</option>
+            <option value={5}>{t('coach.spreadN', { n: 5 })}</option>
           </select>
         </label>
       </h4>

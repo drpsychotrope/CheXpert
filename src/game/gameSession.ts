@@ -162,6 +162,11 @@ export class GameSession {
   get turn(): PlayerColor {
     return this.game.turn === 'w' ? 'white' : 'black';
   }
+  /** Read-only copy of the played UCI list — the post-game debrief names the opening from it
+   *  (PR-03, ADR-0061); the book steering already consumed it internally. */
+  get uciMoves(): string[] {
+    return [...this.playedUci];
+  }
   /** The bot plays the side opposite the player. */
   get botSide(): Side {
     return this.playerSide === 'white' ? 'b' : 'w';

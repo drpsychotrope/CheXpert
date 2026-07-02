@@ -4,6 +4,8 @@
   import ConfirmDialog from './ConfirmDialog.svelte';
   import { coachProfileFilename } from '../coach/funnel';
   import { downloadText } from './pgnDownload';
+  import { exportAll, importAll, validateBackup, backupFilename, type BackupFile, type BackupError } from '../store/backup';
+  import { setSoundEnabled, playSound } from './sound';
   import { t, getLocale, type Locale } from '../i18n';
 
   const settings = $derived(app.settings);
@@ -22,7 +24,46 @@
     await app.persistModel(Date.now());
   }
   // Themed, non-blocking confirmations instead of native confirm() (audit v2 W14/H39).
-  let confirmKind = $state<null | 'network' | 'wipe'>(null);
+  let confirmKind = $state<null | 'network' | 'wipe' | 'import'>(null);
+
+  // PR-01 data-backup (ADR-0059): full-profile export + replace-everything restore.
+  // The parsed+validated backup waits here while the ConfirmDialog asks; Date.now() stays at
+  // this boundary (AP-BACKUP-5) and the DOM file-read stays out of the store core.
+  let pendingBackup = $state<BackupFile | null>(null);
+  let importError = $state('');
+  let fileInput: HTMLInputElement | undefined = $state();
+
+  const IMPORT_ERR_KEY: Record<BackupError, string> = {
+    'not-a-backup': 'settings.importErrNotBackup',
+    'newer-schema': 'settings.importErrNewer',
+    malformed: 'settings.importErrMalformed',
+  };
+
+  async function exportBackup() {
+    const now = Date.now();
+    downloadText(await exportAll(now), backupFilename(now));
+  }
+
+  async function onBackupFile(e: Event) {
+    importError = '';
+    const file = (e.currentTarget as HTMLInputElement).files?.[0];
+    (e.currentTarget as HTMLInputElement).value = ''; // re-selecting the same file re-fires change
+    if (!file) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await file.text());
+    } catch {
+      importError = t('settings.importErrNotBackup');
+      return;
+    }
+    const v = validateBackup(parsed);
+    if (!v.ok) {
+      importError = t(IMPORT_ERR_KEY[v.error]);
+      return;
+    }
+    pendingBackup = v.backup;
+    confirmKind = 'import';
+  }
 
   async function toggleCoached() {
     if (!settings) return;
@@ -48,6 +89,17 @@
   async function toggleTakeback() {
     if (!settings) return;
     settings.takebackInPlay = !(settings.takebackInPlay ?? false);
+    await app.persistSettings();
+  }
+
+  // PR-05 (ADR-0063): the sound kill-switch (Q-F=a — ON by default). The module flag is synced
+  // here AND at boot so playSound sites never read Settings themselves.
+  async function toggleSound() {
+    if (!settings) return;
+    const next = !(settings.soundEnabled ?? true);
+    settings.soundEnabled = next;
+    setSoundEnabled(next);
+    if (next) playSound('move'); // audible confirmation the switch works
     await app.persistSettings();
   }
 
@@ -87,8 +139,32 @@
     } else if (kind === 'wipe') {
       await clearAllData();
       location.reload();
+    } else if (kind === 'import') {
+      if (!pendingBackup) return;
+      await importAll(pendingBackup);
+      pendingBackup = null;
+      // Reload so every in-memory state (model, settings, caches) rehydrates from the restored
+      // stores — the exact pattern the wipe uses.
+      location.reload();
     }
   }
+
+  // Dialog copy per kind (3 states now — the binary ternaries stopped scaling).
+  const dialogTitle = $derived(
+    confirmKind === 'wipe' ? t('settings.wipeTitle')
+    : confirmKind === 'import' ? t('settings.importTitle')
+    : t('settings.allowTitle'),
+  );
+  const dialogBody = $derived(
+    confirmKind === 'wipe' ? t('settings.wipeBody')
+    : confirmKind === 'import' ? t('settings.importBody')
+    : t('settings.allowBody'),
+  );
+  const dialogConfirm = $derived(
+    confirmKind === 'wipe' ? t('settings.wipeConfirm')
+    : confirmKind === 'import' ? t('settings.importConfirm')
+    : t('settings.allowConfirm'),
+  );
 </script>
 
 <section class="col" style="max-width:560px;margin:0 auto">
@@ -142,6 +218,15 @@
   </div>
 
   <div class="panel col">
+    <h3>{t('settings.sound')}</h3>
+    <label class="row" style="flex-direction:row;align-items:center;gap:0.6rem">
+      <input type="checkbox" checked={settings?.soundEnabled ?? true} onchange={toggleSound} />
+      {t('settings.soundLabel')}
+    </label>
+    <p class="muted" style="font-size:0.85rem">{t('settings.soundHint')}</p>
+  </div>
+
+  <div class="panel col">
     <h3>{t('settings.training')}</h3>
     <label class="row" style="flex-direction:row;align-items:center;gap:0.6rem">
       {t('settings.dailyGoalLabel')}
@@ -178,16 +263,31 @@
     {#if model?.coachProfile}
       <button class="ghost" onclick={exportCoachProfile}>{t('coach.exportProfile')}</button>
     {/if}
+    <!-- PR-01 (ADR-0059): full-profile backup + restore. Restore = replace-everything after an
+         explicit themed confirmation; a bad file surfaces a typed error, never a silent no-op. -->
+    <button class="ghost" onclick={exportBackup}>{t('settings.exportAll')}</button>
+    <p class="muted" style="font-size:0.85rem">{t('settings.exportAllHint')}</p>
+    <button class="ghost" onclick={() => fileInput?.click()}>{t('settings.importAll')}</button>
+    <input
+      type="file"
+      accept="application/json,.json"
+      style="display:none"
+      bind:this={fileInput}
+      onchange={onBackupFile}
+    />
+    {#if importError}
+      <p class="muted" style="font-size:0.85rem;color:var(--bad)">{importError}</p>
+    {/if}
     <button onclick={wipe} style="background:var(--bad)">{t('settings.deleteData')}</button>
   </div>
 
   <ConfirmDialog
     open={confirmKind !== null}
-    title={confirmKind === 'wipe' ? t('settings.wipeTitle') : t('settings.allowTitle')}
-    body={confirmKind === 'wipe' ? t('settings.wipeBody') : t('settings.allowBody')}
-    confirmLabel={confirmKind === 'wipe' ? t('settings.wipeConfirm') : t('settings.allowConfirm')}
-    danger={confirmKind === 'wipe'}
+    title={dialogTitle}
+    body={dialogBody}
+    confirmLabel={dialogConfirm}
+    danger={confirmKind === 'wipe' || confirmKind === 'import'}
     onConfirm={onConfirm}
-    onCancel={() => (confirmKind = null)}
+    onCancel={() => { confirmKind = null; pendingBackup = null; }}
   />
 </section>

@@ -79,6 +79,27 @@ export const play: Messages = {
   'play.adaptEasier': { fr: 'Le bot sera plus faible la prochaine fois (−{delta} Elo).', en: 'The bot will be easier next game (−{delta} Elo).' },
   'play.adaptUnchanged': { fr: 'La force du bot est inchangée pour la prochaine partie.', en: "The bot's strength is unchanged for the next game." },
 
+  // PR-03 (ADR-0061): post-game debrief card — surfaces what the game end already computed.
+  'play.debrief.title': { fr: 'Bilan de la partie', en: 'Game debrief' },
+  'play.debrief.rating': { fr: 'Votre classement', en: 'Your rating' },
+  'play.debrief.winRate': { fr: 'Forme récente', en: 'Recent form' },
+  'play.debrief.winRateVal': {
+    fr: '{pct} % sur vos {n} dernières (cible ~{target} %)',
+    en: '{pct}% over your last {n} (target ~{target}%)',
+  },
+  'play.debrief.opening': { fr: 'Ouverture', en: 'Opening' },
+  'play.debrief.clock': { fr: 'Temps', en: 'Time' },
+  'play.debrief.clockVal': {
+    fr: 'vous {you} (moy. {avg} s/coup) · bot {bot}',
+    en: 'you {you} (avg {avg}s/move) · bot {bot}',
+  },
+  // PR-05 (ADR-0063): sober personal-best line (set with the milestone cue).
+  'play.newRatingBest': { fr: 'Nouveau record personnel : {rating} !', en: 'New personal best: {rating}!' },
+  'play.debrief.note': {
+    fr: "Le bot vise ~55 % de victoires pour vous : c'est la zone où l'on progresse le plus.",
+    en: 'The bot aims for you to win ~55% of games: the zone where you improve fastest.',
+  },
+
   'play.opponentLabel': { fr: 'Adversaire :', en: 'Opponent:' },
   'play.opponentHuman': { fr: 'Type humain (coups variés)', en: 'Human-like (varied moves)' },
   'play.opponentEngine': { fr: 'Moteur (meilleurs coups)', en: 'Engine (best moves)' },

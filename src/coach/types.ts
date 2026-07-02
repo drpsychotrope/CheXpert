@@ -47,4 +47,9 @@ export interface CoachProfile {
   // byte-identical). Persisted so a re-run can pre-select it. Mirrors `conceptSeen?`/`coachProfile?` —
   // NO `DB_VERSION` bump (AP-CINTAKE-7).
   goal?: CoachGoal;
+  /** PR-18 (ADR-0076, lifts the ADR-0045 multi-day deferral): the program split across days
+   *  (greedy within the daily budget, worst-first order preserved). Progress is DERIVED from the
+   *  sessionLog (programId/day, ratified I8) — never duplicated here. Additive optional; absent =
+   *  single-session program (byte-identical legacy behaviour). Plain data, clone-safe. */
+  programDays?: import('../analysis/studyPlan').PlanItem[][];
 }

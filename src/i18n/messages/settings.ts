@@ -59,17 +59,51 @@ export const settings: Messages = {
     en: 'Allow network for the Syzygy endgame tablebase',
   },
   'settings.networkHint': {
-    fr: "Le retour parfait du trainer de finales vient de l'API Syzygy de Lichess. Désactivé, les finales fonctionnent quand même contre le moteur — sans la notation parfaite de la table. Activé, seule la position (un FEN) est envoyée ; les résultats sont mis en cache pour ne récupérer chaque position qu'une fois.",
-    en: "The endgame trainer's perfect feedback comes from the Lichess Syzygy API. With this off, endgame drills still work against the engine — you just won't get tablebase-perfect move grading. When on, only the position (a FEN) is sent; results are cached so each position is fetched at most once.",
+    fr: "Couvre les deux seules fonctions réseau : la table Syzygy du trainer de finales (envoie une position — un FEN) et la récupération de vos parties Lichess (envoie votre pseudo). Désactivé, les finales fonctionnent quand même contre le moteur et l'import reste possible par fichier/collage. Les résultats Syzygy sont mis en cache pour ne récupérer chaque position qu'une fois.",
+    en: 'Covers the only two network features: the endgame trainer\'s Syzygy tablebase (sends a position — a FEN) and the Lichess games fetch (sends your username). With this off, endgame drills still work against the engine and importing still works by file/paste. Syzygy results are cached so each position is fetched at most once.',
   },
   'settings.networkStatus': { fr: 'Réseau : {state}', en: 'Network: {state}' },
   'settings.on': { fr: 'activé', en: 'on' },
   'settings.off': { fr: 'désactivé', en: 'off' },
 
+  // PR-05 (ADR-0063): synthesized sounds toggle (ON by default, Q-F=a).
+  'settings.sound': { fr: 'Sons', en: 'Sound' },
+  'settings.soundLabel': { fr: "Sons de l'interface (coups, fin de partie, jalons)", en: 'Interface sounds (moves, game end, milestones)' },
+  'settings.soundHint': {
+    fr: 'Courts et discrets, synthétisés localement (aucun fichier audio). Coupez-les ici en un clic.',
+    en: 'Short and subtle, synthesized locally (no audio files). Kill them here in one click.',
+  },
+
   'settings.yourData': { fr: 'Vos données', en: 'Your data' },
   'settings.rerunEval': { fr: "Refaire l'évaluation de niveau", en: 'Re-run skill evaluation' },
   'settings.rerunCoach': { fr: "Refaire l'évaluation du coach", en: 'Re-run coaching assessment' },
   'settings.deleteData': { fr: 'Supprimer toutes mes données', en: 'Delete all my data' },
+
+  // PR-01 data-backup (ADR-0059): full-profile export / replace-everything restore.
+  'settings.exportAll': { fr: 'Exporter toutes mes données (JSON)', en: 'Export all my data (JSON)' },
+  'settings.exportAllHint': {
+    fr: "Sauvegarde locale complète : parties, analyses, classements, historique de problèmes, SRS, répertoire, réglages. Les problèmes du set intégré et le cache de finales (re-téléchargeables) n'en font pas partie.",
+    en: 'Complete local backup: games, analyses, ratings, puzzle history, SRS, repertoire, settings. The bundled puzzle set and the endgame cache (both re-downloadable) are not included.',
+  },
+  'settings.importAll': { fr: 'Restaurer depuis une sauvegarde…', en: 'Restore from a backup…' },
+  'settings.importTitle': { fr: 'Restaurer cette sauvegarde ?', en: 'Restore this backup?' },
+  'settings.importBody': {
+    fr: 'Cela remplace TOUTES les données locales actuelles par le contenu de la sauvegarde (parties, classements, historique, réglages). Irréversible. Les problèmes du set intégré se rechargeront automatiquement.',
+    en: 'This replaces ALL current local data with the backup contents (games, ratings, history, settings). This cannot be undone. The bundled puzzle set reloads automatically.',
+  },
+  'settings.importConfirm': { fr: 'Restaurer', en: 'Restore' },
+  'settings.importErrNotBackup': {
+    fr: "Ce fichier n'est pas une sauvegarde Chess Trainer.",
+    en: 'This file is not a Chess Trainer backup.',
+  },
+  'settings.importErrNewer': {
+    fr: "Sauvegarde créée par une version plus récente de l'app — mettez d'abord l'app à jour.",
+    en: 'Backup created by a newer app version — update the app first.',
+  },
+  'settings.importErrMalformed': {
+    fr: 'Sauvegarde illisible (fichier corrompu ou incomplet).',
+    en: 'Unreadable backup (corrupted or incomplete file).',
+  },
 
   'settings.wipeTitle': { fr: 'Tout supprimer ?', en: 'Delete all data?' },
   'settings.wipeBody': {

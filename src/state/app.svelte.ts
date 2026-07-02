@@ -57,7 +57,21 @@ class AppState {
    *  `budgetMin` (C7/CO5): the chosen coach budget (15/30/60), so Session.svelte honours the toggle
    *  instead of a hardcoded 30 (AP-CPROG-1). Optional — Insights' generic session path omits it
    *  (Session falls back to 30). In-memory only → no DB_VERSION concern. */
-  activeSession = $state<{ plan: SessionPlan; current: number; startedAt: number; reflection: string; budgetMin?: number } | null>(null);
+  activeSession = $state<{
+    plan: SessionPlan;
+    current: number;
+    startedAt: number;
+    reflection: string;
+    budgetMin?: number;
+    /** PR-09 (ADR-0067): per-step outcomes recorded at advance time (index-aligned with
+     *  plan.steps; missing entry = never reached). In-memory like the rest; persisted as a
+     *  SessionLogRecord when the session finishes. */
+    stepResults?: Array<{ done: boolean; capReached: boolean }>;
+    /** PR-18 (ADR-0076): stamped when this session IS one day of a multi-day coach program —
+     *  written into the sessionLog (the I8 fields) so program progress derives from the log. */
+    programId?: string;
+    day?: number;
+  } | null>(null);
   /** In-progress coach assessment (C8/CF4, in-memory; survives view swaps; NOT persisted by default
    *  — mirrors `activeSession`). Lets the wizard RESUME after navigating away mid-assessment instead
    *  of silently losing every probe. Carries the wizard cursor: `step`, the built à-la-carte `plan`
@@ -75,6 +89,9 @@ class AppState {
   coachOfferDismissed = $state(false);
   /** Set by a coach 'sparring' program step; consumed once by Sparring.svelte to auto-open a scenario. */
   sparringScenarioId = $state<string | null>(null);
+  /** PR-17 (ADR-0075): an ad-hoc play-out position (post-puzzle "play it out vs the bot").
+   *  Consumed once by Sparring.svelte; NOT persisted (mirrors the other one-shot signals). */
+  sparringCustomFen = $state<{ fen: string; sideToTrain: 'w' | 'b'; label: string } | null>(null);
   /** Set by a coach 'play-steered' program step; consumed once by Play.svelte to override the steer dimension. */
   steerDimension = $state<import('../analysis/weakness').Dimension | null>(null);
   /** Due SRS cards (puzzle + repertoire) for the Home/Review badge — the loop's re-engagement
@@ -95,6 +112,9 @@ class AppState {
       this.settings = await loadSettings();
       // Apply the persisted UI language before the first render (V2-W18). Default FR.
       setLocaleState(this.settings.locale ?? 'fr');
+      // PR-05 (ADR-0063): sync the sound kill-switch (ON by default, Q-F=a) before any board mounts.
+      const { setSoundEnabled } = await import('../ui/sound');
+      setSoundEnabled(this.settings.soundEnabled ?? true);
       await this.puzzles.init();
       await this.refreshDue(now);
       await this.refreshUnanalyzed();

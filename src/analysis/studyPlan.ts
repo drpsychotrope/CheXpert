@@ -49,6 +49,10 @@ export interface StudyPlanOpts {
   visionWeakSquares?: string[];
   /** UI locale for the `reason` display strings (V2-W18). `focus`/`activity` stay English routing keys. */
   locale?: Locale;
+  /** PR-09 (ADR-0067): focuses completed in the LAST logged session. Matching leak items are
+   *  moved to the END of the plan — deprioritized, never dropped (the leak is still real; today
+   *  just leads with what's left). Warm-up/resilience blocks are untouched. */
+  deprioritizeFocus?: string[];
 }
 
 /** Build a single day's plan (≤ minutesPerDay), worst-impact leaks first. */
@@ -79,7 +83,14 @@ export function buildStudyPlan(
     used += m;
   }
 
-  for (const leak of leaks) {
+  // PR-09: stable partition — leaks whose focus was completed last session go LAST (same order
+  // within each group), so the day leads with what's left without ever hiding a real leak.
+  const deprio = new Set(opts.deprioritizeFocus ?? []);
+  const ordered = deprio.size
+    ? [...leaks.filter((l) => !deprio.has(activityForLeak(l).focus)), ...leaks.filter((l) => deprio.has(activityForLeak(l).focus))]
+    : leaks;
+
+  for (const leak of ordered) {
     if (used >= minutesPerDay) break;
     const { activity, focus } = activityForLeak(leak);
     const m = Math.min(Math.max(5, Math.round(leak.count)), minutesPerDay - used);

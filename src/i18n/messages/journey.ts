@@ -80,9 +80,25 @@ export const journey: Messages = {
     fr: 'Réfléchissez-y ~20 s — puis terminez quand vous êtes prêt.',
     en: 'Sit with it for ~20s — then finish whenever you are ready.',
   },
-  'session.notesNotSaved': {
-    fr: 'Les notes sont affichées ici seulement et ne sont pas enregistrées.',
-    en: 'Notes are shown here only and are not saved.',
+  // PR-09 (ADR-0067, supersedes ADR-0039 Q-B): the note now persists into your session log.
+  'session.notesSaved': {
+    fr: 'Vos notes sont enregistrées dans votre journal de session (local, comme tout le reste).',
+    en: 'Your notes are saved into your session log (local, like everything else).',
+  },
+  'session.recapTitle': { fr: 'Bilan de la session', en: 'Session recap' },
+  'session.recapSteps': { fr: 'Étapes', en: 'Steps' },
+  'session.recapStepsVal': { fr: '{done} / {total} terminées', en: '{done} / {total} done' },
+  'session.recapStreak': { fr: 'Série', en: 'Streak' },
+  'session.recapStreakVal': { fr: '🔥 {n} jours', en: '🔥 {n} days' },
+  'session.recapNotes': { fr: 'Notes', en: 'Notes' },
+  'session.recapNotesSaved': { fr: 'enregistrées ✓', en: 'saved ✓' },
+  'session.recapAllDone': {
+    fr: 'Session complète — la prochaine mènera avec ce qui reste à travailler.',
+    en: 'Full session — the next one will lead with what is left to work on.',
+  },
+  'session.recapPartial': {
+    fr: 'Les étapes terminées sont lues par le prochain plan (elles passent en fin de liste, jamais supprimées).',
+    en: 'Completed steps are read by the next plan (moved to the end of the list, never dropped).',
   },
   'session.finish': { fr: 'Terminer', en: 'Finish' },
   'session.stepHeader': { fr: '{minutes} min · {kind}', en: '{minutes}m · {kind}' },
@@ -148,6 +164,11 @@ export const journey: Messages = {
   'sparring.backToScenarios': { fr: '← Scénarios', en: '← Scenarios' },
   'sparring.resign': { fr: 'Abandonner', en: 'Resign' },
   'sparring.engineFailedToStart': { fr: 'Le moteur n’a pas pu démarrer : {error}', en: 'Engine failed to start: {error}' },
+  // PR-17 (ADR-0075): ad-hoc post-puzzle play-out.
+  'sparring.playoutGoal': {
+    fr: 'Continuez la position contre le bot — convertissez ce que le puzzle a gagné (partie non comptée).',
+    en: 'Play the position out against the bot — convert what the puzzle won (un-counted game).',
+  },
   'sparring.engineIllegalMove': {
     fr: 'Le moteur a renvoyé un coup illégal — partie interrompue.',
     en: 'Engine returned an illegal move — game halted.',
@@ -224,6 +245,13 @@ export const journey: Messages = {
   'concepts.showAll': { fr: 'tout afficher', en: 'show all' },
   'concepts.noCards': { fr: 'Aucune carte de concept disponible.', en: 'No concept cards available.' },
   'concepts.dismiss': { fr: 'fermer', en: 'dismiss' },
+  // PR-19a (ADR-0077): teach-then-try on the first example.
+  'concepts.tryPrompt': { fr: 'À vous de jouer — trouvez le coup du motif.', en: 'Your turn — find the motif move.' },
+  'concepts.trySolved': { fr: 'Trouvé ✔', en: 'Found it ✔' },
+  'concepts.tryWrong': { fr: 'Pas celui-là — cherchez le motif.', en: 'Not that one — look for the motif.' },
+  'concepts.tryReveal': { fr: 'Montrer le coup', en: 'Show the move' },
+  // PR-19b (ADR-0077): due concept refreshers in the library.
+  'concepts.dueLine': { fr: 'À revoir aujourd’hui :', en: 'Due for a refresh today:' },
 
   // ── Review (spaced repetition) ─────────────────────────────────────────────
   'review.title': { fr: 'Révision', en: 'Review' },

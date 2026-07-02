@@ -256,6 +256,17 @@ export class EngineClient {
     });
   }
 
+  /** Put the engine in Chess960 mode (PR-20, ADR-0078) — the analysis counterpart of
+   *  resetVariant. Idempotent; callers pair it with a finally-resetVariant so a 960 analysis can
+   *  never leave the shared engine in the wrong mode (the audit v2 C-1 failure class). */
+  async setChess960(): Promise<void> {
+    await this.init();
+    return this.enqueue(async () => {
+      this.setOption('UCI_Chess960', true);
+      await this.isready();
+    });
+  }
+
   /** Apply UCI options SERIALIZED with respect to the search queue, then wait for readyok. Use
    *  this (not bare setOption) when a search may be in flight, so option writes never interleave
    *  with a running search (audit v2 L8). */

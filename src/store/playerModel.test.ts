@@ -17,7 +17,7 @@ describe('PlayerModel.conceptSeen (additive, no DB bump)', () => {
   beforeEach(resetDb);
 
   it('does NOT bump the schema version (still v4)', () => {
-    expect(DB_VERSION).toBe(4);
+    expect(DB_VERSION).toBe(5); // v5 = +sessionLog (PR-09, ADR-0067); additive fields still never bump
   });
 
   it('freshPlayerModel seeds conceptSeen to an empty array', () => {
@@ -48,7 +48,7 @@ describe('PlayerModel T3 retention (additive, schemaRev 1→2, no DB bump — AP
   beforeEach(resetDb);
 
   it('DB_VERSION stays 4; CURRENT_PLAYER_SCHEMA_REV is 2', () => {
-    expect(DB_VERSION).toBe(4);
+    expect(DB_VERSION).toBe(5); // v5 = +sessionLog (PR-09, ADR-0067); additive fields still never bump
     expect(CURRENT_PLAYER_SCHEMA_REV).toBe(2);
   });
 
@@ -108,7 +108,7 @@ describe('SettingsRecord.autoAnalyzeOnFinish (additive, no DB bump — P1, AP-PL
   beforeEach(resetDb);
 
   it('DB_VERSION stays 4 and freshSettings omits the opt-in field (reads false via ??)', () => {
-    expect(DB_VERSION).toBe(4);
+    expect(DB_VERSION).toBe(5); // v5 = +sessionLog (PR-09, ADR-0067); additive fields still never bump
     expect(freshSettings().autoAnalyzeOnFinish).toBeUndefined();
     expect(freshSettings().autoAnalyzeOnFinish ?? false).toBe(false);
   });

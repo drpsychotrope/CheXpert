@@ -47,15 +47,26 @@ Everything runs in the browser. Nothing leaves your device by default.
 - **Time controls** — pick a clock on the Play screen (Bullet 1+0/2+1, Blitz 3+2/5+0, Rapid 10+0/15+10,
   Classical 30+0, or No clock). Both sides have a Fischer-increment clock; flag and you lose on time —
   unless your opponent has no mating material, which is a draw (FIDE Art. 6.9). The bot plays to its own
-  clock (snappy in bullet, deliberate in classical). Your **game rating is per time control** — a bullet
+  clock (snappy in bullet, deliberate in classical). Timed games persist **per-move clocks** (`%clk`,
+  like a Lichess export) so your own games feed the time-management diagnosis, and every counted game
+  records your **rating before/after** (ADR-0060). Your **game rating is per time control** — a bullet
   result no longer moves your classical number. The headline rating shown elsewhere is your classical pool;
   the practice drills (Comeback/Sparring) remain untimed = classical.
-- **Coached mode** — optional engine check that flags an apparent blunder right after you play it and offers a take-back (best-effort; pre-move alerts come in Phase 2).
+- **Coached mode** — optional engine check that flags an apparent blunder right after you play it
+  and offers a take-back, plus an **automatic pre-move risk alert** at the start of your turn in
+  rapid/classical/untimed games (never bullet/blitz; only "risky" ever auto-shows — ADR-0080).
 - **Chess960 (Wild)** — play a random Fischer-random position or a specific SP-ID (0–959) against
-  the adaptive bot. Castle by dragging the king onto its own rook. v1 is untimed and not yet
-  auto-analysed (the standard analysis pipeline assumes opening theory; see ADR-0041).
+  the adaptive bot, **with clocks, either color, and full local analysis** (the game replays
+  through the app's own 960 rules shim and the engine runs `UCI_Chess960`; opening/theory modules
+  simply don't apply). Personal puzzles are mined from castling-rights-free positions. Castle by
+  dragging the king onto its own rook (ADR-0078, superseding ADR-0041's v1 limits).
 - **One-click review** — after a game, *Analyse this game* runs the full local analysis (puzzles +
   weakness dashboard) with no PGN to copy or paste.
+- **Post-game debrief & progress** — every game ends on a debrief card (rating before→after,
+  recent form vs the ~55% target band, the opening you actually played, per-side time), and
+  Insights draws your **rating over time** per pool plus a day-bucketed puzzle-rating curve
+  (internal scale, honestly labeled). Subtle **synthesized sounds** (moves, game end, personal
+  bests, streak milestones) ship on by default with a one-click kill-switch (ADR-0061/0062/0063).
 - **In-game move list, rematch, confirm-resign, opt-in takeback, on-demand move check** — a
   scrollable, auto-following SAN move list reads the game back as you play; *Rematch* restarts with the
   same color/clock/variant; *Resign* asks first; an opt-in *Take back* (Settings) undoes your move and
@@ -300,10 +311,17 @@ is fetched at most once. Settings → *Delete all my data* wipes every store plu
 Everything stays on your device. Your games, puzzle history, ratings, and player model live in your
 browser's IndexedDB. Nothing is sent anywhere by default.
 
-The **only** feature that makes a network call is the endgame trainer's Syzygy tablebase lookup
-(Lichess API). It is **off by default**, enabled only with your explicit consent in Settings, sends
-only the board position (a FEN — no identity, no account), and caches every result so a position is
-fetched at most once. With it off, endgame drills still work against the engine.
+Exactly **two** features make network calls, both behind the same **off-by-default** consent
+switch in Settings: the endgame trainer's Syzygy tablebase lookup (sends only the board position —
+a FEN — and caches every result so a position is fetched at most once), and the optional **Lichess
+games fetch** on the Import screen (sends only the username you type to the public export API — no
+account, no token; ADR-0065). With the switch off, endgame drills still work against the engine and
+importing still works by file or paste.
+
+Because everything lives in browser storage, Settings → *Your data* offers a full local
+**backup/restore**: one JSON file with every store (games, analyses, ratings, SRS, repertoire,
+settings). The bundled puzzle set and the Syzygy cache are excluded — both re-download automatically.
+Restoring replaces all current data after an explicit confirmation (ADR-0059).
 
 ---
 
